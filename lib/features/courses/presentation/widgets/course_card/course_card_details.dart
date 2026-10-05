@@ -1,0 +1,69 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:pythagoras/core/theme/styles.dart';
+import 'package:pythagoras/core/theme/light_colors.dart';
+import 'package:pythagoras/core/widgets/custom_text.dart';
+import 'package:pythagoras/features/courses/domain/entities/course.dart';
+
+class CourseCardDetails extends StatelessWidget {
+  final Course course;
+
+  const CourseCardDetails({super.key, required this.course});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.all(16.w),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppText(
+            course.title,
+            style: font16w700.copyWith(color: const Color(0xFF1E1E2D)),
+            maxLines: 2,
+          ),
+          SizedBox(height: 12.h),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Price (Right side in RTL)
+              Row(
+                children: [
+                  AppText(
+                    course.price.toStringAsFixed(2),
+                    style: font16w700.copyWith(
+                      color: AppLightColors.primary,
+                    ),
+                  ),
+                  SizedBox(width: 4.w),
+                  AppText(
+                    course.currencyLabel ?? "دينار كويتي",
+                    style: font14w600.copyWith(
+                      color: AppLightColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+              // Arrow button (Left side in RTL)
+              Container(
+                width: 32.w,
+                height: 32.w,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFCEEFA),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.arrow_forward,
+                    color: AppLightColors.primary,
+                    size: 16.sp,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
