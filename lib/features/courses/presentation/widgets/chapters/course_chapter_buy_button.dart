@@ -7,6 +7,7 @@ class CourseChapterBuyButton extends StatelessWidget {
   final String currencyLabel;
   final VoidCallback? onPressed;
   final bool isEnrolled;
+  final String requestStatus;
 
   const CourseChapterBuyButton({
     super.key,
@@ -14,6 +15,7 @@ class CourseChapterBuyButton extends StatelessWidget {
     required this.currencyLabel,
     this.onPressed,
     required this.isEnrolled,
+    this.requestStatus = 'not_requested',
   });
 
   @override
@@ -24,8 +26,10 @@ class CourseChapterBuyButton extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 16.h),
       child: AppButton(
-        text: isEnrolled ? 'عرض الحصة' : 'شراء الحصة ($parsedPrice $currencyLabel)',
-        onPressed: onPressed ?? () {},
+        text: isEnrolled
+            ? 'عرض الحصة'
+            : (requestStatus == 'pending' ? 'قيد الانتظار' : 'شراء الحصة ($parsedPrice $currencyLabel)'),
+        onPressed: requestStatus == 'pending' ? () {} : (onPressed ?? () {}),
         radius: 12.r,
         textSize: 15.sp,
         height: 48.h,

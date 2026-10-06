@@ -21,8 +21,11 @@ class HomeHeader extends StatelessWidget {
     final prefs = sl<PreferencesStorage>();
     return BlocBuilder<ProfileCubit, ProfileState>(
       builder: (context, state) {
-        String fullName = prefs.getUserName() ?? 'طالب';
-        String branchName = prefs.getBranchName() ?? 'طالبنا المميز';
+        final token = prefs.getUserToken();
+        final isGuest = token == null || token.isEmpty;
+
+        String fullName = isGuest ? 'يا ضيف' : (prefs.getUserName() ?? 'طالب');
+        String branchName = isGuest ? 'تصفح كورساتنا الآن' : (prefs.getBranchName() ?? 'طالبنا المميز');
         String? avatarUrl;
         int? classId;
 
@@ -40,7 +43,7 @@ class HomeHeader extends StatelessWidget {
         }
 
         // Override with loaded state if available
-        if (state is ProfileLoaded) {
+        if (state is ProfileLoaded && !isGuest) {
           fullName = state.userProfile.name;
           if (state.userProfile.profilePictureUrl != null &&
               state.userProfile.profilePictureUrl!.isNotEmpty) {

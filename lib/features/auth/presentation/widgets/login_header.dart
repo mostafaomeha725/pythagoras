@@ -6,6 +6,7 @@ import 'package:pythagoras/core/theme/styles.dart';
 import 'package:pythagoras/core/widgets/app_asset.dart';
 import 'package:pythagoras/core/widgets/bouncing_widgets.dart';
 import 'package:pythagoras/core/widgets/custom_text.dart';
+import 'package:go_router/go_router.dart';
 
 class LoginHeader extends StatelessWidget {
   const LoginHeader({super.key});
@@ -23,7 +24,9 @@ class LoginHeader extends StatelessWidget {
           child: BounceIt(
             child: InkWell(
               onTap: () {
-                // Handle back navigation
+                if (context.canPop()) {
+                  context.pop();
+                }
               },
               borderRadius: BorderRadius.circular(50.r),
               child: Container(

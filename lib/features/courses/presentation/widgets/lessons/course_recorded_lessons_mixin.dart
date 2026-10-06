@@ -33,6 +33,7 @@ mixin CourseRecordedLessonsMixin on State<CourseRecordedLessonsScreenBody> {
             selectedLesson = chapter.videos.first;
             selectedChapterId = chapter.id;
           });
+          _completeSelectedLessonOnLoad(selectedLesson!, chapter.id);
           return;
         }
       }
@@ -45,8 +46,19 @@ mixin CourseRecordedLessonsMixin on State<CourseRecordedLessonsScreenBody> {
           selectedLesson = chapter.videos.first;
           selectedChapterId = chapter.id;
         });
+        _completeSelectedLessonOnLoad(selectedLesson!, chapter.id);
         break;
       }
+    }
+  }
+
+  void _completeSelectedLessonOnLoad(CourseLesson lesson, int chapterId) {
+    if (lesson.status != CourseLessonStatus.completed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _handleVideoCompletion(lesson.id, chapterId, widget.course);
+        }
+      });
     }
   }
 

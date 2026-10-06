@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pythagoras/core/theme/styles.dart';
 import 'package:pythagoras/core/widgets/bouncing_widgets.dart';
 import 'package:pythagoras/core/widgets/custom_text.dart';
+import 'package:go_router/go_router.dart';
 
 class DiscardChangesDialog extends StatelessWidget {
   const DiscardChangesDialog({super.key});
@@ -60,7 +61,7 @@ class DiscardChangesDialog extends StatelessWidget {
               children: [
                 Expanded(
                   child: BounceIt(
-                    onPressed: () => Navigator.pop(context, false),
+                    onPressed: () => context.pop(false),
                     child: Container(
                       padding: EdgeInsets.symmetric(vertical: 14.h),
                       decoration: BoxDecoration(
@@ -81,7 +82,7 @@ class DiscardChangesDialog extends StatelessWidget {
                 SizedBox(width: 16.w),
                 Expanded(
                   child: BounceIt(
-                    onPressed: () => Navigator.pop(context, true),
+                    onPressed: () => context.pop(true),
                     child: Container(
                       padding: EdgeInsets.symmetric(vertical: 14.h),
                       decoration: BoxDecoration(

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pythagoras/core/theme/light_colors.dart';
 import 'package:pythagoras/core/theme/styles.dart';
@@ -6,7 +6,8 @@ import 'package:pythagoras/core/widgets/custom_text.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_detail.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_meta_chip.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_star_row.dart';
-import 'package:pythagoras/features/courses/presentation/screens/course_reviews_screen.dart';
+import 'package:go_router/go_router.dart';
+import 'package:pythagoras/core/routes/route_paths.dart';
 
 class CourseDetailInfo extends StatelessWidget {
   final CourseDetail course;
@@ -37,14 +38,12 @@ class CourseDetailInfo extends StatelessWidget {
             ),
             GestureDetector(
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => CourseReviewsScreen(
-                      courseId: course.id,
-                      courseTitle: course.title,
-                    ),
-                  ),
+                context.push(
+                  Routes.courseReviewsScreen,
+                  extra: {
+                    'courseId': course.id,
+                    'courseTitle': course.title,
+                  },
                 );
               },
               child: CourseStarRow(rating: course.rating.toDouble()),

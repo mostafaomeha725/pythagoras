@@ -70,6 +70,7 @@ class QuizActionButtons extends StatelessWidget {
                 child: AppText(
                   'السابق',
                   style: font16w700.copyWith(color: const Color(0xFFC792B6)),
+                  alignment: AlignmentDirectional.center,
                 ),
               ),
             ),

@@ -11,6 +11,7 @@ class CourseChapter {
   final String price;
   final String currency;
   final String currencyLabel;
+  final String requestStatus;
   final bool isEnrolled;
   final List<CourseLesson> videos;
   final List<CourseQuiz> quizzes;
@@ -25,6 +26,7 @@ class CourseChapter {
     required this.price,
     required this.currency,
     required this.currencyLabel,
+    this.requestStatus = 'not_requested',
     this.isEnrolled = false,
     this.videos = const [],
     this.quizzes = const [],
@@ -40,6 +42,7 @@ class CourseChapter {
     String? price,
     String? currency,
     String? currencyLabel,
+    String? requestStatus,
     bool? isEnrolled,
     List<CourseLesson>? videos,
     List<CourseQuiz>? quizzes,
@@ -54,6 +57,7 @@ class CourseChapter {
       price: price ?? this.price,
       currency: currency ?? this.currency,
       currencyLabel: currencyLabel ?? this.currencyLabel,
+      requestStatus: requestStatus ?? this.requestStatus,
       isEnrolled: isEnrolled ?? this.isEnrolled,
       videos: videos ?? this.videos,
       quizzes: quizzes ?? this.quizzes,

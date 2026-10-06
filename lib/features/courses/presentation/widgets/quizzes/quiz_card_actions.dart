@@ -5,7 +5,8 @@ import 'package:pythagoras/core/theme/styles.dart';
 import 'package:pythagoras/core/widgets/custom_text.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_quiz.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/course_exams/course_exams_cubit.dart';
-import 'package:pythagoras/features/courses/presentation/screens/quiz_screen.dart';
+import 'package:go_router/go_router.dart';
+import 'package:pythagoras/core/routes/route_paths.dart';
 
 /// Bottom row of [CourseQuizCard]: duration info + start button.
 class QuizCardActions extends StatelessWidget {
@@ -34,13 +35,14 @@ class QuizCardActions extends StatelessWidget {
         ),
         InkWell(
           onTap: () async {
-            final result = await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => QuizScreen(quiz: quiz)),
+            final result = await context.push<bool>(
+              Routes.quizScreen,
+              extra: quiz,
             );
             if (result == true && context.mounted && quiz.courseId != null) {
               context.read<CourseExamsCubit>().fetchExamsAndAssignments(
                 quiz.courseId!,
+                showLoading: true,
               );
             }
           },

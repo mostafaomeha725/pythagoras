@@ -37,33 +37,35 @@ class _CourseReviewsScreenBodyState extends State<CourseReviewsScreenBody> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<CourseReviewsCubit, CourseReviewsState>(
-      builder: (context, state) {
-        if (state is CourseReviewsLoading) {
-          return const CourseReviewsShimmer();
-        } else if (state is CourseReviewsError) {
-          return Center(child: Text(state.message));
-        } else if (state is CourseReviewsLoaded) {
-          final data = state.reviewsData;
+    return SingleChildScrollView(
+      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 24.h),
+      child: Column(
+        children: [
+          CourseReviewHeaderInfo(title: widget.courseTitle),
+          SizedBox(height: 24.h),
+          CourseAddReviewFormCard(courseId: widget.courseId),
+          SizedBox(height: 32.h),
+          BlocBuilder<CourseReviewsCubit, CourseReviewsState>(
+            builder: (context, state) {
+              if (state is CourseReviewsLoading) {
+                return const CourseReviewsShimmer();
+              } else if (state is CourseReviewsError) {
+                return Center(child: Text(state.message));
+              } else if (state is CourseReviewsLoaded) {
+                final data = state.reviewsData;
 
-          // Sort logic
-          List<CourseReview> displayedReviews = List.from(data.reviews);
-          if (_sortType == 'latest') {
-            displayedReviews.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          } else {
-            displayedReviews.sort((a, b) => b.rating.compareTo(a.rating));
-          }
+                // Sort logic
+                List<CourseReview> displayedReviews = List.from(data.reviews);
+                if (_sortType == 'latest') {
+                  displayedReviews.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+                } else {
+                  displayedReviews.sort((a, b) => b.rating.compareTo(a.rating));
+                }
 
-          return SingleChildScrollView(
-            padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 24.h),
-            child: Column(
-              children: [
-                CourseReviewHeaderInfo(title: widget.courseTitle),
-                SizedBox(height: 24.h),
-                CourseAddReviewFormCard(courseId: widget.courseId),
-                SizedBox(height: 32.h),
-                CourseOverallRatingCard(data: data),
-                SizedBox(height: 32.h),
+                return Column(
+                  children: [
+                    CourseOverallRatingCard(data: data),
+                    SizedBox(height: 32.h),
                 CourseReviewsFilterHeader(
                   totalReviews: data.totalReviews,
                   currentSort: _sortType,
@@ -99,11 +101,13 @@ class _CourseReviewsScreenBodyState extends State<CourseReviewsScreenBody> {
 
                 SizedBox(height: 40.h),
               ],
-            ),
-          );
-        }
-        return const SizedBox.shrink();
-      },
+            );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+        ],
+      ),
     );
   }
 }

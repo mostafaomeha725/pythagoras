@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pythagoras/core/theme/styles.dart';
 import 'package:pythagoras/core/widgets/custom_text.dart';
+import 'package:pythagoras/core/widgets/app_image.dart';
 import 'package:pythagoras/features/courses/domain/entities/quiz_question.dart';
 
 class QuizOptionsGrid extends StatelessWidget {
@@ -20,42 +21,25 @@ class QuizOptionsGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasImages = question.options.any((o) => o.imageUrl != null && o.imageUrl!.isNotEmpty);
 
-    if (!hasImages) {
-      return Column(
-        children: [
-          for (int i = 0; i < question.options.length; i += 2)
-            Padding(
-              padding: EdgeInsets.only(bottom: 16.h),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: _buildOptionCard(context, question.options[i], false)),
-                  SizedBox(width: 16.w),
-                  Expanded(
-                    child: i + 1 < question.options.length
-                        ? _buildOptionCard(context, question.options[i + 1], false)
-                        : const SizedBox.shrink(),
-                  ),
-                ],
-              ),
+    return Column(
+      children: [
+        for (int i = 0; i < question.options.length; i += 2)
+          Padding(
+            padding: EdgeInsets.only(bottom: 16.h),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _buildOptionCard(context, question.options[i], hasImages)),
+                SizedBox(width: 16.w),
+                Expanded(
+                  child: i + 1 < question.options.length
+                      ? _buildOptionCard(context, question.options[i + 1], hasImages)
+                      : const SizedBox.shrink(),
+                ),
+              ],
             ),
-        ],
-      );
-    }
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: question.options.length,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16.w,
-        mainAxisSpacing: 16.h,
-        childAspectRatio: 0.8,
-      ),
-      itemBuilder: (context, index) {
-        return _buildOptionCard(context, question.options[index], true);
-      },
+          ),
+      ],
     );
   }
 
@@ -82,20 +66,15 @@ class QuizOptionsGrid extends StatelessWidget {
           ],
         ),
         child: Column(
-          mainAxisSize: hasImages ? MainAxisSize.max : MainAxisSize.min,
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (hasImages && option.imageUrl != null && option.imageUrl!.isNotEmpty)
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(15.r)),
-                  child: Image.network(
-                    option.imageUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => const Center(
-                      child: Icon(Icons.image_not_supported, color: Colors.grey),
-                    ),
-                  ),
+              ClipRRect(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(15.r)),
+                child: AppImage(
+                  imageUrl: option.imageUrl!,
+                  fit: BoxFit.contain, // To show the full image without cropping
                 ),
               ),
             Padding(
@@ -107,6 +86,7 @@ class QuizOptionsGrid extends StatelessWidget {
                     child: AppText(
                       option.text ?? '',
                       style: font14w700.copyWith(color: const Color(0xFF1E1E2D)),
+                      maxLines: 20,
                     ),
                   ),
                   SizedBox(width: 8.w),

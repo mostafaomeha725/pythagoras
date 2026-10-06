@@ -14,41 +14,10 @@ class CourseReviewsShimmer extends StatelessWidget {
     return Shimmer.fromColors(
       baseColor: baseColor,
       highlightColor: highlightColor,
-      child: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 24.h),
-        child: Column(
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Info Title Shimmer
-            Container(
-              width: 150.w,
-              height: 20.h,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(4.r),
-              ),
-            ),
-            SizedBox(height: 8.h),
-            Container(
-              width: double.infinity,
-              height: 28.h,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(4.r),
-              ),
-            ),
-            SizedBox(height: 24.h),
 
-            // Add Review Form Shimmer
-            Container(
-              width: double.infinity,
-              height: 180.h,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16.r),
-              ),
-            ),
-            SizedBox(height: 32.h),
 
             // Overall Rating Shimmer
             Container(
@@ -99,7 +68,6 @@ class CourseReviewsShimmer extends StatelessWidget {
             ],
           ],
         ),
-      ),
     );
   }
 }

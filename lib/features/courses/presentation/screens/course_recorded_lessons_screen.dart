@@ -13,7 +13,11 @@ class CourseRecordedLessonsScreen extends StatelessWidget {
   final CourseDetail course;
   final int? selectedChapterId;
 
-  const CourseRecordedLessonsScreen({super.key, required this.course, this.selectedChapterId});
+  const CourseRecordedLessonsScreen({
+    super.key,
+    required this.course,
+    this.selectedChapterId,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +36,10 @@ class CourseRecordedLessonsScreen extends StatelessWidget {
             BlocProvider(create: (context) => sl<CompleteLessonCubit>()),
           ],
           child: SafeArea(
-            child: CourseRecordedLessonsScreenBody(course: course, selectedChapterId: selectedChapterId),
+            child: CourseRecordedLessonsScreenBody(
+              course: course,
+              selectedChapterId: selectedChapterId,
+            ),
           ),
         ),
       ),

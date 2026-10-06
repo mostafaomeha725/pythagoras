@@ -9,6 +9,8 @@ import 'package:pythagoras/features/profile/presentation/cubit/profile/profile_c
 import '../widgets/home_screen_body.dart';
 import 'package:pythagoras/features/courses/presentation/screens/courses_screen.dart';
 import 'package:pythagoras/features/profile/presentation/screens/profile_screen.dart';
+import 'package:pythagoras/core/di/services_locator.dart';
+import 'package:pythagoras/core/cache/preferences_storage.dart';
 
 class HomeScreenContent extends StatefulWidget {
   final NavigationState navState;
@@ -40,7 +42,12 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
 
     await coursesCubit.fetchCourses();
     await classesCubit.fetchClasses();
-    await profileCubit.getAccountInfo();
+    
+    final prefs = sl<PreferencesStorage>();
+    final token = prefs.getUserToken();
+    if (token != null && token.isNotEmpty) {
+      await profileCubit.getAccountInfo();
+    }
   }
 
   @override

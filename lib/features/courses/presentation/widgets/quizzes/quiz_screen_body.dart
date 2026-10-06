@@ -13,6 +13,7 @@ import 'package:pythagoras/features/courses/presentation/widgets/quizzes/quiz_ac
 import 'package:pythagoras/core/utils/easy_loading.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/quizzes/quiz_empty_state.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/quizzes/quiz_shimmer.dart';
+import 'package:go_router/go_router.dart';
 
 class QuizScreenBody extends StatelessWidget {
   final CourseQuiz quiz;
@@ -26,7 +27,7 @@ class QuizScreenBody extends StatelessWidget {
         if (state is QuizCompleted) {
           // Navigate to results screen or show success
           showSuccess('تم إنهاء الامتحان بنجاح');
-          Navigator.of(context).pop(true);
+          context.pop(true);
         } else if (state is QuizError) {
           showError(state.message);
         }

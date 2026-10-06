@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:pythagoras/core/routes/route_paths.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/request_enrollment/request_enrollment_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/course_details/course_details_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/course_details/course_details_state.dart';
+import 'package:pythagoras/core/utils/auth_guard.dart';
 import 'package:pythagoras/core/theme/light_colors.dart';
 import 'package:pythagoras/core/widgets/custom_button.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_detail.dart';
@@ -84,8 +87,21 @@ class CourseChapterBody extends StatelessWidget {
             price: chapter.price,
             currencyLabel: chapter.currencyLabel,
             isEnrolled: isEnrolled || chapter.isEnrolled,
-            onPressed: () {
-              context.read<RequestEnrollmentCubit>().requestChapter(chapter.id);
+            requestStatus: chapter.requestStatus,
+            onPressed: () async {
+              final didLogin = await AuthGuard.checkAuthAndExecute(context, () {
+                context.read<RequestEnrollmentCubit>().requestChapter(chapter.id);
+              });
+
+              if (didLogin == true && context.mounted) {
+                // If the user just logged in, they might already own this chapter or course!
+                // Refresh the parent course details so the UI updates accurately.
+                final courseDetailCubit = context.read<CourseDetailsCubit>();
+                if (courseDetailCubit.state is CourseDetailsLoaded) {
+                  final courseId = (courseDetailCubit.state as CourseDetailsLoaded).courseDetail.id;
+                  courseDetailCubit.fetchCourseDetails(courseId);
+                }
+              }
             },
           ),
       ],

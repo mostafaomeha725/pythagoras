@@ -97,6 +97,15 @@ class CourseVideoPlayerManager extends ChangeNotifier {
           ..setBackgroundColor(Colors.black)
           ..setNavigationDelegate(
             NavigationDelegate(
+              onPageFinished: (String url) {
+                webViewController?.runJavaScript(
+                  "document.oncontextmenu = function() { return false; }; "
+                  "document.onselectstart = function() { return false; }; "
+                  "document.body.style.userSelect = 'none'; "
+                  "document.body.style.webkitUserSelect = 'none'; "
+                  "document.body.style.webkitTouchCallout = 'none'; "
+                );
+              },
               onWebResourceError: (WebResourceError error) {
                 errorMessage = 'فشل تحميل الفيديو. يرجى التحقق من اتصالك بالإنترنت.';
                 notifyListeners();

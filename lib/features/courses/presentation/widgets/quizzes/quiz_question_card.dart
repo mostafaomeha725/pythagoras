@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pythagoras/core/theme/styles.dart';
 import 'package:pythagoras/core/widgets/custom_text.dart';
+import 'package:pythagoras/core/widgets/app_image.dart';
 import 'package:pythagoras/features/courses/domain/entities/quiz_question.dart';
 
 class QuizQuestionCard extends StatelessWidget {
@@ -53,22 +54,16 @@ class QuizQuestionCard extends StatelessWidget {
             AppText(
               question.questionText!,
               style: font20w700.copyWith(color: const Color(0xFF1E1E2D)),
+              maxLines: 20,
             ),
           
           if (question.imageUrl != null && question.imageUrl!.isNotEmpty) ...[
             SizedBox(height: 16.h),
-            ClipRRect(
+            AppImage(
+              imageUrl: question.imageUrl!,
+              width: double.infinity,
+              fit: BoxFit.contain, // Show full image without cropping
               borderRadius: BorderRadius.circular(12.r),
-              child: Image.network(
-                question.imageUrl!,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  height: 150.h,
-                  color: const Color(0xFFF3F4F6),
-                  child: const Center(child: Icon(Icons.image_not_supported, color: Colors.grey)),
-                ),
-              ),
             ),
           ],
         ],

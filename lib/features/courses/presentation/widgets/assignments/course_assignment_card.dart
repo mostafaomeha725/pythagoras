@@ -10,6 +10,7 @@ import 'package:pythagoras/core/utils/date_formatter.dart';
 import 'package:pythagoras/core/utils/url_launcher_helper.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/assignments/assignment_card_file_badge.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/assignments/assignment_status_pill.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/assignments/course_assignment_view_button.dart';
 
 class CourseAssignmentCard extends StatelessWidget {
   final CourseAssignment assignment;
@@ -127,6 +128,11 @@ class CourseAssignmentCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              // View button
+              if (fileUrl != null) ...[
+                CourseAssignmentViewButton(assignment: assignment),
+                SizedBox(width: 8.w),
+              ],
               // Download button
               if (fileUrl != null) ...[
                 BounceIt(

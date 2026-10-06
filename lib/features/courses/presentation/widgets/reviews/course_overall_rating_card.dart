@@ -113,26 +113,6 @@ class CourseOverallRatingCard extends StatelessWidget {
             ],
           ),
           SizedBox(height: 24.h),
-
-          // Recommendation Banner
-          Container(
-            padding: EdgeInsets.symmetric(vertical: 12.h),
-            decoration: BoxDecoration(
-              color: const Color(0xFFECFDF5),
-              borderRadius: BorderRadius.circular(12.r),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons
-                      .verified_user_rounded, // Better to use a shield check icon if available
-                  color: const Color(0xFF059669),
-                  size: 18.sp,
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );

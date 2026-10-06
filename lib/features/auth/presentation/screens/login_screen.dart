@@ -7,14 +7,15 @@ import 'package:pythagoras/features/auth/presentation/cubit/login_cubit.dart';
 import '../widgets/login_screen_body.dart';
 
 class LoginScreen extends StatelessWidget {
-  const LoginScreen({super.key});
+  final bool returnBack;
+  const LoginScreen({super.key, this.returnBack = false});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (context) => sl<LoginCubit>(),
-      child: const Scaffold(
-        body: LoginScreenBody(),
+      child: Scaffold(
+        body: LoginScreenBody(returnBack: returnBack),
       ),
     );
   }

@@ -75,11 +75,8 @@ class CourseDetailScreen extends StatelessWidget {
                   ),
                 );
               } else if (state is CourseDetailsLoaded) {
-                // The API might not return the correct isEnrolled for course-details,
-                // so we override it with the one passed from the courses list.
-                final updatedCourse = state.courseDetail.copyWith(
-                  isEnrolled: isEnrolled,
-                );
+                // Use the CourseDetail directly from the API which contains the fresh request_status
+                final updatedCourse = state.courseDetail;
 
                 return Stack(
                   children: [

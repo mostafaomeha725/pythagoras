@@ -22,7 +22,16 @@ class CourseExamsCubit extends Cubit<CourseExamsState> {
 
   bool _isFetchingRemote = false;
 
-  Future<void> fetchExamsAndAssignments(int courseId) async {
+  Future<void> fetchExamsAndAssignments(int courseId, {bool showLoading = false}) async {
+    if (showLoading) {
+      emit(CourseExamsLoading());
+      _isFetchingRemote = true;
+      await _loadExamsData(courseId, fromCache: false);
+      if (isClosed) return;
+      _isFetchingRemote = false;
+      return;
+    }
+
     // 1. Try to load from Cache first
     final hasCache = await _loadExamsData(courseId, fromCache: true);
     

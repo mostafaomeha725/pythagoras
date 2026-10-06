@@ -13,6 +13,7 @@ import 'package:pythagoras/features/courses/presentation/widgets/assignments/sub
 import 'package:pythagoras/features/courses/presentation/widgets/assignments/submit_assignment_file_picker.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/assignments/submit_assignment_notes_field.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/assignments/submit_assignment_widgets.dart';
+import 'package:go_router/go_router.dart';
 
 class SubmitAssignmentSheet extends StatefulWidget {
   final int assignmentId;
@@ -101,7 +102,7 @@ class _SubmitAssignmentSheetState extends State<SubmitAssignmentSheet> {
           EasyLoading.show(status: 'جاري التسليم...');
         } else if (state is SubmitAssignmentSuccess) {
           EasyLoading.dismiss();
-          Navigator.of(context).pop();
+          context.pop();
           showSuccess('تم تسليم الواجب بنجاح');
           widget.onSubmitted?.call();
         } else if (state is SubmitAssignmentError) {

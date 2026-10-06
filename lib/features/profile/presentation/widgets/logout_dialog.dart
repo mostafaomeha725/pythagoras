@@ -3,7 +3,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pythagoras/core/di/services_locator.dart';
-import 'package:pythagoras/core/routes/route_paths.dart';
 import 'package:pythagoras/core/theme/light_colors.dart';
 import 'package:pythagoras/core/theme/styles.dart';
 import 'package:pythagoras/core/utils/easy_loading.dart';
@@ -11,6 +10,8 @@ import 'package:pythagoras/core/widgets/bouncing_widgets.dart';
 import 'package:pythagoras/core/widgets/custom_text.dart';
 import 'package:pythagoras/features/auth/presentation/cubit/logout_cubit.dart';
 import 'package:pythagoras/features/auth/presentation/cubit/logout_state.dart';
+import 'package:pythagoras/features/profile/presentation/cubit/profile/profile_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/courses_list/courses_list_cubit.dart';
 
 class LogoutDialog extends StatelessWidget {
   const LogoutDialog({super.key});
@@ -26,7 +27,13 @@ class LogoutDialog extends StatelessWidget {
           } else if (state is LogoutSuccess) {
             hideLoading();
             showSuccess('تم تسجيل الخروج بنجاح');
-            context.go(Routes.chooseUserTypeScreen);
+            
+            // Reset state to Guest
+            context.read<ProfileCubit>().resetProfile();
+            context.read<CoursesListCubit>().fetchCourses();
+
+            // Just close the dialog, staying on the same page
+            context.pop();
           } else if (state is LogoutFailure) {
             hideLoading();
             showError(state.message);

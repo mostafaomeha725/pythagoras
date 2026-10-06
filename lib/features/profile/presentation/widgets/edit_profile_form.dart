@@ -44,11 +44,6 @@ class EditProfileForm extends StatelessWidget {
           controller: passwordController,
           isPassword: true,
           readOnly: false,
-          suffixIcon: const Icon(
-            Icons.visibility_outlined,
-            color: Color(0xFF6B7280),
-            size: 20,
-          ),
         ),
         SizedBox(height: 20.h),
 

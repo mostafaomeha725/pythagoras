@@ -20,4 +20,6 @@ class Routes {
   static const contactUsScreen = '/contact-us';
   static const pdfViewerScreen = '/pdf-viewer';
   static const webViewScreen = '/web-viewer';
+  static const quizScreen = '/quiz';
+  static const courseReviewsScreen = '/course-reviews';
 }

@@ -64,6 +64,7 @@ dependencies:
   hive_flutter: ^1.1.0
   path_provider: ^2.1.6
   mime: ^2.1.0
+  screen_protector: ^1.5.3
 
 
 dev_dependencies:

@@ -5,6 +5,8 @@ import 'package:pythagoras/core/cache/preferences_storage.dart';
 import 'package:pythagoras/core/error/failure.dart';
 import 'package:pythagoras/core/network/endpoints.dart';
 import 'package:pythagoras/core/network/network_service.dart';
+import 'package:pythagoras/core/cache/hive_boxes.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:pythagoras/features/auth/domain/repositories/auth_repository.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
@@ -52,6 +54,9 @@ class AuthRepositoryImpl implements AuthRepository {
           if (token == null || token.isEmpty) {
             return const Left(Failure('لم يتم استلام رمز الدخول'));
           }
+
+          // Clear previous user data and cache to start fresh
+          await _clearLocalSessionData();
 
           await preferencesStorage.saveUserToken(token);
           networkService.addToken(token);
@@ -109,10 +114,11 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   Future<void> _clearLocalSessionData() async {
-    await preferencesStorage.deleteUserToken();
-    await preferencesStorage.deleteUserProfile();
-    await preferencesStorage.deleteUserId();
+    await preferencesStorage.clear();
     networkService.removeToken();
+    try {
+      await Hive.box(HiveBoxes.cacheBox).clear();
+    } catch (_) {}
   }
 
   @override

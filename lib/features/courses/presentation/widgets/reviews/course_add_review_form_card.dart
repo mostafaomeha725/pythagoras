@@ -1,6 +1,7 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:pythagoras/core/utils/auth_guard.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:pythagoras/core/theme/light_colors.dart';
 import 'package:pythagoras/core/theme/styles.dart';
@@ -123,7 +124,9 @@ class _CourseAddReviewFormCardState extends State<CourseAddReviewFormCard> {
                 // Submit Button
                 AppButton(
                   text: 'إرسال التقييم',
-                  onPressed: _submitReview,
+                  onPressed: () {
+                    AuthGuard.checkAuthAndExecute(context, _submitReview);
+                  },
                   radius: 12.r,
                   color: AppLightColors.primary,
                   textColor: Colors.white,

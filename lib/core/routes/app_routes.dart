@@ -1,6 +1,4 @@
 import 'package:chucker_flutter/chucker_flutter.dart';
-import 'package:pythagoras/core/cache/preferences_storage.dart';
-import 'package:pythagoras/core/di/services_locator.dart';
 import 'package:pythagoras/features/auth/presentation/screens/login_screen.dart';
 import 'package:pythagoras/features/auth/presentation/screens/choose_user_type_screen.dart';
 import 'package:pythagoras/features/auth/presentation/screens/register_screen.dart';
@@ -19,6 +17,9 @@ import 'package:pythagoras/features/home/screens/home_screen.dart';
 import 'package:pythagoras/features/splash/presentation/screens/splash_screen.dart';
 import 'package:pythagoras/features/courses/presentation/screens/pdf_viewer_screen.dart';
 import 'package:pythagoras/features/courses/presentation/screens/webview_screen.dart';
+import 'package:pythagoras/features/courses/presentation/screens/quiz_screen.dart';
+import 'package:pythagoras/features/courses/presentation/screens/course_reviews_screen.dart';
+import 'package:pythagoras/features/courses/domain/entities/course_quiz.dart';
 import 'package:flutter/material.dart';
 
 import 'package:go_router/go_router.dart';
@@ -31,14 +32,8 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final CustomGoRouterObserver customGoRouterObserver = CustomGoRouterObserver();
 
 GoRouter createRouter() {
-  final prefs = sl<PreferencesStorage>();
-  final token = prefs.getUserToken();
-  final isLoggedIn = token != null && token.isNotEmpty;
-
   return GoRouter(
-    initialLocation: isLoggedIn
-        ? Routes.mainNavigationScreen
-        : Routes.loginScreen,
+    initialLocation: Routes.mainNavigationScreen,
     navigatorKey: navigatorKey,
     debugLogDiagnostics: true,
     observers: [
@@ -52,7 +47,10 @@ GoRouter createRouter() {
       ),
       GoRoute(
         path: Routes.loginScreen,
-        builder: (context, state) => const LoginScreen(),
+        builder: (context, state) {
+          final returnBack = state.extra as bool? ?? false;
+          return LoginScreen(returnBack: returnBack);
+        },
       ),
       GoRoute(
         path: Routes.chooseUserTypeScreen,
@@ -160,6 +158,22 @@ GoRouter createRouter() {
           final url = extra['url'] as String;
           final title = extra['title'] as String;
           return WebViewScreen(url: url, title: title);
+        },
+      ),
+      GoRoute(
+        path: Routes.quizScreen,
+        builder: (context, state) {
+          final quiz = state.extra as CourseQuiz;
+          return QuizScreen(quiz: quiz);
+        },
+      ),
+      GoRoute(
+        path: Routes.courseReviewsScreen,
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>;
+          final courseId = extra['courseId'] as int;
+          final courseTitle = extra['courseTitle'] as String;
+          return CourseReviewsScreen(courseId: courseId, courseTitle: courseTitle);
         },
       ),
     ],

@@ -8,10 +8,10 @@ import 'package:pythagoras/features/profile/presentation/cubit/edit_profile/edit
 import 'package:pythagoras/features/profile/presentation/cubit/edit_profile/edit_profile_state.dart';
 import 'package:pythagoras/features/profile/presentation/widgets/edit_profile_avatar.dart';
 import 'package:pythagoras/features/profile/presentation/widgets/edit_profile_form.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pythagoras/features/profile/presentation/widgets/discard_changes_dialog.dart';
 import 'package:pythagoras/features/profile/presentation/widgets/save_profile_button.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_app_bar.dart';
-import 'package:go_router/go_router.dart';
 
 class EditProfileScreenBody extends StatefulWidget {
   final UserProfile? userProfile;
@@ -103,7 +103,7 @@ class _EditProfileScreenBodyState extends State<EditProfileScreenBody> {
                   showError(state.message);
                 } else if (state is EditProfileSuccess) {
                   showSuccess('تم حفظ التغييرات بنجاح');
-                  Navigator.pop(context, true);
+                  context.pop(true);
                 }
               }
             },

@@ -1,6 +1,11 @@
 import 'package:pythagoras/core/cache/preferences_storage.dart';
 import 'package:dio/dio.dart';
 import '/core/di/services_locator.dart';
+import 'package:pythagoras/core/routes/app_routes.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:pythagoras/features/profile/presentation/cubit/profile/profile_cubit.dart';
+import 'package:pythagoras/core/utils/easy_loading.dart';
+import 'package:pythagoras/core/cache/hive_storage.dart';
 
 class AuthorizationInterceptor extends Interceptor {
   @override
@@ -22,8 +27,37 @@ class AuthorizationInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     if (err.response?.statusCode == 401) {
-      print("Unauthenticated → redirect to login");
+      final data = err.response?.data;
+      String message = '';
+      if (data is Map && data['message'] != null) {
+        message = data['message'].toString();
+      }
+      
+      if (message.contains('تسجيل خروجك') || message.contains('جهاز آخر')) {
+        _handleGlobalLogout(message);
+      }
     }
     handler.next(err);
+  }
+
+  Future<void> _handleGlobalLogout(String message) async {
+    try {
+      final prefs = sl<PreferencesStorage>();
+      await prefs.clear();
+      
+      try {
+        final cache = sl<CacheService>();
+        await cache.clear();
+      } catch (_) {}
+      
+      final context = navigatorKey.currentContext;
+      if (context != null) {
+        if (context.mounted) {
+          context.read<ProfileCubit>().resetProfile();
+        }
+      }
+      
+      showError('تم تسجيل خروجك لأن الحساب تم تسجيل دخوله على جهاز آخر.');
+    } catch (_) {}
   }
 }

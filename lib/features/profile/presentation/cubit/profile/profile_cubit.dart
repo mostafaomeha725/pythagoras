@@ -47,4 +47,8 @@ class ProfileCubit extends Cubit<ProfileState> {
       },
     );
   }
+
+  void resetProfile() {
+    emit(ProfileInitial());
+  }
 }

@@ -4,7 +4,8 @@ import 'package:pythagoras/core/theme/styles.dart';
 import 'package:pythagoras/core/widgets/custom_text.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_quiz.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:pythagoras/features/courses/presentation/screens/quiz_screen.dart';
+import 'package:go_router/go_router.dart';
+import 'package:pythagoras/core/routes/route_paths.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/course_exams/course_exams_cubit.dart';
 
 class CourseQuizCard extends StatelessWidget {
@@ -95,17 +96,16 @@ class CourseQuizCard extends StatelessWidget {
               ),
               InkWell(
                 onTap: () async {
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => QuizScreen(quiz: quiz),
-                    ),
+                  final result = await context.push<bool>(
+                    Routes.quizScreen,
+                    extra: quiz,
                   );
                   if (result == true &&
                       context.mounted &&
                       quiz.courseId != null) {
                     context.read<CourseExamsCubit>().fetchExamsAndAssignments(
                       quiz.courseId!,
+                      showLoading: true,
                     );
                   }
                 },

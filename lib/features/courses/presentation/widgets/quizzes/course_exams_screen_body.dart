@@ -97,7 +97,7 @@ class CourseExamsScreenBody extends StatelessWidget {
                     onSubmitted: () {
                       context
                           .read<CourseExamsCubit>()
-                          .fetchExamsAndAssignments(course.id);
+                          .fetchExamsAndAssignments(course.id, showLoading: true);
                     },
                   );
                 } else if (task.type == CourseTaskType.quiz &&
