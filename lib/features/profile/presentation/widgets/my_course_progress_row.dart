@@ -19,17 +19,18 @@ class MyCourseProgressRow extends StatelessWidget {
             value: progressInt / 100,
             minHeight: 6.h,
             backgroundColor: const Color(0xFFEDEDED),
-            valueColor:
-                const AlwaysStoppedAnimation<Color>(AppLightColors.primary),
+            valueColor: const AlwaysStoppedAnimation<Color>(
+              AppLightColors.primary,
+            ),
           ),
         ),
         SizedBox(height: 8.h),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // FIRST = RIGHT in RTL: 'مستمر بالدراسة'
+            // FIRST = RIGHT in RTL: 'مستمر بالدراسة' or completion text
             AppText(
-              'مستمر بالدراسة',
+              progressInt == 100 ? 'أتممت الدورة بنجاح' : 'مستمر بالدراسة',
               style: font12w500.copyWith(color: const Color(0xFF6B7280)),
             ),
             // LAST = LEFT in RTL: progress percent

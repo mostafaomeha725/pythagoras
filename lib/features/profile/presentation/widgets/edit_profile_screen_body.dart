@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:pythagoras/core/theme/light_colors.dart';
-import 'package:pythagoras/core/theme/styles.dart';
 import 'package:pythagoras/core/utils/easy_loading.dart';
-import 'package:pythagoras/core/widgets/bouncing_widgets.dart';
-import 'package:pythagoras/core/widgets/custom_text.dart';
 
 import 'package:pythagoras/features/profile/domain/entities/user_profile.dart';
 import 'package:pythagoras/features/profile/presentation/cubit/edit_profile/edit_profile_cubit.dart';
 import 'package:pythagoras/features/profile/presentation/cubit/edit_profile/edit_profile_state.dart';
 import 'package:pythagoras/features/profile/presentation/widgets/edit_profile_avatar.dart';
 import 'package:pythagoras/features/profile/presentation/widgets/edit_profile_form.dart';
+import 'package:pythagoras/features/profile/presentation/widgets/discard_changes_dialog.dart';
+import 'package:pythagoras/features/profile/presentation/widgets/save_profile_button.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_app_bar.dart';
+import 'package:go_router/go_router.dart';
 
 class EditProfileScreenBody extends StatefulWidget {
   final UserProfile? userProfile;
@@ -28,7 +28,9 @@ class _EditProfileScreenBodyState extends State<EditProfileScreenBody> {
   @override
   void initState() {
     super.initState();
-    nameController = TextEditingController(text: widget.userProfile?.name ?? '');
+    nameController = TextEditingController(
+      text: widget.userProfile?.name ?? '',
+    );
     passwordController = TextEditingController();
   }
 
@@ -39,85 +41,107 @@ class _EditProfileScreenBodyState extends State<EditProfileScreenBody> {
     super.dispose();
   }
 
+  bool get _hasUnsavedChanges {
+    final name = nameController.text.trim();
+    final password = passwordController.text.trim();
+    final originalName = widget.userProfile?.name ?? '';
+    final hasImageChanged =
+        context.read<EditProfileCubit>().selectedImage != null;
+
+    return name != originalName || password.isNotEmpty || hasImageChanged;
+  }
+
+  bool _forcePop = false;
+
+  void _onBackPress() async {
+    if (!_hasUnsavedChanges) {
+      setState(() {
+        _forcePop = true;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.pop();
+      });
+      return;
+    }
+
+    final shouldPop = await showDialog<bool>(
+      context: context,
+      builder: (context) => const DiscardChangesDialog(),
+    );
+
+    if (shouldPop == true && mounted) {
+      setState(() {
+        _forcePop = true;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.pop();
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return BlocConsumer<EditProfileCubit, EditProfileState>(
-      listener: (context, state) {
-        if (state is EditProfileLoading) {
-          showLoading();
-        } else {
-          hideLoading();
-          if (state is EditProfileFailure) {
-            showError(state.message);
-          } else if (state is EditProfileSuccess) {
-            showSuccess('تم حفظ التغييرات بنجاح');
-            Navigator.pop(context, true);
-          }
-        }
+    return PopScope(
+      canPop: _forcePop,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _onBackPress();
       },
-      builder: (context, state) {
-        return SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 32.h),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Avatar
-              EditProfileAvatar(profilePictureUrl: widget.userProfile?.profilePictureUrl),
-              
-              SizedBox(height: 32.h),
+      child: Scaffold(
+        appBar: CourseDetailAppBar(
+          title: 'تعديل الملف الشخصي',
+          onBack: _onBackPress,
+        ),
+        body: SafeArea(
+          child: BlocConsumer<EditProfileCubit, EditProfileState>(
+            listener: (context, state) {
+              if (state is EditProfileLoading) {
+                showLoading();
+              } else {
+                hideLoading();
+                if (state is EditProfileFailure) {
+                  showError(state.message);
+                } else if (state is EditProfileSuccess) {
+                  showSuccess('تم حفظ التغييرات بنجاح');
+                  Navigator.pop(context, true);
+                }
+              }
+            },
+            builder: (context, state) {
+              return SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 32.h),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Avatar
+                    EditProfileAvatar(
+                      profilePictureUrl: widget.userProfile?.profilePictureUrl,
+                    ),
 
-              // Form Fields
-              EditProfileForm(
-                userProfile: widget.userProfile,
-                nameController: nameController,
-                passwordController: passwordController,
-              ),
+                    SizedBox(height: 32.h),
 
-              SizedBox(height: 40.h),
+                    // Form Fields
+                    EditProfileForm(
+                      userProfile: widget.userProfile,
+                      nameController: nameController,
+                      passwordController: passwordController,
+                    ),
 
-              // Save Button
-              BounceIt(
-                onPressed: () {
-                  final name = nameController.text.trim();
-                  if (name.isEmpty) {
-                    showError('الرجاء إدخال الاسم');
-                    return;
-                  }
-                  
-                  final password = passwordController.text.trim();
-                  final originalName = widget.userProfile?.name ?? '';
-                  final hasImageChanged = context.read<EditProfileCubit>().selectedImage != null;
+                    SizedBox(height: 40.h),
 
-                  if (name == originalName && password.isEmpty && !hasImageChanged) {
-                    showError('لم تقم بإجراء أي تغييرات');
-                    return;
-                  }
-
-                  context.read<EditProfileCubit>().saveChanges(
-                    name: name,
-                    password: password.isEmpty ? null : password,
-                  );
-                },
-                child: Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.symmetric(vertical: 16.h),
-                  decoration: BoxDecoration(
-                    color: AppLightColors.primary,
-                    borderRadius: BorderRadius.circular(12.r),
-                  ),
-                  alignment: Alignment.center,
-                  child: AppText(
-                    'حفظ التغييرات',
-                    style: font16w700.copyWith(color: Colors.white),
-                    alignment: AlignmentDirectional.center,
-                  ),
+                    // Save Button
+                    SaveProfileButton(
+                      userProfile: widget.userProfile,
+                      nameController: nameController,
+                      passwordController: passwordController,
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              );
+            },
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
-

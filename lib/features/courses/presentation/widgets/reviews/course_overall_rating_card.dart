@@ -44,7 +44,9 @@ class CourseOverallRatingCard extends StatelessWidget {
                       return Padding(
                         padding: EdgeInsets.symmetric(horizontal: 2.w),
                         child: Icon(
-                          index < data.averageRating.floor() ? Icons.star_rounded : Icons.star_border_rounded,
+                          index < data.averageRating.floor()
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
                           color: const Color(0xFFFBBF24),
                           size: 16.sp,
                         ),
@@ -58,7 +60,7 @@ class CourseOverallRatingCard extends StatelessWidget {
                   ),
                 ],
               ),
-              
+
               // Divider
               Container(
                 height: 80.h,
@@ -71,22 +73,47 @@ class CourseOverallRatingCard extends StatelessWidget {
               Expanded(
                 child: Column(
                   children: [
-                    CourseReviewsProgressBar(stars: 5, progress: (data.ratingsDistribution[5] ?? 0) / 100, percentage: '${(data.ratingsDistribution[5] ?? 0).round()}%'),
+                    CourseReviewsProgressBar(
+                      stars: 5,
+                      progress: (data.ratingsDistribution[5] ?? 0) / 100,
+                      percentage:
+                          '${(data.ratingsDistribution[5] ?? 0).round()}%',
+                    ),
                     SizedBox(height: 8.h),
-                    CourseReviewsProgressBar(stars: 4, progress: (data.ratingsDistribution[4] ?? 0) / 100, percentage: '${(data.ratingsDistribution[4] ?? 0).round()}%'),
+                    CourseReviewsProgressBar(
+                      stars: 4,
+                      progress: (data.ratingsDistribution[4] ?? 0) / 100,
+                      percentage:
+                          '${(data.ratingsDistribution[4] ?? 0).round()}%',
+                    ),
                     SizedBox(height: 8.h),
-                    CourseReviewsProgressBar(stars: 3, progress: (data.ratingsDistribution[3] ?? 0) / 100, percentage: '${(data.ratingsDistribution[3] ?? 0).round()}%'),
+                    CourseReviewsProgressBar(
+                      stars: 3,
+                      progress: (data.ratingsDistribution[3] ?? 0) / 100,
+                      percentage:
+                          '${(data.ratingsDistribution[3] ?? 0).round()}%',
+                    ),
                     SizedBox(height: 8.h),
-                    CourseReviewsProgressBar(stars: 2, progress: (data.ratingsDistribution[2] ?? 0) / 100, percentage: '${(data.ratingsDistribution[2] ?? 0).round()}%'),
+                    CourseReviewsProgressBar(
+                      stars: 2,
+                      progress: (data.ratingsDistribution[2] ?? 0) / 100,
+                      percentage:
+                          '${(data.ratingsDistribution[2] ?? 0).round()}%',
+                    ),
                     SizedBox(height: 8.h),
-                    CourseReviewsProgressBar(stars: 1, progress: (data.ratingsDistribution[1] ?? 0) / 100, percentage: '${(data.ratingsDistribution[1] ?? 0).round()}%'),
+                    CourseReviewsProgressBar(
+                      stars: 1,
+                      progress: (data.ratingsDistribution[1] ?? 0) / 100,
+                      percentage:
+                          '${(data.ratingsDistribution[1] ?? 0).round()}%',
+                    ),
                   ],
                 ),
               ),
             ],
           ),
           SizedBox(height: 24.h),
-          
+
           // Recommendation Banner
           Container(
             padding: EdgeInsets.symmetric(vertical: 12.h),
@@ -98,14 +125,10 @@ class CourseOverallRatingCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  Icons.verified_user_rounded, // Better to use a shield check icon if available
+                  Icons
+                      .verified_user_rounded, // Better to use a shield check icon if available
                   color: const Color(0xFF059669),
                   size: 18.sp,
-                ),
-                SizedBox(width: 8.w),
-                Text(
-                  '94% من الطلاب يوصون بهذا الدورة',
-                  style: font12w500.copyWith(color: const Color(0xFF059669)),
                 ),
               ],
             ),

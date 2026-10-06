@@ -59,6 +59,8 @@ import 'package:pythagoras/features/courses/domain/use_cases/get_live_sessions_u
 import 'package:pythagoras/features/courses/presentation/cubit/course_live_sessions/course_live_sessions_cubit.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/get_course_resources_use_case.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/course_resources/course_resources_cubit.dart';
+import 'package:pythagoras/features/courses/domain/use_cases/download_resource_use_case.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/download_resource/download_resource_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/chapter_videos/chapter_videos_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/complete_video/complete_video_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/complete_lesson/complete_lesson_cubit.dart';
@@ -176,8 +178,10 @@ class ServiceLocator {
     );
     sl.registerLazySingleton(() => GetCourseReviewsUseCase(sl()));
     sl.registerLazySingleton(() => AddCourseReviewUseCase(sl()));
+    sl.registerLazySingleton(() => DownloadResourceUseCase(sl()));
     sl.registerFactory(() => CourseReviewsCubit(sl()));
     sl.registerFactory(() => AddCourseReviewCubit(sl()));
+    sl.registerFactory(() => DownloadResourceCubit(downloadResourceUseCase: sl()));
   }
 
   /// =============================

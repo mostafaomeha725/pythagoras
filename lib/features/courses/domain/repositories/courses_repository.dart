@@ -102,4 +102,9 @@ abstract class CoursesRepository {
     required double rating,
     required String comment,
   });
+  Future<Either<Failure, void>> downloadResourceNative({
+    required int resourceId,
+    required String title,
+    required String fileName,
+  });
 }

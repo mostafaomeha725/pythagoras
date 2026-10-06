@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pythagoras/core/theme/light_colors.dart';
@@ -7,7 +7,8 @@ import 'package:pythagoras/core/theme/styles.dart';
 class CourseDetailAppBar extends StatelessWidget
     implements PreferredSizeWidget {
   final String title;
-  const CourseDetailAppBar({super.key, this.title = 'تفاصيل الدورة'});
+  final VoidCallback? onBack;
+  const CourseDetailAppBar({super.key, this.title = 'تفاصيل الدورة', this.onBack});
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +25,7 @@ class CourseDetailAppBar extends StatelessWidget
                 children: [
                   // Back button
                   GestureDetector(
-                    onTap: () => context.pop(),
+                    onTap: onBack ?? () => context.pop(),
                     child: Container(
                       width: 40.w,
                       height: 40.w,

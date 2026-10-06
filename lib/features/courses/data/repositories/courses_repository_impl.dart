@@ -18,6 +18,8 @@ import 'package:pythagoras/features/courses/data/models/answer_submitted_model.d
 import 'package:pythagoras/features/courses/data/models/quiz_result_model.dart';
 import 'package:pythagoras/features/courses/data/models/live_session_model.dart';
 import 'package:pythagoras/features/courses/data/models/course_lesson_model.dart';
+import 'package:pythagoras/core/constants/strings.dart';
+import 'package:pythagoras/core/services/native_download_service.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_lesson.dart';
 import 'package:pythagoras/features/courses/domain/entities/student_class.dart';
 import 'package:pythagoras/features/courses/domain/entities/course.dart';
@@ -937,6 +939,28 @@ class CoursesRepositoryImpl implements CoursesRepository {
           );
         }
       });
+    } catch (e) {
+      return Left(Failure(e.toString()));
+    }
+  }
+  @override
+  Future<Either<Failure, void>> downloadResourceNative({
+    required int resourceId,
+    required String title,
+    required String fileName,
+  }) async {
+    try {
+      final url = '${AppStrings.baseUrl}${EndPoints.downloadResource(resourceId)}';
+      final success = await NativeDownloadService().enqueueDownload(
+        url: url,
+        title: title,
+        fileName: fileName,
+      );
+      if (success) {
+        return const Right(null);
+      } else {
+        return const Left(Failure('فشل في بدء التحميل'));
+      }
     } catch (e) {
       return Left(Failure(e.toString()));
     }
