@@ -6,6 +6,7 @@ class CourseLessonModel extends CourseLesson {
     required super.title,
     super.description,
     super.videoUrl,
+    super.videoType,
     required super.durationMinutes,
     super.isPreview,
     super.status,
@@ -38,6 +39,7 @@ class CourseLessonModel extends CourseLesson {
       title: json['title'] as String? ?? '',
       description: json['description'] as String?,
       videoUrl: json['video_url'] as String?,
+      videoType: json['video_type'] as String?,
       durationMinutes: parsedDuration,
       isPreview: false,
       status: isCompleted 

@@ -65,4 +65,10 @@ class CoursesListCubit extends Cubit<CoursesListState> {
       fetchCourses();
     }
   }
+
+  void resetCourses() {
+    selectedClassId = null;
+    selectedSemester = null;
+    emit(CoursesListInitial());
+  }
 }

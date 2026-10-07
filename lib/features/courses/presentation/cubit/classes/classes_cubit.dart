@@ -24,14 +24,14 @@ class ClassesCubit extends Cubit<ClassesState> {
         if (isClosed) return;
         final List<StudentClass> withAll = [
           const StudentClass(id: 0, name: 'الكل'),
-          ...cachedClasses
+          ...cachedClasses,
         ];
-        
+
         StudentClass? currentSelected;
         if (state is ClassesLoaded) {
           currentSelected = (state as ClassesLoaded).selectedClass;
         }
-        
+
         emit(ClassesLoaded(classes: withAll, selectedClass: currentSelected));
       },
     );
@@ -41,7 +41,7 @@ class ClassesCubit extends Cubit<ClassesState> {
     _isFetchingRemote = true;
 
     final result = await getClassesUseCase(fromCache: false);
-    
+
     _isFetchingRemote = false;
     if (isClosed) return;
 
@@ -54,14 +54,14 @@ class ClassesCubit extends Cubit<ClassesState> {
       (remoteClasses) {
         final List<StudentClass> withAll = [
           const StudentClass(id: 0, name: 'الكل'),
-          ...remoteClasses
+          ...remoteClasses,
         ];
-        
+
         StudentClass? currentSelected;
         if (state is ClassesLoaded) {
           currentSelected = (state as ClassesLoaded).selectedClass;
         }
-        
+
         emit(ClassesLoaded(classes: withAll, selectedClass: currentSelected));
       },
     );
@@ -70,11 +70,14 @@ class ClassesCubit extends Cubit<ClassesState> {
   void selectClass(StudentClass newClass) {
     if (state is ClassesLoaded) {
       final currentState = state as ClassesLoaded;
-      emit(ClassesLoaded(
-        classes: currentState.classes,
-        selectedClass: newClass,
-      ));
+      emit(
+        ClassesLoaded(classes: currentState.classes, selectedClass: newClass),
+      );
       // Later on we can trigger fetching courses using this new class ID
     }
+  }
+
+  void resetClasses() {
+    emit(ClassesInitial());
   }
 }

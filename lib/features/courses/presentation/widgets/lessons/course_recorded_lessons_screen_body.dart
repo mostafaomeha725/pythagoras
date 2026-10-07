@@ -50,6 +50,7 @@ class _CourseRecordedLessonsScreenBodyState
               child: CourseVideoPlayerPlaceholder(
                 imageUrl: widget.course.imageUrl ?? '',
                 videoUrl: selectedLesson?.videoUrl,
+                videoType: selectedLesson?.videoType,
               ),
             ),
             Expanded(

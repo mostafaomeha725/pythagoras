@@ -6,6 +6,7 @@ import 'package:pythagoras/features/courses/presentation/cubit/chapter_videos/ch
 import 'package:pythagoras/features/courses/presentation/cubit/complete_lesson/complete_lesson_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/complete_video/complete_video_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/lessons/course_recorded_lessons_screen_body.dart';
+import 'package:screen_protector/screen_protector.dart';
 
 /// Mixin to handle all UI logic and lifecycle for [CourseRecordedLessonsScreenBody]
 /// This follows Clean Code principles by separating UI rendering from state logic.
@@ -16,6 +17,7 @@ mixin CourseRecordedLessonsMixin on State<CourseRecordedLessonsScreenBody> {
   @override
   void initState() {
     super.initState();
+    _initSecurity();
     _selectFirstAvailableVideo();
     
     // Fetch videos for all chapters in bulk so the UI can show the Skeleton Shimmer!
@@ -127,5 +129,21 @@ mixin CourseRecordedLessonsMixin on State<CourseRecordedLessonsScreenBody> {
           completeLessonCubit.completeLesson(chapterId);
       }
     });
+  }
+
+  Future<void> _initSecurity() async {
+    await ScreenProtector.protectDataLeakageOn();
+    await ScreenProtector.preventScreenshotOn();
+  }
+
+  Future<void> _disposeSecurity() async {
+    await ScreenProtector.protectDataLeakageOff();
+    await ScreenProtector.preventScreenshotOff();
+  }
+
+  @override
+  void dispose() {
+    _disposeSecurity();
+    super.dispose();
   }
 }

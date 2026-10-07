@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-class CourseWebviewPlayer extends StatelessWidget {
+class CourseWebviewPlayer extends StatefulWidget {
   final WebViewController controller;
 
-  const CourseWebviewPlayer({
-    super.key,
-    required this.controller,
-  });
+  const CourseWebviewPlayer({super.key, required this.controller});
 
   @override
+  State<CourseWebviewPlayer> createState() => _CourseWebviewPlayerState();
+}
+
+class _CourseWebviewPlayerState extends State<CourseWebviewPlayer> {
+  @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 220.h,
-      width: double.infinity,
-      child: WebViewWidget(controller: controller),
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: WebViewWidget(controller: widget.controller),
     );
   }
 }

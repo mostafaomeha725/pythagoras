@@ -1,141 +1,241 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:video_player/video_player.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'package:screen_protector/screen_protector.dart';
 
-/// Manages the state and logic for the video player (Youtube & Webview).
-/// Extracted from the UI widget to enforce Clean Architecture.
+import 'package:pythagoras/features/courses/presentation/widgets/video_player/video_provider_type.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/video_player/adapters/course_video_adapter.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/video_player/adapters/course_youtube_adapter.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/video_player/adapters/course_native_adapter.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/video_player/adapters/course_webview_adapter.dart';
+
+/// Manages the state and logic for the unified video player.
 class CourseVideoPlayerManager extends ChangeNotifier {
+  VideoProviderType providerType = VideoProviderType.unknown;
+
+  // Controllers
+  CourseVideoAdapter? adapter;
   YoutubePlayerController? ytController;
+  VideoPlayerController? nativeController;
   WebViewController? webViewController;
-  String? youtubeId;
+
   bool isFullScreen = false;
   String? errorMessage;
+  String? currentVideoUrl;
 
-  void initPlayer(String? videoUrl) {
+  void initPlayer(String? videoUrl, [String? videoTypeStr]) async {
+    if (videoUrl == currentVideoUrl && errorMessage == null) {
+      return; // Already initialized
+    }
+
+    currentVideoUrl = videoUrl;
     errorMessage = null;
+
     if (videoUrl == null || videoUrl.isEmpty) {
       _disposePlayers();
       return;
     }
 
-    final newYoutubeId = YoutubePlayerController.convertUrlToId(videoUrl);
+    // Enable Screen Protection
+    await ScreenProtector.protectDataLeakageOn();
+    await ScreenProtector.preventScreenshotOn();
 
-    if (newYoutubeId != null) {
-      youtubeId = newYoutubeId;
-      // It's a YouTube video
-      _disposeWebViewController();
+    providerType = determineVideoProvider(videoUrl, videoTypeStr);
 
-      if (ytController != null) {
-        // Reuse existing controller for instant loading!
-        ytController!.loadVideoById(videoId: youtubeId!);
-      } else {
-        // Create new controller
-        ytController = YoutubePlayerController.fromVideoId(
-          videoId: youtubeId!,
-          autoPlay: false,
-          params: const YoutubePlayerParams(
-            showFullscreenButton: true,
-            mute: false,
-            showControls: true,
-            strictRelatedVideos: true,
-          ),
-        );
+    // If it's a direct video link, force Native Player (Bunny)
+    if (_isDirectVideo(videoUrl)) {
+      providerType = VideoProviderType.bunny;
+    }
 
-        ytController!.listen((value) {
-          bool needsNotify = false;
-          
-          if (value.error != YoutubeError.none) {
-            final newError = 'عذراً، حدثت مشكلة في تحميل هذا الفيديو. (السبب: ${value.error.name})';
-            if (errorMessage != newError) {
-              errorMessage = newError;
-              needsNotify = true;
-            }
-          } else if (errorMessage != null) {
-            errorMessage = null;
-            needsNotify = true;
-          }
+    _disposePlayers(keepScreenProtection: true); // Clear previous controllers
 
-          if (value.fullScreenOption.enabled != isFullScreen) {
-            final bool wasPlaying = value.playerState == PlayerState.playing;
-            isFullScreen = value.fullScreenOption.enabled;
-            
-            if (isFullScreen) {
-              SystemChrome.setPreferredOrientations([
-                DeviceOrientation.landscapeLeft,
-                DeviceOrientation.landscapeRight,
-              ]);
-            } else {
-              SystemChrome.setPreferredOrientations([
-                DeviceOrientation.portraitUp,
-                DeviceOrientation.portraitDown,
-              ]);
-            }
-            
-            // Fix: Android WebView sometimes pauses the video when changing orientations/parents.
-            if (wasPlaying) {
-              Future.delayed(const Duration(milliseconds: 400), () {
-                ytController?.playVideo();
-              });
-            }
-            needsNotify = true;
-          }
-
-          if (needsNotify) notifyListeners();
-        });
+    try {
+      switch (providerType) {
+        case VideoProviderType.youtube:
+          _initYoutube(videoUrl);
+          break;
+        case VideoProviderType.bunny:
+          _initNative(videoUrl);
+          break;
+        case VideoProviderType.vimeo:
+        case VideoProviderType.viewlock:
+        case VideoProviderType.unknown:
+          final embedUrl = formatEmbedUrl(videoUrl, providerType);
+          _initWebView(embedUrl);
+          break;
       }
-    } else {
-      // It's Vimeo, Bunny, Viewlock, or other embed URL
-      youtubeId = null;
-      _disposeYoutubeController();
-
-      if (webViewController != null) {
-        webViewController!.loadRequest(Uri.parse(videoUrl));
-      } else {
-        webViewController = WebViewController()
-          ..setJavaScriptMode(JavaScriptMode.unrestricted)
-          ..setBackgroundColor(Colors.black)
-          ..setNavigationDelegate(
-            NavigationDelegate(
-              onPageFinished: (String url) {
-                webViewController?.runJavaScript(
-                  "document.oncontextmenu = function() { return false; }; "
-                  "document.onselectstart = function() { return false; }; "
-                  "document.body.style.userSelect = 'none'; "
-                  "document.body.style.webkitUserSelect = 'none'; "
-                  "document.body.style.webkitTouchCallout = 'none'; "
-                );
-              },
-              onWebResourceError: (WebResourceError error) {
-                errorMessage = 'فشل تحميل الفيديو. يرجى التحقق من اتصالك بالإنترنت.';
-                notifyListeners();
-              },
-            ),
-          )
-          ..loadRequest(Uri.parse(videoUrl));
-      }
+    } catch (e) {
+      errorMessage = 'عذراً، حدثت مشكلة في تهيئة الفيديو.';
     }
 
     notifyListeners();
   }
 
-  void _disposePlayers() {
-    _disposeYoutubeController();
-    _disposeWebViewController();
-    notifyListeners();
+  void _initYoutube(String url) {
+    final youtubeId = YoutubePlayerController.convertUrlToId(url) ?? url;
+    ytController = YoutubePlayerController.fromVideoId(
+      videoId: youtubeId,
+      autoPlay: false,
+      params: const YoutubePlayerParams(
+        showFullscreenButton: false,
+        mute: false,
+        showControls: false,
+        strictRelatedVideos: true,
+        pointerEvents: PointerEvents.initial,
+      ),
+    );
+    adapter = CourseYoutubeAdapter(ytController!);
+
+    ytController!.listen((value) {
+      bool needsNotify = false;
+
+      if (value.error != YoutubeError.none) {
+        final newError =
+            'عذراً، حدثت مشكلة في تحميل هذا الفيديو. (السبب: ${value.error.name})';
+        if (errorMessage != newError) {
+          errorMessage = newError;
+          needsNotify = true;
+        }
+      }
+
+      if (value.fullScreenOption.enabled != isFullScreen) {
+        final bool wasPlaying = value.playerState == PlayerState.playing;
+        _toggleFullScreen(value.fullScreenOption.enabled);
+
+        // Fix: Android WebView sometimes pauses the video when changing orientations
+        if (wasPlaying) {
+          Timer(const Duration(milliseconds: 400), () {
+            ytController?.playVideo();
+          });
+        }
+        needsNotify = true;
+      }
+      if (needsNotify) notifyListeners();
+    });
   }
 
-  void _disposeYoutubeController() {
-    ytController?.close();
-    ytController = null;
+  void _initNative(String url) {
+    nativeController = VideoPlayerController.networkUrl(Uri.parse(url));
+    nativeController!
+        .initialize()
+        .then((_) {
+          notifyListeners();
+        })
+        .catchError((e) {
+          errorMessage = 'عذراً، تعذر تشغيل الفيديو.';
+          notifyListeners();
+        });
+    nativeController!.addListener(() {
+      if (nativeController!.value.hasError) {
+        errorMessage = 'عذراً، حدث خطأ أثناء تشغيل الفيديو.';
+        notifyListeners();
+      }
+    });
+    adapter = CourseNativeAdapter(nativeController!);
   }
 
-  void _disposeWebViewController() {
-    webViewController = null;
+  void _initWebView(String url) {
+    debugPrint('Init WebView with URL: $url');
+
+    webViewController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted);
+
+    if (webViewController!.platform is AndroidWebViewController) {
+      (webViewController!.platform as AndroidWebViewController)
+          .setMediaPlaybackRequiresUserGesture(false);
+    }
+
+    webViewController!
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onNavigationRequest: (NavigationRequest request) {
+            debugPrint('WebView NavigationRequest: ${request.url}');
+
+            // Allow standard web navigation for the player to work (redirects, iframes, CDNs)
+            // Block only completely unhandled schemes to prevent crashes
+            if (request.url.startsWith('intent://') ||
+                request.url.startsWith('mailto:') ||
+                request.url.startsWith('tel:')) {
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
+          },
+          onWebResourceError: (WebResourceError error) {
+            debugPrint(
+              'WebView Error: URL: $url | ErrorCode: ${error.errorCode} | Description: ${error.description}',
+            );
+            // Don't show error for standard tracking/ad blockers failing
+            if (error.errorCode != -2 && error.description.isNotEmpty) {
+              errorMessage =
+                  'WebView Error: ${error.errorCode} - ${error.description}';
+              notifyListeners();
+            }
+          },
+          onPageStarted: (String pageUrl) {
+            debugPrint('WebView PageStarted: $pageUrl');
+          },
+          onPageFinished: (String pageUrl) {
+            debugPrint('WebView PageFinished: $pageUrl');
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse(url));
+    adapter = CourseWebViewAdapter(webViewController!);
+  }
+
+  bool _isDirectVideo(String url) {
+    final lower = url.toLowerCase();
+    return lower.endsWith('.mp4') ||
+        lower.endsWith('.m3u8') ||
+        lower.contains('.mp4?') ||
+        lower.contains('.m3u8?');
+  }
+
+  void _toggleFullScreen(bool fullScreen) {
+    isFullScreen = fullScreen;
+    if (isFullScreen) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    } else {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+    }
   }
 
   void exitFullScreen() {
-    ytController?.exitFullScreen();
+    _toggleFullScreen(false);
+    notifyListeners();
+  }
+
+  void toggleFullScreen() {
+    _toggleFullScreen(!isFullScreen);
+    notifyListeners();
+  }
+
+  void _disposePlayers({bool keepScreenProtection = false}) {
+    adapter?.disposeAdapter();
+    adapter = null;
+
+    ytController?.close();
+    ytController = null;
+
+    nativeController?.dispose();
+    nativeController = null;
+
+    webViewController = null;
+
+    if (!keepScreenProtection) {
+      ScreenProtector.protectDataLeakageOff();
+      ScreenProtector.preventScreenshotOff();
+    }
   }
 
   @override
@@ -144,8 +244,7 @@ class CourseVideoPlayerManager extends ChangeNotifier {
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
-    _disposeYoutubeController();
-    _disposeWebViewController();
+    _disposePlayers();
     super.dispose();
   }
 }

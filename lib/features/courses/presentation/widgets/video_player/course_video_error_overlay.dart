@@ -40,7 +40,7 @@ class CourseVideoErrorOverlay extends StatelessWidget {
               ),
               SizedBox(height: 12.h),
               AppText(
-                'الفيديو غير متاح',
+                errorMessage.isNotEmpty ? errorMessage : 'الفيديو غير متاح',
                 style: font16w700.copyWith(color: Colors.white),
                 alignment: AlignmentDirectional.center,
               ),

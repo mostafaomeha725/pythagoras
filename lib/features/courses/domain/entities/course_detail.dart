@@ -9,6 +9,7 @@ class CourseDetail {
   final String className;
   final String? imageUrl;
   final String? introVideoUrl;
+  final String? introVideoType;
   final bool isEnrolled;
   final String price;
   final String? discountPrice;
@@ -32,6 +33,7 @@ class CourseDetail {
     required this.className,
     this.imageUrl,
     this.introVideoUrl,
+    this.introVideoType,
     required this.isEnrolled,
     required this.price,
     this.discountPrice,
@@ -54,6 +56,7 @@ class CourseDetail {
     String? className,
     String? imageUrl,
     String? introVideoUrl,
+    String? introVideoType,
     bool? isEnrolled,
     String? price,
     String? discountPrice,
@@ -75,6 +78,7 @@ class CourseDetail {
       className: className ?? this.className,
       imageUrl: imageUrl ?? this.imageUrl,
       introVideoUrl: introVideoUrl ?? this.introVideoUrl,
+      introVideoType: introVideoType ?? this.introVideoType,
       isEnrolled: isEnrolled ?? this.isEnrolled,
       price: price ?? this.price,
       discountPrice: discountPrice ?? this.discountPrice,

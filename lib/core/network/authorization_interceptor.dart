@@ -2,8 +2,12 @@ import 'package:pythagoras/core/cache/preferences_storage.dart';
 import 'package:dio/dio.dart';
 import '/core/di/services_locator.dart';
 import 'package:pythagoras/core/routes/app_routes.dart';
+import 'package:pythagoras/core/routes/route_paths.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pythagoras/features/profile/presentation/cubit/profile/profile_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/courses_list/courses_list_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/classes/classes_cubit.dart';
 import 'package:pythagoras/core/utils/easy_loading.dart';
 import 'package:pythagoras/core/cache/hive_storage.dart';
 
@@ -54,6 +58,16 @@ class AuthorizationInterceptor extends Interceptor {
       if (context != null) {
         if (context.mounted) {
           context.read<ProfileCubit>().resetProfile();
+          
+          final coursesCubit = context.read<CoursesListCubit>();
+          coursesCubit.resetCourses();
+          coursesCubit.fetchCourses();
+          
+          final classesCubit = context.read<ClassesCubit>();
+          classesCubit.resetClasses();
+          classesCubit.fetchClasses();
+          
+          context.go(Routes.mainNavigationScreen);
         }
       }
       
