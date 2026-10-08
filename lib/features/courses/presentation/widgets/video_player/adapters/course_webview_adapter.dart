@@ -12,14 +12,37 @@ class CourseWebViewAdapter extends CourseVideoAdapter {
   double _volume = 1.0;
   bool _isMuted = false;
 
+  @override
+  bool get supportsVolume => false;
+
   CourseWebViewAdapter(this.controller) {
-    _timer = Timer.periodic(const Duration(milliseconds: 500), (_) => _syncState());
+    _timer = Timer.periodic(
+      const Duration(milliseconds: 500),
+      (_) => _syncState(),
+    );
   }
 
   Future<void> _syncState() async {
     try {
       final jsResult = await controller.runJavaScriptReturningResult('''
         (function() {
+          var style = document.getElementById('custom-hide-style');
+          if (!style) {
+            style = document.createElement('style');
+            style.id = 'custom-hide-style';
+            // Only hide the big central play button for Plyr (used by Bunny).
+            // Avoiding general selectors to not affect other providers.
+            style.innerHTML = `
+              .plyr__control--overlaid { 
+                display: none !important; 
+                opacity: 0 !important; 
+                visibility: hidden !important; 
+                z-index: -9999 !important; 
+                pointer-events: none !important;
+              }
+            `;
+            document.head.appendChild(style);
+          }
           var v = document.querySelector('video');
           if (!v) return null;
           return JSON.stringify({
@@ -37,7 +60,7 @@ class CourseWebViewAdapter extends CourseVideoAdapter {
         if (resultStr.startsWith("'") || resultStr.startsWith('"')) {
           resultStr = resultStr.substring(1, resultStr.length - 1);
         }
-        
+
         // primitive JSON parsing to avoid heavy imports
         bool paused = resultStr.contains('"paused":true');
         double currentTime = _extractDouble(resultStr, '"currentTime":');
@@ -111,7 +134,9 @@ class CourseWebViewAdapter extends CourseVideoAdapter {
   @override
   void seekTo(Duration pos) {
     final seconds = pos.inMilliseconds / 1000.0;
-    controller.runJavaScript("document.querySelector('video').currentTime = $seconds;");
+    controller.runJavaScript(
+      "document.querySelector('video').currentTime = $seconds;",
+    );
     _position = pos;
     notifyListeners();
   }
@@ -124,7 +149,9 @@ class CourseWebViewAdapter extends CourseVideoAdapter {
   @override
   void toggleMute() {
     final newMuted = !_isMuted;
-    controller.runJavaScript("document.querySelector('video').muted = $newMuted;");
+    controller.runJavaScript(
+      "document.querySelector('video').muted = $newMuted;",
+    );
     _isMuted = newMuted;
     notifyListeners();
   }

@@ -1,6 +1,5 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:video_player/video_player.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -23,6 +22,9 @@ class CourseVideoPlayerManager extends ChangeNotifier {
   VideoPlayerController? nativeController;
   WebViewController? webViewController;
 
+  // GlobalKey to maintain player state across route changes (Fullscreen)
+  final GlobalKey playerKey = GlobalKey();
+
   bool isFullScreen = false;
   String? errorMessage;
   String? currentVideoUrl;
@@ -44,12 +46,21 @@ class CourseVideoPlayerManager extends ChangeNotifier {
     await ScreenProtector.protectDataLeakageOn();
     await ScreenProtector.preventScreenshotOn();
 
-    providerType = determineVideoProvider(videoUrl, videoTypeStr);
+    final newProviderType = determineVideoProvider(videoUrl, videoTypeStr);
+    final actualNewProviderType = _isDirectVideo(videoUrl) ? VideoProviderType.bunny : newProviderType;
 
-    // If it's a direct video link, force Native Player (Bunny)
-    if (_isDirectVideo(videoUrl)) {
-      providerType = VideoProviderType.bunny;
+    // Reuse existing YouTube controller if switching between YouTube videos
+    if (providerType == VideoProviderType.youtube &&
+        actualNewProviderType == VideoProviderType.youtube &&
+        ytController != null) {
+      final youtubeId = YoutubePlayerController.convertUrlToId(videoUrl) ?? videoUrl;
+      ytController!.loadVideoById(videoId: youtubeId);
+      currentVideoUrl = videoUrl;
+      notifyListeners();
+      return;
     }
+
+    providerType = actualNewProviderType;
 
     _disposePlayers(keepScreenProtection: true); // Clear previous controllers
 
@@ -79,7 +90,7 @@ class CourseVideoPlayerManager extends ChangeNotifier {
     final youtubeId = YoutubePlayerController.convertUrlToId(url) ?? url;
     ytController = YoutubePlayerController.fromVideoId(
       videoId: youtubeId,
-      autoPlay: false,
+      autoPlay: true,
       params: const YoutubePlayerParams(
         showFullscreenButton: false,
         mute: false,
@@ -102,18 +113,6 @@ class CourseVideoPlayerManager extends ChangeNotifier {
         }
       }
 
-      if (value.fullScreenOption.enabled != isFullScreen) {
-        final bool wasPlaying = value.playerState == PlayerState.playing;
-        _toggleFullScreen(value.fullScreenOption.enabled);
-
-        // Fix: Android WebView sometimes pauses the video when changing orientations
-        if (wasPlaying) {
-          Timer(const Duration(milliseconds: 400), () {
-            ytController?.playVideo();
-          });
-        }
-        needsNotify = true;
-      }
       if (needsNotify) notifyListeners();
     });
   }
@@ -197,17 +196,6 @@ class CourseVideoPlayerManager extends ChangeNotifier {
 
   void _toggleFullScreen(bool fullScreen) {
     isFullScreen = fullScreen;
-    if (isFullScreen) {
-      SystemChrome.setPreferredOrientations([
-        DeviceOrientation.landscapeLeft,
-        DeviceOrientation.landscapeRight,
-      ]);
-    } else {
-      SystemChrome.setPreferredOrientations([
-        DeviceOrientation.portraitUp,
-        DeviceOrientation.portraitDown,
-      ]);
-    }
   }
 
   void exitFullScreen() {
@@ -240,10 +228,6 @@ class CourseVideoPlayerManager extends ChangeNotifier {
 
   @override
   void dispose() {
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
     _disposePlayers();
     super.dispose();
   }

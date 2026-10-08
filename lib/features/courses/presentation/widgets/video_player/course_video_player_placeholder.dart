@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:pythagoras/core/utils/system_ui_manager.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/video_player/course_video_player_manager.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/video_player/course_video_fallback.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/video_player/course_youtube_player.dart';
@@ -53,6 +54,9 @@ class _CourseVideoPlayerPlaceholderState
 
   @override
   void dispose() {
+    if (_manager.isFullScreen) {
+      SystemUiManager.exitFullscreen();
+    }
     _manager.removeListener(_onManagerStateChanged);
     _manager.dispose();
     super.dispose();
@@ -64,54 +68,141 @@ class _CourseVideoPlayerPlaceholderState
       return CourseVideoFallback(imageUrl: widget.imageUrl);
     }
 
-    return PopScope(
-      canPop: !_manager.isFullScreen,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        if (_manager.isFullScreen) {
-          _manager.exitFullScreen();
-        }
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16.r),
-        child: _manager.errorMessage != null
-            ? Stack(
-                children: [
-                  CourseVideoFallback(imageUrl: widget.imageUrl),
-                  Positioned.fill(
-                    child: CourseVideoErrorOverlay(
-                      errorMessage: _manager.errorMessage!,
-                      onRetry: () => _manager.initPlayer(
-                        widget.videoUrl,
-                        widget.videoType,
-                      ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16.r),
+      child: _manager.errorMessage != null
+          ? Stack(
+              children: [
+                CourseVideoFallback(imageUrl: widget.imageUrl),
+                Positioned.fill(
+                  child: CourseVideoErrorOverlay(
+                    errorMessage: _manager.errorMessage!,
+                    onRetry: () => _manager.initPlayer(
+                      widget.videoUrl,
+                      widget.videoType,
                     ),
                   ),
-                ],
-              )
-            : _buildPlayer(),
-      ),
+                ),
+              ],
+            )
+          : _buildPlayer(),
     );
   }
 
   Widget _buildPlayer() {
-    Widget? playerWidget;
+    if (_manager.adapter == null) {
+      return CourseVideoFallback(imageUrl: widget.imageUrl);
+    }
+
+    if (_manager.isFullScreen) {
+      // Return empty when in fullscreen to avoid duplicate GlobalKeys in widget tree
+      return const SizedBox.shrink();
+    }
+
+    return _buildPlayerWidget();
+  }
+
+  void _triggerExitFullscreen() {
+    // 1. Rotate device back to Portrait WHILE STILL in the unrestricted Fullscreen Route.
+    // This prevents the Portrait Route's Column from overflowing during the orientation change.
+    SystemUiManager.exitFullscreen().then((_) {
+      // 2. Wait for the engine to complete the layout in Portrait mode.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        // 3. Now that the screen is safely Portrait, relinquish the GlobalKey and pop.
+        if (_manager.isFullScreen) {
+          _manager.exitFullScreen();
+        }
+        Navigator.of(context, rootNavigator: true).pop();
+      });
+    });
+  }
+
+  Future<void> _handleFullscreenToggle() async {
+    if (!_manager.isFullScreen) {
+      // 1. Sync state change + route push FIRST.
+      // This safely extracts the GlobalKey from the restrictive Portrait Route 
+      // (which has Columns that can overflow) into the unrestricted Fullscreen Route.
+      _manager.toggleFullScreen();
+      
+      Navigator.of(context, rootNavigator: true).push(
+        PageRouteBuilder(
+          opaque: false, // Keeps the underlying route in the render tree to prevent Surface detachment
+          fullscreenDialog: true,
+          transitionDuration: const Duration(milliseconds: 250),
+          reverseTransitionDuration: const Duration(milliseconds: 250),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: animation,
+              child: child,
+            );
+          },
+          pageBuilder: (context, animation, secondaryAnimation) {
+            return PopScope(
+              canPop: false,
+              onPopInvokedWithResult: (didPop, result) {
+                if (didPop) return;
+                _triggerExitFullscreen();
+              },
+              child: Scaffold(
+                backgroundColor: Colors.black,
+                body: AnimatedBuilder(
+                  animation: _manager,
+                  builder: (context, child) {
+                    return Center(
+                      child: _manager.isFullScreen
+                          ? _buildPlayerWidget(isFullscreenRoute: true)
+                          : const SizedBox.shrink(),
+                    );
+                  },
+                ),
+              ),
+            );
+          },
+        ),
+      );
+      
+      // 2. Wait ONE frame to guarantee the RenderTree has fully reparented the PlatformView.
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (mounted) {
+          // 3. NOW rotate the device. The Fullscreen Route will smoothly resize without overflowing!
+          await SystemUiManager.enterFullscreen();
+        }
+      });
+      
+    } else {
+      // Exiting fullscreen programmatically (via UI button)
+      _triggerExitFullscreen();
+    }
+  }
+
+  Widget _buildPlayerWidget({bool isFullscreenRoute = false}) {
+    final customControls = CourseVideoPlayerView(
+      key: ValueKey('${widget.videoUrl}_$isFullscreenRoute'),
+      adapter: _manager.adapter!,
+      isFullScreen: _manager.isFullScreen,
+      onToggleFullScreen: _handleFullscreenToggle,
+    );
+
+    Widget? player;
 
     switch (_manager.providerType) {
       case VideoProviderType.youtube:
         if (_manager.ytController != null) {
-          playerWidget = CourseYoutubePlayer(
-            key: ValueKey(_manager.ytController.hashCode),
+          player = CourseYoutubePlayer(
+            key: _manager.playerKey,
             controller: _manager.ytController!,
+            customControls: customControls,
           );
         }
         break;
       case VideoProviderType.bunny:
         if (_manager.nativeController != null &&
             _manager.nativeController!.value.isInitialized) {
-          playerWidget = CourseNativeVideoPlayer(
-            key: ValueKey(_manager.nativeController.hashCode),
+          player = CourseNativeVideoPlayer(
+            key: _manager.playerKey,
             controller: _manager.nativeController!,
+            customControls: customControls,
           );
         }
         break;
@@ -119,27 +210,26 @@ class _CourseVideoPlayerPlaceholderState
       case VideoProviderType.viewlock:
       case VideoProviderType.unknown:
         if (_manager.webViewController != null) {
-          playerWidget = CourseWebviewPlayer(
-            key: ValueKey(_manager.webViewController.hashCode),
+          player = CourseWebviewPlayer(
+            key: _manager.playerKey,
             controller: _manager.webViewController!,
+            customControls: customControls,
           );
         }
         break;
     }
 
-    if (playerWidget != null && _manager.adapter != null) {
-      return CourseVideoPlayerView(
-        key: ValueKey(widget.videoUrl), // Forces full rebuild on video change
-        adapter: _manager.adapter!,
-        playerWidget: playerWidget,
-        isFullScreen: _manager.isFullScreen,
-        onToggleFullScreen: () {
-          _manager.toggleFullScreen();
-        },
+    if (player == null) {
+      return CourseVideoFallback(imageUrl: widget.imageUrl);
+    }
+
+    if (!isFullscreenRoute) {
+      return AspectRatio(
+        aspectRatio: 16 / 9,
+        child: player,
       );
     }
 
-    // Loading state or fallback
-    return CourseVideoFallback(imageUrl: widget.imageUrl);
+    return player;
   }
 }

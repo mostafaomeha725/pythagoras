@@ -32,9 +32,11 @@ class CourseRecordedChaptersList extends StatelessWidget {
       children: [
         Row(
           children: [
-            AppText(
-              'محتوى الدورة',
-              style: font18w700.copyWith(color: const Color(0xFF1E1E2D)),
+            Expanded(
+              child: AppText(
+                'محتوى الدورة',
+                style: font18w700.copyWith(color: const Color(0xFF1E1E2D)),
+              ),
             ),
             SizedBox(width: 12.w),
             Container(

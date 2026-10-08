@@ -7,6 +7,14 @@ abstract class CourseVideoAdapter extends ChangeNotifier {
   Duration get duration;
   double get volume;
 
+  // Capabilities
+  bool get supportsPlayPause => true;
+  bool get supportsSeek => true;
+  bool get supportsVolume => true;
+  bool get supportsPosition => true;
+  bool get supportsDuration => true;
+  bool get supportsCustomControls => true;
+
   void play();
   void pause();
   void togglePlayPause();

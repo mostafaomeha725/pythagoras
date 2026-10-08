@@ -73,9 +73,13 @@ class CourseRecordedCurrentLessonInfo extends StatelessWidget {
                 ),
               ),
             ),
-            AppText(
-              course.instructor?.name ?? '',
-              style: font12w500.copyWith(color: const Color(0xFF6B7280)),
+            Expanded(
+              child: AppText(
+                course.instructor?.name ?? '',
+                style: font12w500.copyWith(color: const Color(0xFF6B7280)),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),

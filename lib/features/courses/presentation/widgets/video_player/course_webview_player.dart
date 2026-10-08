@@ -3,8 +3,13 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 class CourseWebviewPlayer extends StatefulWidget {
   final WebViewController controller;
+  final Widget customControls;
 
-  const CourseWebviewPlayer({super.key, required this.controller});
+  const CourseWebviewPlayer({
+    super.key,
+    required this.controller,
+    required this.customControls,
+  });
 
   @override
   State<CourseWebviewPlayer> createState() => _CourseWebviewPlayerState();
@@ -13,9 +18,12 @@ class CourseWebviewPlayer extends StatefulWidget {
 class _CourseWebviewPlayerState extends State<CourseWebviewPlayer> {
   @override
   Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: 16 / 9,
-      child: WebViewWidget(controller: widget.controller),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        WebViewWidget(controller: widget.controller),
+        widget.customControls,
+      ],
     );
   }
 }
