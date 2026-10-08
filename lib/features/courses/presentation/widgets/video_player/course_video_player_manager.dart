@@ -73,10 +73,13 @@ class CourseVideoPlayerManager extends ChangeNotifier {
           _initNative(videoUrl);
           break;
         case VideoProviderType.vimeo:
+          final embedUrl = formatEmbedUrl(videoUrl, providerType);
+          _initWebView(embedUrl, isVimeo: true);
+          break;
         case VideoProviderType.viewlock:
         case VideoProviderType.unknown:
           final embedUrl = formatEmbedUrl(videoUrl, providerType);
-          _initWebView(embedUrl);
+          _initWebView(embedUrl, isVimeo: false);
           break;
       }
     } catch (e) {
@@ -137,8 +140,8 @@ class CourseVideoPlayerManager extends ChangeNotifier {
     adapter = CourseNativeAdapter(nativeController!);
   }
 
-  void _initWebView(String url) {
-    debugPrint('Init WebView with URL: $url');
+  void _initWebView(String url, {bool isVimeo = false}) {
+    debugPrint('Init WebView with URL: $url (isVimeo: $isVimeo)');
 
     webViewController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted);
@@ -148,42 +151,97 @@ class CourseVideoPlayerManager extends ChangeNotifier {
           .setMediaPlaybackRequiresUserGesture(false);
     }
 
-    webViewController!
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onNavigationRequest: (NavigationRequest request) {
-            debugPrint('WebView NavigationRequest: ${request.url}');
+    adapter = CourseWebViewAdapter(webViewController!, isVimeo: isVimeo);
 
-            // Allow standard web navigation for the player to work (redirects, iframes, CDNs)
-            // Block only completely unhandled schemes to prevent crashes
-            if (request.url.startsWith('intent://') ||
-                request.url.startsWith('mailto:') ||
-                request.url.startsWith('tel:')) {
-              return NavigationDecision.prevent;
-            }
-            return NavigationDecision.navigate;
-          },
-          onWebResourceError: (WebResourceError error) {
-            debugPrint(
-              'WebView Error: URL: $url | ErrorCode: ${error.errorCode} | Description: ${error.description}',
-            );
-            // Don't show error for standard tracking/ad blockers failing
-            if (error.errorCode != -2 && error.description.isNotEmpty) {
-              errorMessage =
-                  'WebView Error: ${error.errorCode} - ${error.description}';
-              notifyListeners();
-            }
-          },
-          onPageStarted: (String pageUrl) {
-            debugPrint('WebView PageStarted: $pageUrl');
-          },
-          onPageFinished: (String pageUrl) {
-            debugPrint('WebView PageFinished: $pageUrl');
-          },
-        ),
-      )
-      ..loadRequest(Uri.parse(url));
-    adapter = CourseWebViewAdapter(webViewController!);
+    webViewController!.setNavigationDelegate(
+      NavigationDelegate(
+        onNavigationRequest: (NavigationRequest request) {
+          debugPrint('WebView NavigationRequest: \${request.url}');
+
+          if (request.url.startsWith('intent://') ||
+              request.url.startsWith('mailto:') ||
+              request.url.startsWith('tel:')) {
+            return NavigationDecision.prevent;
+          }
+          return NavigationDecision.navigate;
+        },
+        onWebResourceError: (WebResourceError error) {
+          debugPrint(
+            'WebView Error: URL: $url | ErrorCode: \${error.errorCode} | Description: \${error.description}',
+          );
+          if (error.errorCode != -2 && error.description.isNotEmpty) {
+            errorMessage =
+                'WebView Error: \${error.errorCode} - \${error.description}';
+            notifyListeners();
+          }
+        },
+      ),
+    );
+
+    if (isVimeo) {
+      final videoId = _extractVimeoId(url);
+      final html = '''
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+          <style>body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: black; overflow: hidden; }</style>
+        </head>
+        <body>
+          <iframe id="vimeo-player" src="https://player.vimeo.com/video/$videoId?controls=0&autoplay=1&playsinline=1" width="100%" height="100%" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
+          <script src="https://player.vimeo.com/api/player.js"></script>
+          <script>
+            var iframe = document.querySelector('iframe');
+            var player = new Vimeo.Player(iframe);
+            
+            player.on('timeupdate', function(data) {
+               window.VimeoFlutterChannel.postMessage(JSON.stringify({
+                  event: 'timeupdate',
+                  duration: data.duration,
+                  currentTime: data.seconds
+               }));
+            });
+            player.on('play', function() {
+               window.VimeoFlutterChannel.postMessage(JSON.stringify({ event: 'play' }));
+            });
+            player.on('pause', function() {
+               window.VimeoFlutterChannel.postMessage(JSON.stringify({ event: 'pause' }));
+            });
+            
+            window.flutterPlay = function() { player.play(); };
+            window.flutterPause = function() { player.pause(); };
+            window.flutterSeek = function(sec) { player.setCurrentTime(sec); };
+            window.flutterVolume = function(vol) { player.setVolume(vol); };
+            
+            player.getDuration().then(function(dur) {
+                window.VimeoFlutterChannel.postMessage(JSON.stringify({
+                  event: 'ready',
+                  duration: dur
+               }));
+            }).catch(function() {});
+          </script>
+        </body>
+        </html>
+      ''';
+      webViewController!.addJavaScriptChannel('VimeoFlutterChannel', onMessageReceived: (msg) {
+        if (adapter is CourseWebViewAdapter) {
+          (adapter as CourseWebViewAdapter).handleVimeoMessage(msg.message);
+        }
+      });
+      webViewController!.loadHtmlString(html);
+    } else {
+      webViewController!.loadRequest(Uri.parse(url));
+    }
+  }
+
+  String _extractVimeoId(String url) {
+    final regex = RegExp(r'vimeo\.com/(?:video/)?(\d+)');
+    final match = regex.firstMatch(url);
+    if (match != null) {
+      return match.group(1) ?? url;
+    }
+    // fallback
+    return url;
   }
 
   bool _isDirectVideo(String url) {

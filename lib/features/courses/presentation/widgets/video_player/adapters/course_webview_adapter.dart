@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'course_video_adapter.dart';
 
 class CourseWebViewAdapter extends CourseVideoAdapter {
   final WebViewController controller;
+  final bool isVimeo;
   Timer? _timer;
 
   bool _isPlaying = false;
@@ -15,11 +18,43 @@ class CourseWebViewAdapter extends CourseVideoAdapter {
   @override
   bool get supportsVolume => false;
 
-  CourseWebViewAdapter(this.controller) {
-    _timer = Timer.periodic(
-      const Duration(milliseconds: 500),
-      (_) => _syncState(),
-    );
+  CourseWebViewAdapter(this.controller, {this.isVimeo = false}) {
+    if (!isVimeo) {
+      _timer = Timer.periodic(
+        const Duration(milliseconds: 500),
+        (_) => _syncState(),
+      );
+    }
+  }
+
+  void handleVimeoMessage(String message) {
+    try {
+      final Map<String, dynamic> data = jsonDecode(message);
+      final event = data['event'];
+      
+      debugPrint('[VIMEO] JS Event: $event, Data: $data');
+
+      if (event == 'ready') {
+        final dur = (data['duration'] as num?)?.toDouble() ?? 0.0;
+        if (dur > 0) _duration = Duration(milliseconds: (dur * 1000).toInt());
+        debugPrint('[VIMEO] duration = ${_duration.inSeconds}s');
+      } else if (event == 'timeupdate') {
+        final dur = (data['duration'] as num?)?.toDouble() ?? 0.0;
+        final curr = (data['currentTime'] as num?)?.toDouble() ?? 0.0;
+        if (dur > 0) _duration = Duration(milliseconds: (dur * 1000).toInt());
+        if (curr >= 0) _position = Duration(milliseconds: (curr * 1000).toInt());
+        debugPrint('[VIMEO] currentTime = ${_position.inSeconds}s');
+      } else if (event == 'play') {
+        _isPlaying = true;
+        debugPrint('[VIMEO] play');
+      } else if (event == 'pause') {
+        _isPlaying = false;
+        debugPrint('[VIMEO] pause');
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('[VIMEO] message parse error: $e');
+    }
   }
 
   Future<void> _syncState() async {
@@ -43,54 +78,87 @@ class CourseWebViewAdapter extends CourseVideoAdapter {
             `;
             document.head.appendChild(style);
           }
-          var v = document.querySelector('video');
-          if (!v) return null;
+          var videos = document.getElementsByTagName('video');
+          var v = null;
+          var maxDur = 0;
+          for (var i = 0; i < videos.length; i++) {
+            if (videos[i].duration && !isNaN(videos[i].duration) && videos[i].duration > maxDur) {
+              maxDur = videos[i].duration;
+              v = videos[i];
+            }
+          }
+          if (!v && videos.length > 0) v = videos[0];
+          
+          if (!v) {
+            return JSON.stringify({ error: 'No video element found' });
+          }
+          
           return JSON.stringify({
             paused: v.paused,
             currentTime: v.currentTime,
             duration: v.duration,
             volume: v.volume,
-            muted: v.muted
+            muted: v.muted,
+            vimeo_videos_count: videos.length
           });
         })();
       ''');
 
-      if (jsResult != null && jsResult != 'null') {
+      debugPrint('[VIMEO] RAW JS RESULT: $jsResult');
+
+      if (jsResult.toString() != 'null') {
         String resultStr = jsResult.toString();
-        if (resultStr.startsWith("'") || resultStr.startsWith('"')) {
-          resultStr = resultStr.substring(1, resultStr.length - 1);
+
+        // runJavaScriptReturningResult returns a JSON-encoded string for string results.
+        if (resultStr.startsWith('"') || resultStr.startsWith("'")) {
+          try {
+            resultStr = jsonDecode(resultStr);
+          } catch (_) {
+            resultStr = resultStr
+                .substring(1, resultStr.length - 1)
+                .replaceAll(r'\"', '"');
+          }
         }
 
-        // primitive JSON parsing to avoid heavy imports
-        bool paused = resultStr.contains('"paused":true');
-        double currentTime = _extractDouble(resultStr, '"currentTime":');
-        double duration = _extractDouble(resultStr, '"duration":');
-        double volume = _extractDouble(resultStr, '"volume":');
-        bool muted = resultStr.contains('"muted":true');
+        try {
+          final Map<String, dynamic> data = jsonDecode(resultStr);
+          debugPrint('[VIMEO] PARSED JSON DATA: $data');
 
-        _isPlaying = !paused;
-        if (!duration.isNaN && duration > 0) {
-          _duration = Duration(milliseconds: (duration * 1000).toInt());
+          if (data.containsKey('error')) {
+            debugPrint('[VIMEO] JS ERROR: ${data['error']}');
+            return;
+          }
+
+          bool paused = data['paused'] == true;
+          double currentTime = (data['currentTime'] as num?)?.toDouble() ?? 0.0;
+          double duration = (data['duration'] as num?)?.toDouble() ?? 0.0;
+          double volume = (data['volume'] as num?)?.toDouble() ?? 1.0;
+          bool muted = data['muted'] == true;
+
+          debugPrint(
+            '[VIMEO] EXTRACTED -> duration: $duration, currentTime: $currentTime, paused: $paused',
+          );
+
+          _isPlaying = !paused;
+          if (duration > 0 && !duration.isNaN) {
+            _duration = Duration(milliseconds: (duration * 1000).toInt());
+          }
+          if (currentTime >= 0 && !currentTime.isNaN) {
+            _position = Duration(milliseconds: (currentTime * 1000).toInt());
+          }
+          _volume = volume;
+          _isMuted = muted;
+
+          debugPrint(
+            '[VIMEO] ADAPTER UPDATED -> duration: ${_duration.inSeconds}s, position: ${_position.inSeconds}s',
+          );
+
+          notifyListeners();
+        } catch (e) {
+          debugPrint('[VIMEO] JSON DECODE ERROR: $e');
         }
-        _position = Duration(milliseconds: (currentTime * 1000).toInt());
-        _volume = volume;
-        _isMuted = muted;
-
-        notifyListeners();
       }
     } catch (_) {}
-  }
-
-  double _extractDouble(String json, String key) {
-    int startIndex = json.indexOf(key);
-    if (startIndex == -1) return 0.0;
-    startIndex += key.length;
-    int endIndex = json.indexOf(',', startIndex);
-    if (endIndex == -1) {
-      endIndex = json.indexOf('}', startIndex);
-    }
-    String valStr = json.substring(startIndex, endIndex);
-    return double.tryParse(valStr) ?? 0.0;
   }
 
   @override
@@ -110,14 +178,22 @@ class CourseWebViewAdapter extends CourseVideoAdapter {
 
   @override
   void play() {
-    controller.runJavaScript("document.querySelector('video')?.play();");
+    if (isVimeo) {
+      controller.runJavaScript("if(window.flutterPlay) window.flutterPlay();");
+    } else {
+      controller.runJavaScript("document.querySelector('video')?.play();");
+    }
     _isPlaying = true;
     notifyListeners();
   }
 
   @override
   void pause() {
-    controller.runJavaScript("document.querySelector('video')?.pause();");
+    if (isVimeo) {
+      controller.runJavaScript("if(window.flutterPause) window.flutterPause();");
+    } else {
+      controller.runJavaScript("document.querySelector('video')?.pause();");
+    }
     _isPlaying = false;
     notifyListeners();
   }
@@ -134,24 +210,37 @@ class CourseWebViewAdapter extends CourseVideoAdapter {
   @override
   void seekTo(Duration pos) {
     final seconds = pos.inMilliseconds / 1000.0;
-    controller.runJavaScript(
-      "document.querySelector('video').currentTime = $seconds;",
-    );
+    if (isVimeo) {
+      controller.runJavaScript("if(window.flutterSeek) window.flutterSeek($seconds);");
+      debugPrint('[VIMEO] seeked to $seconds');
+    } else {
+      controller.runJavaScript(
+        "var v = document.querySelector('video'); if (v) v.currentTime = $seconds;",
+      );
+    }
     _position = pos;
     notifyListeners();
   }
 
   @override
   void setVolume(double vol) {
-    controller.runJavaScript("document.querySelector('video').volume = $vol;");
+    if (isVimeo) {
+      controller.runJavaScript("if(window.flutterVolume) window.flutterVolume($vol);");
+    } else {
+      controller.runJavaScript("var v = document.querySelector('video'); if (v) v.volume = $vol;");
+    }
   }
 
   @override
   void toggleMute() {
     final newMuted = !_isMuted;
-    controller.runJavaScript(
-      "document.querySelector('video').muted = $newMuted;",
-    );
+    if (isVimeo) {
+      controller.runJavaScript("if(window.flutterVolume) window.flutterVolume(${newMuted ? 0.0 : 1.0});");
+    } else {
+      controller.runJavaScript(
+        "var v = document.querySelector('video'); if (v) v.muted = $newMuted;",
+      );
+    }
     _isMuted = newMuted;
     notifyListeners();
   }
@@ -159,5 +248,6 @@ class CourseWebViewAdapter extends CourseVideoAdapter {
   @override
   void disposeAdapter() {
     _timer?.cancel();
+    _timer = null;
   }
 }
