@@ -4,7 +4,10 @@ import 'package:pythagoras/core/theme/light_colors.dart';
 import 'package:pythagoras/core/theme/styles.dart';
 import 'package:pythagoras/core/widgets/bouncing_widgets.dart';
 import 'package:pythagoras/core/widgets/custom_text.dart';
-import 'package:pythagoras/core/utils/url_launcher_helper.dart';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_easyloading/flutter_easyloading.dart';
+import 'package:pythagoras/core/services/native_download_service.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/assignments/submit_assignment_sheet.dart';
 
 /// Row of action buttons: "Download" (conditional) + "Submit" for assignment cards.
@@ -30,7 +33,23 @@ class AssignmentCardActions extends StatelessWidget {
       children: [
         if (fileUrl != null) ...[
           BounceIt(
-            onPressed: () => UrlLauncherHelper.openUrl(fileUrl!),
+            onPressed: () async {
+              EasyLoading.show(status: 'جاري التحميل...');
+              final fileName = fileUrl!.split('/').last.split('?').first;
+              final success = await NativeDownloadService().enqueueDownload(
+                url: fileUrl!,
+                title: assignmentTitle,
+                fileName: fileName.isNotEmpty ? fileName : 'assignment_file',
+              );
+              EasyLoading.dismiss();
+              if (success && !kIsWeb && Platform.isIOS) {
+                // share_plus opens the UI
+              } else if (success) {
+                EasyLoading.showSuccess('تم البدء في تحميل الملف');
+              } else {
+                EasyLoading.showError('فشل في بدء التحميل');
+              }
+            },
             child: Container(
               padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
               decoration: BoxDecoration(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:pythagoras/core/theme/light_colors.dart';
 import 'package:pythagoras/core/theme/styles.dart';
 import 'package:pythagoras/core/widgets/custom_text.dart';
 
@@ -62,14 +63,14 @@ class QuizActionButtons extends StatelessWidget {
               child: OutlinedButton(
                 onPressed: isSubmitting ? null : onPrevious,
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFFDF4FA)),
+                  side: BorderSide(color: AppLightColors.primary),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12.r),
                   ),
                 ),
                 child: AppText(
                   'السابق',
-                  style: font16w700.copyWith(color: const Color(0xFFC792B6)),
+                  style: font16w700.copyWith(color: AppLightColors.primary),
                   alignment: AlignmentDirectional.center,
                 ),
               ),

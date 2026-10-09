@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_easyloading/flutter_easyloading.dart';
+import 'package:pythagoras/core/services/native_download_service.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pythagoras/core/theme/light_colors.dart';
 import 'package:pythagoras/core/theme/styles.dart';
@@ -7,7 +11,6 @@ import 'package:pythagoras/core/widgets/custom_text.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_assignment.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/assignments/submit_assignment_sheet.dart';
 import 'package:pythagoras/core/utils/date_formatter.dart';
-import 'package:pythagoras/core/utils/url_launcher_helper.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/assignments/assignment_card_file_badge.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/assignments/assignment_status_pill.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/assignments/course_assignment_view_button.dart';
@@ -136,7 +139,23 @@ class CourseAssignmentCard extends StatelessWidget {
               // Download button
               if (fileUrl != null) ...[
                 BounceIt(
-                  onPressed: () => UrlLauncherHelper.openUrl(fileUrl),
+                  onPressed: () async {
+                    EasyLoading.show(status: 'جاري التحميل...');
+                    final fileName = fileUrl.split('/').last.split('?').first;
+                    final success = await NativeDownloadService().enqueueDownload(
+                      url: fileUrl,
+                      title: assignment.title,
+                      fileName: fileName.isNotEmpty ? fileName : 'assignment_file',
+                    );
+                    EasyLoading.dismiss();
+                    if (success && !kIsWeb && Platform.isIOS) {
+                      // share_plus opens the UI
+                    } else if (success) {
+                      EasyLoading.showSuccess('تم البدء في تحميل الملف');
+                    } else {
+                      EasyLoading.showError('فشل في بدء التحميل');
+                    }
+                  },
                   child: Container(
                     padding: EdgeInsets.symmetric(
                       horizontal: 12.w,

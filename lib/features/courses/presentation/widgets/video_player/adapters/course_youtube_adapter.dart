@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'course_video_adapter.dart';
 
@@ -25,7 +27,14 @@ class CourseYoutubeAdapter extends CourseVideoAdapter {
       final muted = await controller.isMuted;
       
       _position = Duration(milliseconds: (pos * 1000).toInt());
-      _volume = muted ? 0.0 : (vol / 100);
+      
+      bool isIOS = !kIsWeb && Platform.isIOS;
+      if (isIOS) {
+        _volume = muted ? 0.0 : 1.0;
+      } else {
+        _volume = muted ? 0.0 : (vol / 100);
+      }
+      
       _isMuted = muted;
       
       notifyListeners();
@@ -82,10 +91,21 @@ class CourseYoutubeAdapter extends CourseVideoAdapter {
 
   @override
   void toggleMute() {
+    bool isIOS = !kIsWeb && Platform.isIOS;
     if (_isMuted || _volume == 0) {
       controller.unMute();
+      if (isIOS) {
+        _isMuted = false;
+        _volume = 1.0;
+        notifyListeners();
+      }
     } else {
       controller.mute();
+      if (isIOS) {
+        _isMuted = true;
+        _volume = 0.0;
+        notifyListeners();
+      }
     }
   }
 

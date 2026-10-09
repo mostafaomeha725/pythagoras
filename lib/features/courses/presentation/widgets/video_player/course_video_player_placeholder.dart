@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pythagoras/core/utils/system_ui_manager.dart';
@@ -127,6 +129,8 @@ class _CourseVideoPlayerPlaceholderState
   }
 
   void _triggerExitFullscreen() {
+    final bool wasPlaying = _manager.adapter?.isPlaying ?? false;
+
     // 1. Rotate device back to Portrait WHILE STILL in the unrestricted Fullscreen Route.
     // This prevents the Portrait Route's Column from overflowing during the orientation change.
     SystemUiManager.exitFullscreen().then((_) {
@@ -138,12 +142,21 @@ class _CourseVideoPlayerPlaceholderState
           _manager.exitFullScreen();
         }
         Navigator.of(context, rootNavigator: true).pop();
+        
+        bool isIOS = !kIsWeb && Platform.isIOS;
+        if (isIOS && wasPlaying) {
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (mounted) _manager.adapter?.play();
+          });
+        }
       });
     });
   }
 
   Future<void> _handleFullscreenToggle() async {
     if (!_manager.isFullScreen) {
+      final bool wasPlaying = _manager.adapter?.isPlaying ?? false;
+
       // 1. Sync state change + route push FIRST.
       // This safely extracts the GlobalKey from the restrictive Portrait Route
       // (which has Columns that can overflow) into the unrestricted Fullscreen Route.
@@ -189,6 +202,13 @@ class _CourseVideoPlayerPlaceholderState
         if (mounted) {
           // 3. NOW rotate the device. The Fullscreen Route will smoothly resize without overflowing!
           await SystemUiManager.enterFullscreen();
+          
+          bool isIOS = !kIsWeb && Platform.isIOS;
+          if (isIOS && wasPlaying) {
+            Future.delayed(const Duration(milliseconds: 300), () {
+              if (mounted) _manager.adapter?.play();
+            });
+          }
         }
       });
     } else {
