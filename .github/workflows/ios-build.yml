@@ -29,7 +29,7 @@ jobs:
           APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
           APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
         run: |
-          set -e
+          set -euo pipefail
           missing=()
           for name in \
             BUILD_CERTIFICATE_BASE64 \
@@ -63,12 +63,13 @@ jobs:
 
       - name: Check iOS project
         run: |
-          test -d ios || {
-            echo "::error::The repository does not contain an ios directory."
-            exit 1
-          }
+          set -euo pipefail
           test -f ios/Runner.xcodeproj/project.pbxproj || {
             echo "::error::ios/Runner.xcodeproj/project.pbxproj was not found."
+            exit 1
+          }
+          test -f ios/Runner/Info.plist || {
+            echo "::error::ios/Runner/Info.plist was not found."
             exit 1
           }
 
@@ -78,15 +79,17 @@ jobs:
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
           BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
 
           CERTIFICATE_PATH="$RUNNER_TEMP/build_certificate.p12"
           PROFILE_PATH="$RUNNER_TEMP/build_profile.mobileprovision"
           KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
 
-          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$CERTIFICATE_PATH"
-          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
+          printf '%s' "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$CERTIFICATE_PATH"
+          printf '%s' "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
 
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
@@ -103,11 +106,75 @@ jobs:
             -S apple-tool:,apple:,codesign: \
             -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-          cp "$PROFILE_PATH" \
-            "$HOME/Library/MobileDevice/Provisioning Profiles/Pythagoras.mobileprovision"
+          mkdir -p "$PROFILE_DIR"
+          cp "$PROFILE_PATH" "$PROFILE_DIR/Pythagoras.mobileprovision"
 
           security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
+          PROFILE_PLIST="$RUNNER_TEMP/profile.plist"
+          security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST"
+
+          PROFILE_APP_ID=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$PROFILE_PLIST")
+          PROFILE_TEAM=$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$PROFILE_PLIST")
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c 'Print :Name' "$PROFILE_PLIST")
+
+          echo "Provisioning profile name: $PROFILE_NAME"
+
+          if [ "$PROFILE_APP_ID" != "${APPLE_TEAM_ID}.com.mostafaomeha725.pythagoras" ]; then
+            echo "::error::Provisioning profile App ID or Team ID does not match com.mostafaomeha725.pythagoras."
+            exit 1
+          fi
+
+          if [ "$PROFILE_TEAM" != "$APPLE_TEAM_ID" ]; then
+            echo "::error::Provisioning profile Team ID does not match APPLE_TEAM_ID."
+            exit 1
+          fi
+
+      - name: Configure Xcode manual signing
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PROVISIONING_PROFILE_NAME: ${{ secrets.PROVISIONING_PROFILE_NAME }}
+        run: |
+          set -euo pipefail
+
+          python3 <<'PY'
+          from pathlib import Path
+          import os
+          import re
+
+          path = Path("ios/Runner.xcodeproj/project.pbxproj")
+          text = path.read_text()
+          settings = {
+              "CODE_SIGN_STYLE": "Manual",
+              "DEVELOPMENT_TEAM": os.environ["APPLE_TEAM_ID"],
+              "PROVISIONING_PROFILE_SPECIFIER": os.environ["PROVISIONING_PROFILE_NAME"],
+              "CODE_SIGN_IDENTITY": "Apple Distribution",
+              "PRODUCT_BUNDLE_IDENTIFIER": "com.mostafaomeha725.pythagoras",
+          }
+
+          pattern = re.compile(r"(buildSettings = \{)(.*?)(\n\s*\};)", re.S)
+
+          def update_block(match):
+              body = match.group(2)
+              for key, value in settings.items():
+                  line = f"{key} = {value};"
+                  setting_pattern = re.compile(
+                      r"(?m)^\s*" + re.escape(key) + r"\s*=.*?;"
+                  )
+                  if setting_pattern.search(body):
+                      body = setting_pattern.sub(line, body)
+                  else:
+                      body += "\n\t\t\t\t" + line
+              return match.group(1) + body + match.group(3)
+
+          updated, count = pattern.subn(update_block, text)
+          if count == 0:
+              raise SystemExit("No Xcode buildSettings blocks were found.")
+          path.write_text(updated)
+          print(f"Updated {count} Xcode build-setting blocks.")
+          PY
+
+          xcodebuild -list -project ios/Runner.xcodeproj
 
       - name: Create ExportOptions.plist
         env:
@@ -115,8 +182,6 @@ jobs:
           PROVISIONING_PROFILE_NAME: ${{ secrets.PROVISIONING_PROFILE_NAME }}
         run: |
           set -euo pipefail
-
-          /usr/libexec/PlistBuddy -c "Add :method string app-store-connect" /dev/null 2>/dev/null || true
 
           cat > ios/ExportOptions.plist <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
@@ -127,15 +192,15 @@ jobs:
             <string>app-store-connect</string>
             <key>teamID</key>
             <string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
             <key>provisioningProfiles</key>
             <dict>
               <key>com.mostafaomeha725.pythagoras</key>
               <string>${PROVISIONING_PROFILE_NAME}</string>
             </dict>
-            <key>signingStyle</key>
-            <string>manual</string>
-            <key>signingCertificate</key>
-            <string>Apple Distribution</string>
             <key>stripSwiftSymbols</key>
             <true/>
           </dict>
