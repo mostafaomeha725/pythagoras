@@ -73,8 +73,6 @@ jobs:
             echo "::error::ios/Runner/Info.plist was not found."
             exit 1
           }
-
-      - name: Install Apple certificate and provisioning profile
       - name: Validate Xcode Project
         run: |
           echo "Linting project.pbxproj..."
