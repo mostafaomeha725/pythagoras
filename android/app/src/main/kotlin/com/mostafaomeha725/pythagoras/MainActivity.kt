@@ -1,4 +1,4 @@
-package com.example.pythagoras
+package com.mostafaomeha725.pythagoras
 
 import android.app.DownloadManager
 import android.content.Context

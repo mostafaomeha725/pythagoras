@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.pythagoras"
+    namespace = "com.mostafaomeha725.pythagoras"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,7 +21,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.pythagoras"
+        applicationId = "com.mostafaomeha725.pythagoras"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
