@@ -169,9 +169,9 @@ jobs:
                       r"(?m)^\s*" + re.escape(key) + r"\s*=.*?;"
                   )
                   if setting_pattern.search(body):
-                      body = setting_pattern.sub(line, body)
+                      body = setting_pattern.sub(f"\n\t\t\t\t{line}", body)
                   else:
-                      body += "\n\t\t\t\t" + line
+                      body += f"\n\t\t\t\t{line}"
               return match.group(1) + body + match.group(3)
 
           updated, count = pattern.subn(update_block, text)
