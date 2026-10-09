@@ -2,9 +2,6 @@ name: iOS TestFlight Build & Upload
 
 on:
   workflow_dispatch: # Manual trigger only for App Store uploads
-  # push:
-  #   branches:
-  #     - main
 
 jobs:
   build_and_upload:
@@ -14,6 +11,35 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Validate Required Secrets
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PROVISIONING_PROFILE_NAME: ${{ secrets.PROVISIONING_PROFILE_NAME }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+        run: |
+          missing_secrets=()
+          [ -z "$BUILD_CERTIFICATE_BASE64" ] && missing_secrets+=("BUILD_CERTIFICATE_BASE64")
+          [ -z "$P12_PASSWORD" ] && missing_secrets+=("P12_PASSWORD")
+          [ -z "$BUILD_PROVISION_PROFILE_BASE64" ] && missing_secrets+=("BUILD_PROVISION_PROFILE_BASE64")
+          [ -z "$KEYCHAIN_PASSWORD" ] && missing_secrets+=("KEYCHAIN_PASSWORD")
+          [ -z "$APPLE_TEAM_ID" ] && missing_secrets+=("APPLE_TEAM_ID")
+          [ -z "$PROVISIONING_PROFILE_NAME" ] && missing_secrets+=("PROVISIONING_PROFILE_NAME")
+          [ -z "$APPSTORE_ISSUER_ID" ] && missing_secrets+=("APPSTORE_ISSUER_ID")
+          [ -z "$APPSTORE_KEY_ID" ] && missing_secrets+=("APPSTORE_KEY_ID")
+          [ -z "$APPSTORE_PRIVATE_KEY" ] && missing_secrets+=("APPSTORE_PRIVATE_KEY")
+          
+          if [ ${#missing_secrets[@]} -ne 0 ]; then
+            echo "::error::The following required secrets are missing: ${missing_secrets[*]}"
+            echo "Please configure these secrets in your repository settings before running the workflow."
+            exit 1
+          fi
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -30,25 +56,20 @@ jobs:
           BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          # Create variables
           CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
           PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
 
-          # Import certificate and provisioning profile from secrets
           echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
           echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o $PP_PATH
 
-          # Create temporary keychain
           security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
 
-          # Import certificate to keychain
           security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
 
-          # Apply provisioning profile
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
 
@@ -81,24 +102,34 @@ jobs:
           PLIST
 
       - name: Build Signed IPA
-        # Use GITHUB_RUN_NUMBER as the build number to ensure uniqueness for TestFlight
         run: flutter build ipa --release --build-number=$GITHUB_RUN_NUMBER --export-options-plist=ios/ExportOptions.plist
+
+      - name: Locate IPA File
+        id: locate-ipa
+        run: |
+          IPA_FILES=(build/ios/ipa/*.ipa)
+          if [ ${#IPA_FILES[@]} -eq 0 ]; then
+            echo "::error::No IPA file found in build/ios/ipa/"
+            exit 1
+          elif [ ${#IPA_FILES[@]} -gt 1 ]; then
+            echo "::error::Multiple IPA files found: ${IPA_FILES[*]}"
+            exit 1
+          else
+            echo "Found IPA: ${IPA_FILES[0]}"
+            echo "ipa_path=${IPA_FILES[0]}" >> $GITHUB_ENV
+          fi
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Pythagoras-iOS-Release
-          path: build/ios/ipa/*.ipa
+          path: ${{ env.ipa_path }}
           retention-days: 7
 
       - name: Upload to TestFlight
         uses: apple-actions/upload-testflight-build@v1
         with:
-          # Flutter 3.x usually places the ipa inside build/ios/ipa/*.ipa
-          # The filename is usually the product name, but we can use wildcard if the action supports it,
-          # or exact path if known. Let's assume pythagoras.ipa or Runner.ipa.
-          # flutter build ipa usually generates app name based on CFBundleName, which we changed to Pythagoras.ipa
-          app-path: 'build/ios/ipa/Pythagoras.ipa'
+          app-path: ${{ env.ipa_path }}
           issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
           api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
