@@ -12,8 +12,9 @@ import 'package:pythagoras/features/courses/presentation/cubit/request_enrollmen
 import 'package:pythagoras/features/courses/presentation/cubit/request_enrollment/request_enrollment_state.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_shimmer.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/courses_list/courses_list_cubit.dart';
 
-class CourseDetailScreen extends StatelessWidget {
+class CourseDetailScreen extends StatefulWidget {
   final int courseId;
   final String courseTitle;
   final bool isEnrolled;
@@ -26,14 +27,47 @@ class CourseDetailScreen extends StatelessWidget {
   });
 
   @override
+  State<CourseDetailScreen> createState() => _CourseDetailScreenState();
+}
+
+class _CourseDetailScreenState extends State<CourseDetailScreen> with WidgetsBindingObserver {
+  late final CourseDetailsCubit _courseDetailsCubit;
+  late final RequestEnrollmentCubit _requestEnrollmentCubit;
+  bool _isWaitingForWhatsApp = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _courseDetailsCubit = sl<CourseDetailsCubit>()..fetchCourseDetails(widget.courseId);
+    _requestEnrollmentCubit = sl<RequestEnrollmentCubit>();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _courseDetailsCubit.close();
+    _requestEnrollmentCubit.close();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _isWaitingForWhatsApp) {
+      _isWaitingForWhatsApp = false;
+      _courseDetailsCubit.fetchCourseDetails(widget.courseId);
+      if (mounted) {
+        context.read<CoursesListCubit>().fetchCourses();
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider(
-          create: (context) =>
-              sl<CourseDetailsCubit>()..fetchCourseDetails(courseId),
-        ),
-        BlocProvider(create: (context) => sl<RequestEnrollmentCubit>()),
+        BlocProvider.value(value: _courseDetailsCubit),
+        BlocProvider.value(value: _requestEnrollmentCubit),
       ],
       child: BlocListener<RequestEnrollmentCubit, RequestEnrollmentState>(
         listener: (context, state) async {
@@ -43,6 +77,7 @@ class CourseDetailScreen extends StatelessWidget {
             EasyLoading.dismiss();
             final url = Uri.parse(state.whatsappUrl);
             if (await canLaunchUrl(url)) {
+              _isWaitingForWhatsApp = true;
               await launchUrl(url, mode: LaunchMode.externalApplication);
             } else {
               EasyLoading.showError('لا يمكن فتح الواتساب');
@@ -66,9 +101,7 @@ class CourseDetailScreen extends StatelessWidget {
                     children: [
                       Text(state.message),
                       ElevatedButton(
-                        onPressed: () => context
-                            .read<CourseDetailsCubit>()
-                            .fetchCourseDetails(courseId),
+                        onPressed: () => _courseDetailsCubit.fetchCourseDetails(widget.courseId),
                         child: const Text('إعادة المحاولة'),
                       ),
                     ],

@@ -38,9 +38,22 @@ class NativeDownloadService {
         );
         
         if (response.statusCode == 200 || response.statusCode == 201) {
-          final file = File(savePath);
+          File file = File(savePath);
           if (await file.exists()) {
-             await Share.shareXFiles([XFile(savePath)], subject: title);
+             String finalPath = savePath;
+             final String? correctExt = _getExtensionFromHeaders(response.headers);
+             String? mimeType = response.headers.value(Headers.contentTypeHeader)?.split(';').first.trim();
+             
+             if (correctExt != null && !finalPath.toLowerCase().endsWith(correctExt.toLowerCase())) {
+                // If the file ends with a fake extension like .powerpoint or lacks an extension, replace it
+                final pathWithoutFakeExt = finalPath.contains('.') 
+                    ? finalPath.substring(0, finalPath.lastIndexOf('.'))
+                    : finalPath;
+                finalPath = '$pathWithoutFakeExt$correctExt';
+                file = await file.rename(finalPath);
+             }
+             
+             await Share.shareXFiles([XFile(finalPath, mimeType: mimeType)], subject: title);
              return true;
           }
         }
@@ -57,5 +70,38 @@ class NativeDownloadService {
     } catch (e) {
       return false;
     }
+  }
+
+  String? _getExtensionFromHeaders(Headers headers) {
+    final contentDisposition = headers.value('content-disposition');
+    if (contentDisposition != null) {
+      final regex = RegExp(r'filename[^;=\n]*=((["'
+          "'"
+          r']).*?\2|[^;\n]*)');
+      final match = regex.firstMatch(contentDisposition);
+      if (match != null && match.groupCount >= 1) {
+        String name = match.group(1)!.replaceAll('"', '').replaceAll("'", "");
+        if (name.contains('.')) {
+          return '.${name.split('.').last}';
+        }
+      }
+    }
+    
+    final contentType = headers.value(Headers.contentTypeHeader);
+    if (contentType != null) {
+      final ct = contentType.toLowerCase();
+      if (ct.contains('application/pdf')) return '.pdf';
+      if (ct.contains('wordprocessingml.document')) return '.docx';
+      if (ct.contains('msword')) return '.doc';
+      if (ct.contains('presentationml.presentation')) return '.pptx';
+      if (ct.contains('ms-powerpoint')) return '.ppt';
+      if (ct.contains('spreadsheetml.sheet')) return '.xlsx';
+      if (ct.contains('ms-excel')) return '.xls';
+      if (ct.contains('image/jpeg')) return '.jpg';
+      if (ct.contains('image/png')) return '.png';
+      if (ct.contains('text/csv')) return '.csv';
+      if (ct.contains('application/zip')) return '.zip';
+    }
+    return null;
   }
 }
