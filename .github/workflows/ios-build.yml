@@ -1,0 +1,46 @@
+name: iOS Build (Unsigned IPA)
+
+on:
+  workflow_dispatch: # Allows manual trigger
+  push:
+    branches:
+      - main # Or your default branch
+
+jobs:
+  build-ios:
+    name: Build iOS App
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          # You can specify a version if needed, e.g., flutter-version: '3.19.0'
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      # Since we don't have Apple certificates, we must build without code signing.
+      # `flutter build ipa` normally requires signing to export the final .ipa.
+      # By using `--no-codesign`, it stops at generating the .xcarchive.
+      - name: Build iOS Archive (Unsigned)
+        run: flutter build ipa --release --no-codesign
+
+      # To create an .ipa from the unsigned .xcarchive, we manually package the Runner.app
+      - name: Package Application into IPA
+        run: |
+          mkdir -p build/ios/ipa/Payload
+          cp -r build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app build/ios/ipa/Payload/
+          cd build/ios/ipa
+          zip -qr app-unsigned.ipa Payload
+        
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-unsigned-ipa
+          path: build/ios/ipa/app-unsigned.ipa
+          retention-days: 7
