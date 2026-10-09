@@ -61,6 +61,7 @@ jobs:
       - name: Install Flutter dependencies
         run: flutter pub get
 
+
       - name: Check iOS project
         run: |
           set -euo pipefail
@@ -73,6 +74,7 @@ jobs:
             exit 1
           }
 
+      - name: Install Apple certificate and provisioning profile
       - name: Validate Xcode Project
         run: |
           echo "Linting project.pbxproj..."
