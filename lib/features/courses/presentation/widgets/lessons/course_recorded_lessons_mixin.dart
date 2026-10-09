@@ -122,10 +122,17 @@ mixin CourseRecordedLessonsMixin on State<CourseRecordedLessonsScreenBody> {
     completeVideoCubit.completeVideo(videoId).then((_) {
       if (!mounted) return;
       
-      // Check if this was the last video in the chapter
+      // Check if ALL videos in the chapter are now completed.
+      // Since 'updatedCourse' holds the state before this optimistic update, 
+      // we consider a video completed if its status is already 'completed' 
+      // OR if it's the current video we are completing right now.
       final chap = updatedCourse.chapters.firstWhere((c) => c.id == chapterId);
-      if (chap.videos.isNotEmpty && chap.videos.last.id == lessonIdStr) {
-          // Reached the last video of the chapter/lesson, call completeLesson
+      
+      final allVideosCompleted = chap.videos.every((v) => 
+          v.status == CourseLessonStatus.completed || v.id == lessonIdStr);
+          
+      if (chap.videos.isNotEmpty && allVideosCompleted) {
+          // User has finished ALL videos in this chapter, call completeLesson
           completeLessonCubit.completeLesson(chapterId);
       }
     });

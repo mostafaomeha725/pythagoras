@@ -17,6 +17,7 @@ class CourseYoutubePlayer extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
+        Container(color: Colors.black),
         YoutubePlayer(
           controller: controller,
           autoFullScreen: false,

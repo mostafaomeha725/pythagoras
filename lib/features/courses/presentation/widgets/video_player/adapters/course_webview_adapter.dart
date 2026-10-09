@@ -14,6 +14,8 @@ class CourseWebViewAdapter extends CourseVideoAdapter {
   Duration _duration = Duration.zero;
   double _volume = 1.0;
   bool _isMuted = false;
+  bool hasError = false;
+  int _errorConsecutiveCount = 0;
 
   @override
   bool get supportsVolume => false;
@@ -61,23 +63,6 @@ class CourseWebViewAdapter extends CourseVideoAdapter {
     try {
       final jsResult = await controller.runJavaScriptReturningResult('''
         (function() {
-          var style = document.getElementById('custom-hide-style');
-          if (!style) {
-            style = document.createElement('style');
-            style.id = 'custom-hide-style';
-            // Only hide the big central play button for Plyr (used by Bunny).
-            // Avoiding general selectors to not affect other providers.
-            style.innerHTML = `
-              .plyr__control--overlaid { 
-                display: none !important; 
-                opacity: 0 !important; 
-                visibility: hidden !important; 
-                z-index: -9999 !important; 
-                pointer-events: none !important;
-              }
-            `;
-            document.head.appendChild(style);
-          }
           var videos = document.getElementsByTagName('video');
           var v = null;
           var maxDur = 0;
@@ -89,8 +74,22 @@ class CourseWebViewAdapter extends CourseVideoAdapter {
           }
           if (!v && videos.length > 0) v = videos[0];
           
+          var iframe = document.querySelector('iframe');
+          var ifSrc = iframe ? iframe.src : 'none';
+          
+          var hasPlyr = document.querySelector('.plyr') !== null;
+          var hasPoster = document.querySelector('.plyr__poster') !== null;
+          var posterHidden = false;
+          if (hasPoster) {
+            var poster = document.querySelector('.plyr__poster');
+            posterHidden = window.getComputedStyle(poster).opacity === '0' || window.getComputedStyle(poster).display === 'none';
+          }
+
+          var vWidth = v ? v.clientWidth : 0;
+          var vHeight = v ? v.clientHeight : 0;
+          
           if (!v) {
-            return JSON.stringify({ error: 'No video element found' });
+            return JSON.stringify({ error: 'No video element found', iframe: ifSrc, hasPlyr: hasPlyr });
           }
           
           return JSON.stringify({
@@ -99,12 +98,20 @@ class CourseWebViewAdapter extends CourseVideoAdapter {
             duration: v.duration,
             volume: v.volume,
             muted: v.muted,
-            vimeo_videos_count: videos.length
+            videos_count: videos.length,
+            iframe: ifSrc,
+            hasPlyr: hasPlyr,
+            hasPoster: hasPoster,
+            posterHidden: posterHidden,
+            vWidth: vWidth,
+            vHeight: vHeight,
+            readyState: v.readyState,
+            networkState: v.networkState
           });
         })();
       ''');
 
-      debugPrint('[VIMEO] RAW JS RESULT: $jsResult');
+      debugPrint('[WEBVIEW] RAW JS RESULT: $jsResult');
 
       if (jsResult.toString() != 'null') {
         String resultStr = jsResult.toString();
@@ -122,11 +129,22 @@ class CourseWebViewAdapter extends CourseVideoAdapter {
 
         try {
           final Map<String, dynamic> data = jsonDecode(resultStr);
-          debugPrint('[VIMEO] PARSED JSON DATA: $data');
+          debugPrint('[WEBVIEW] PARSED JSON DATA: $data');
 
           if (data.containsKey('error')) {
-            debugPrint('[VIMEO] JS ERROR: ${data['error']}');
+            debugPrint('[WEBVIEW] JS ERROR: ${data['error']}');
+            _errorConsecutiveCount++;
+            if (_errorConsecutiveCount >= 4 && !hasError) {
+              hasError = true;
+              notifyListeners();
+            }
             return;
+          }
+
+          _errorConsecutiveCount = 0;
+          if (hasError) {
+            hasError = false;
+            notifyListeners();
           }
 
           bool paused = data['paused'] == true;
@@ -136,7 +154,7 @@ class CourseWebViewAdapter extends CourseVideoAdapter {
           bool muted = data['muted'] == true;
 
           debugPrint(
-            '[VIMEO] EXTRACTED -> duration: $duration, currentTime: $currentTime, paused: $paused',
+            '[WEBVIEW] EXTRACTED -> duration: $duration, currentTime: $currentTime, paused: $paused',
           );
 
           _isPlaying = !paused;
@@ -150,12 +168,12 @@ class CourseWebViewAdapter extends CourseVideoAdapter {
           _isMuted = muted;
 
           debugPrint(
-            '[VIMEO] ADAPTER UPDATED -> duration: ${_duration.inSeconds}s, position: ${_position.inSeconds}s',
+            '[WEBVIEW] ADAPTER UPDATED -> duration: ${_duration.inSeconds}s, position: ${_position.inSeconds}s',
           );
 
           notifyListeners();
         } catch (e) {
-          debugPrint('[VIMEO] JSON DECODE ERROR: $e');
+          debugPrint('[WEBVIEW] JSON DECODE ERROR: $e');
         }
       }
     } catch (_) {}

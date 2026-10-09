@@ -1,10 +1,4 @@
-enum VideoProviderType {
-  youtube,
-  bunny,
-  vimeo,
-  viewlock,
-  unknown,
-}
+enum VideoProviderType { youtube, bunny, vimeo, viewlock, native, unknown }
 
 VideoProviderType determineVideoProvider(String? url, String? explicitType) {
   if (explicitType != null) {
@@ -35,10 +29,10 @@ VideoProviderType determineVideoProvider(String? url, String? explicitType) {
   if (lowerUrl.contains('viewlock')) {
     return VideoProviderType.viewlock;
   }
-  
+
   // Default fallback for mp4/m3u8 if unknown
   if (lowerUrl.endsWith('.mp4') || lowerUrl.endsWith('.m3u8')) {
-    return VideoProviderType.bunny; // Use native player for standard streams
+    return VideoProviderType.native; // Use native player for standard streams
   }
 
   return VideoProviderType.unknown;
@@ -54,7 +48,7 @@ String formatEmbedUrl(String url, VideoProviderType type) {
       return 'https://player.vimeo.com/video/$videoId?autoplay=0&title=0&byline=0&portrait=0';
     }
   }
-  
+
   // Return as-is for Viewlock and others which are likely already embed links
   return url;
 }

@@ -55,8 +55,9 @@ class CourseRecordedChaptersList extends StatelessWidget {
         SizedBox(height: 16.h),
         ...course.chapters.asMap().entries.map((entry) {
           final chapter = entry.value;
-          int totalChapterMinutes = chapter.videos.fold(0, (sum, video) => sum + video.durationMinutes);
-          String subtitle = '${chapter.videos.length} دروس • $totalChapterMinutes دقائق';
+          int totalChapterSeconds = chapter.videos.fold(0, (sum, video) => sum + video.durationMinutes);
+          int totalChapterMinutes = totalChapterSeconds ~/ 60;
+          String subtitle = '${chapter.videos.length} دروس • $totalChapterMinutes دقيقة';
 
           return CourseChapterTile(
             chapter: chapter,

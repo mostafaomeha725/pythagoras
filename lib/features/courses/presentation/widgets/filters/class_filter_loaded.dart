@@ -30,38 +30,20 @@ class ClassFilterLoaded extends StatelessWidget {
         child: DropdownButton<StudentClass>(
           isExpanded: true,
           isDense: true,
+          alignment: AlignmentDirectional.center,
+          style: font14w600.copyWith(color: const Color(0xFF1E1E2D)),
           value: selectedClass,
           icon: const SizedBox.shrink(), // Hide default icon
           dropdownColor: Colors.white,
           menuMaxHeight: 350.h,
-          itemHeight: null, // Allow items to have dynamic height for multiline text
+          itemHeight:
+              null, // Allow items to have dynamic height for multiline text
           borderRadius: BorderRadius.circular(16.r),
-          hint: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.keyboard_arrow_down_rounded,
-                color: const Color(0xFF6B7280), // Grey icon
-                size: 20.sp,
-              ),
-              SizedBox(width: 6.w),
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: AppText(
-                    'الصف الدراسي',
-                    style: font14w600.copyWith(
-                      color: const Color(0xFF1E1E2D),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          selectedItemBuilder: (context) {
-            return classes.map((studentClass) {
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+          hint: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
                     Icons.keyboard_arrow_down_rounded,
@@ -69,19 +51,37 @@ class ClassFilterLoaded extends StatelessWidget {
                     size: 20.sp,
                   ),
                   SizedBox(width: 6.w),
-                  Flexible(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerRight,
-                      child: AppText(
+                  AppText(
+                    'الصف الدراسي',
+                    style: font14w600.copyWith(color: const Color(0xFF1E1E2D)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          selectedItemBuilder: (context) {
+            return classes.map((studentClass) {
+              return Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: const Color(0xFF6B7280), // Grey icon
+                        size: 20.sp,
+                      ),
+                      SizedBox(width: 6.w),
+                      AppText(
                         studentClass.name,
                         style: font14w600.copyWith(
                           color: const Color(0xFF1E1E2D),
                         ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               );
             }).toList();
           },
@@ -92,13 +92,8 @@ class ClassFilterLoaded extends StatelessWidget {
               child: Container(
                 width: double.infinity,
                 alignment: Alignment.centerRight,
-                padding: EdgeInsets.symmetric(
-                  vertical: 10.h,
-                  horizontal: 12.w,
-                ),
-                decoration: const BoxDecoration(
-                  color: Colors.transparent,
-                ),
+                padding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 12.w),
+                decoration: const BoxDecoration(color: Colors.transparent),
                 child: AppText(
                   studentClass.name,
                   style: font12w700.copyWith(

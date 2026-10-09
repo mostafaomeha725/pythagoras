@@ -1,6 +1,8 @@
+import 'dart:ui';
 import 'package:pythagoras/core/routes/app_routes.dart';
 import 'package:pythagoras/core/theme/light_colors.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -22,6 +24,29 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  PlatformDispatcher.instance.onError = (error, stack) {
+    if (error.toString().contains('YouTube player failed to initialize')) {
+      return true;
+    }
+    return false;
+  };
+
+  final originalOnError = FlutterError.onError;
+  FlutterError.onError = (FlutterErrorDetails details) {
+    if (details.exceptionAsString().contains('YouTube player failed to initialize')) {
+      return;
+    }
+    if (originalOnError != null) {
+      originalOnError(details);
+    }
+  };
+  
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
   await Hive.initFlutter();
   await Hive.openBox(HiveBoxes.cacheBox);
   await initializeDateFormatting('ar', null);

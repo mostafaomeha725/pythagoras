@@ -17,9 +17,18 @@ class CourseLessonModel extends CourseLesson {
     int parsedDuration = 0;
     if (json['duration'] != null) {
       final durStr = json['duration'].toString();
-      final match = RegExp(r'\d+').firstMatch(durStr);
-      if (match != null) {
-        parsedDuration = int.tryParse(match.group(0) ?? '0') ?? 0;
+      if (durStr.contains(':')) {
+        final parts = durStr.split(':').map((e) => int.tryParse(e) ?? 0).toList();
+        if (parts.length == 3) {
+          parsedDuration = (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+        } else if (parts.length >= 2) {
+          parsedDuration = (parts[0] * 60) + parts[1];
+        }
+      } else {
+        final match = RegExp(r'\d+').firstMatch(durStr);
+        if (match != null) {
+          parsedDuration = (int.tryParse(match.group(0) ?? '0') ?? 0) * 60; // Assume flat numbers are minutes
+        }
       }
     }
     bool isCompleted = false;

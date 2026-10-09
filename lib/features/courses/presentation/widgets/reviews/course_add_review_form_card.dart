@@ -133,14 +133,6 @@ class _CourseAddReviewFormCardState extends State<CourseAddReviewFormCard> {
                   textWeight: FontWeight.w700,
                   textSize: 14.sp,
                 ),
-                SizedBox(height: 12.h),
-
-                // Footer text
-                AppText(
-                  'سيظهر تقييمك باسمك الأول فقط بعد المراجعة',
-                  style: font10w400.copyWith(color: const Color(0xFF9CA3AF)),
-                  textAlign: TextAlign.center,
-                ),
               ],
             ),
           ),

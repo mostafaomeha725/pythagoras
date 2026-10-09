@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pythagoras/core/utils/system_ui_manager.dart';
+
 import 'package:pythagoras/features/courses/presentation/widgets/video_player/course_video_player_manager.dart';
-import 'package:pythagoras/features/courses/presentation/widgets/video_player/course_video_fallback.dart';
+
 import 'package:pythagoras/features/courses/presentation/widgets/video_player/course_youtube_player.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/video_player/course_native_video_player.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/video_player/course_webview_player.dart';
@@ -64,34 +65,57 @@ class _CourseVideoPlayerPlaceholderState
 
   @override
   Widget build(BuildContext context) {
-    if (widget.videoUrl == null || widget.videoUrl!.isEmpty) {
-      return CourseVideoFallback(imageUrl: widget.imageUrl);
+    Widget content;
+    final bool isWaitingForUrl =
+        widget.videoUrl == null || widget.videoUrl!.isEmpty;
+    final bool isFullscreenRoute =
+        ModalRoute.of(context)?.settings.name == '/fullscreen_video';
+
+    if (isWaitingForUrl) {
+      content = Container(
+        color: Colors.black,
+        child: const Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      );
+    } else if (_manager.errorMessage != null) {
+      content = Stack(
+        fit: StackFit.expand,
+        children: [
+          Container(color: Colors.black),
+          Positioned.fill(
+            child: CourseVideoErrorOverlay(
+              errorMessage: _manager.errorMessage!,
+              onRetry: () =>
+                  _manager.initPlayer(widget.videoUrl, widget.videoType),
+            ),
+          ),
+        ],
+      );
+    } else {
+      content = _buildPlayer();
     }
 
-    return ClipRRect(
+    content = ClipRRect(
       borderRadius: BorderRadius.circular(16.r),
-      child: _manager.errorMessage != null
-          ? Stack(
-              children: [
-                CourseVideoFallback(imageUrl: widget.imageUrl),
-                Positioned.fill(
-                  child: CourseVideoErrorOverlay(
-                    errorMessage: _manager.errorMessage!,
-                    onRetry: () => _manager.initPlayer(
-                      widget.videoUrl,
-                      widget.videoType,
-                    ),
-                  ),
-                ),
-              ],
-            )
-          : _buildPlayer(),
+      child: content,
     );
+
+    if (!isFullscreenRoute) {
+      return AspectRatio(aspectRatio: 16 / 9, child: content);
+    }
+
+    return content;
   }
 
   Widget _buildPlayer() {
     if (_manager.adapter == null) {
-      return CourseVideoFallback(imageUrl: widget.imageUrl);
+      return Container(
+        color: Colors.black,
+        child: const Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      );
     }
 
     if (_manager.isFullScreen) {
@@ -121,21 +145,19 @@ class _CourseVideoPlayerPlaceholderState
   Future<void> _handleFullscreenToggle() async {
     if (!_manager.isFullScreen) {
       // 1. Sync state change + route push FIRST.
-      // This safely extracts the GlobalKey from the restrictive Portrait Route 
+      // This safely extracts the GlobalKey from the restrictive Portrait Route
       // (which has Columns that can overflow) into the unrestricted Fullscreen Route.
       _manager.toggleFullScreen();
-      
+
       Navigator.of(context, rootNavigator: true).push(
         PageRouteBuilder(
-          opaque: false, // Keeps the underlying route in the render tree to prevent Surface detachment
+          opaque:
+              false, // Keeps the underlying route in the render tree to prevent Surface detachment
           fullscreenDialog: true,
           transitionDuration: const Duration(milliseconds: 250),
           reverseTransitionDuration: const Duration(milliseconds: 250),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(
-              opacity: animation,
-              child: child,
-            );
+            return FadeTransition(opacity: animation, child: child);
           },
           pageBuilder: (context, animation, secondaryAnimation) {
             return PopScope(
@@ -161,7 +183,7 @@ class _CourseVideoPlayerPlaceholderState
           },
         ),
       );
-      
+
       // 2. Wait ONE frame to guarantee the RenderTree has fully reparented the PlatformView.
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (mounted) {
@@ -169,7 +191,6 @@ class _CourseVideoPlayerPlaceholderState
           await SystemUiManager.enterFullscreen();
         }
       });
-      
     } else {
       // Exiting fullscreen programmatically (via UI button)
       _triggerExitFullscreen();
@@ -196,9 +217,8 @@ class _CourseVideoPlayerPlaceholderState
           );
         }
         break;
-      case VideoProviderType.bunny:
-        if (_manager.nativeController != null &&
-            _manager.nativeController!.value.isInitialized) {
+      case VideoProviderType.native:
+        if (_manager.nativeController != null) {
           player = CourseNativeVideoPlayer(
             key: _manager.playerKey,
             controller: _manager.nativeController!,
@@ -206,6 +226,7 @@ class _CourseVideoPlayerPlaceholderState
           );
         }
         break;
+      case VideoProviderType.bunny:
       case VideoProviderType.vimeo:
       case VideoProviderType.viewlock:
       case VideoProviderType.unknown:
@@ -220,16 +241,33 @@ class _CourseVideoPlayerPlaceholderState
     }
 
     if (player == null) {
-      return CourseVideoFallback(imageUrl: widget.imageUrl);
-    }
-
-    if (!isFullscreenRoute) {
-      return AspectRatio(
-        aspectRatio: 16 / 9,
-        child: player,
+      return Container(
+        color: Colors.black,
+        child: const Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
       );
     }
 
-    return player;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Container(color: Colors.black),
+        if (_manager.isInitializing)
+          Positioned(
+            left: 0,
+            top: 0,
+            width: 1,
+            height: 1,
+            child: player,
+          )
+        else
+          Positioned.fill(child: player),
+        if (_manager.isInitializing)
+          const Center(
+            child: CircularProgressIndicator(color: Colors.white),
+          ),
+      ],
+    );
   }
 }

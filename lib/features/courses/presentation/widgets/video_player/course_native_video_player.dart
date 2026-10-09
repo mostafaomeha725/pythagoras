@@ -22,6 +22,7 @@ class _CourseNativeVideoPlayerState extends State<CourseNativeVideoPlayer> {
     return Stack(
       fit: StackFit.expand,
       children: [
+        Container(color: Colors.black),
         Center(
           child: AspectRatio(
             aspectRatio: widget.controller.value.aspectRatio > 0 ? widget.controller.value.aspectRatio : 16 / 9,

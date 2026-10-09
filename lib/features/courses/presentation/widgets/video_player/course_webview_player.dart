@@ -21,6 +21,7 @@ class _CourseWebviewPlayerState extends State<CourseWebviewPlayer> {
     return Stack(
       fit: StackFit.expand,
       children: [
+        Container(color: Colors.black),
         WebViewWidget(controller: widget.controller),
         widget.customControls,
       ],

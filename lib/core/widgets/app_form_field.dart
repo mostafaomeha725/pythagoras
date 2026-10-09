@@ -80,6 +80,11 @@ class _AppFormFieldState extends State<AppFormField> {
       obscureText: widget.obsecureText,
       controller: widget.controller,
       keyboardType: widget.keyboardType,
+      style: font14w500.copyWith(
+        color: Theme.of(context).brightness == Brightness.dark
+            ? AppDarkColors.offwhite
+            : const Color(0xFF1E1E2D), // Dark text for light mode
+      ),
       onChanged: (value) {
         setState(() {});
         widget.onChanged?.call(value);

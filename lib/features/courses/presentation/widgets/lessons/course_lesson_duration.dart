@@ -16,6 +16,15 @@ class CourseLessonDuration extends StatelessWidget {
     required this.isPlaying,
   });
 
+  String _formatDuration(int totalSeconds) {
+    String twoDigits(int n) => n.toString().padLeft(2, "0");
+    int h = totalSeconds ~/ 3600;
+    int m = (totalSeconds % 3600) ~/ 60;
+    int s = totalSeconds % 60;
+    if (h > 0) return "$h:${twoDigits(m)}:${twoDigits(s)}";
+    return "${twoDigits(m)}:${twoDigits(s)}";
+  }
+
   @override
   Widget build(BuildContext context) {
     if (showStatuses) {
@@ -29,7 +38,7 @@ class CourseLessonDuration extends StatelessWidget {
           ),
           SizedBox(width: 4.w),
           AppText(
-            '$durationMinutes دقيقة',
+            _formatDuration(durationMinutes),
             style: font10w700.copyWith(
               color: isPlaying ? AppLightColors.primary : const Color(0xFF9CA3AF),
             ),
@@ -38,7 +47,7 @@ class CourseLessonDuration extends StatelessWidget {
       );
     } else {
       return AppText(
-        '$durationMinutes دقائق',
+        _formatDuration(durationMinutes),
         style: font12w500.copyWith(color: const Color(0xFF9CA3AF)),
       );
     }

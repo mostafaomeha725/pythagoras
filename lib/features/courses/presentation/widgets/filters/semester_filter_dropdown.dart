@@ -19,7 +19,7 @@ class _SemesterFilterDropdownState extends State<SemesterFilterDropdown> {
     SemesterOption(id: 1, name: 'الفصل الدراسي الأول'),
     SemesterOption(id: 2, name: 'الفصل الدراسي الثاني'),
   ];
-  
+
   SemesterOption? selectedSemester;
 
   @override
@@ -41,38 +41,20 @@ class _SemesterFilterDropdownState extends State<SemesterFilterDropdown> {
         child: DropdownButton<SemesterOption>(
           isExpanded: true,
           isDense: true,
+          alignment: AlignmentDirectional.center,
+          style: font14w600.copyWith(color: const Color(0xFF1E1E2D)),
           value: selectedSemester,
           icon: const SizedBox.shrink(), // Hide default icon
           dropdownColor: Colors.white,
           menuMaxHeight: 350.h,
-          itemHeight: null, // Allow items to have dynamic height for multiline text
+          itemHeight:
+              null, // Allow items to have dynamic height for multiline text
           borderRadius: BorderRadius.circular(16.r),
-          hint: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.keyboard_arrow_down_rounded,
-                color: const Color(0xFF6B7280), // Grey icon
-                size: 20.sp,
-              ),
-              SizedBox(width: 6.w),
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: AppText(
-                    'الفصل الدراسي',
-                    style: font14w600.copyWith(
-                      color: const Color(0xFF1E1E2D),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          selectedItemBuilder: (context) {
-            return semesters.map((semester) {
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+          hint: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
                     Icons.keyboard_arrow_down_rounded,
@@ -80,19 +62,37 @@ class _SemesterFilterDropdownState extends State<SemesterFilterDropdown> {
                     size: 20.sp,
                   ),
                   SizedBox(width: 6.w),
-                  Flexible(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerRight,
-                      child: AppText(
+                  AppText(
+                    'الفصل الدراسي',
+                    style: font14w600.copyWith(color: const Color(0xFF1E1E2D)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          selectedItemBuilder: (context) {
+            return semesters.map((semester) {
+              return Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: const Color(0xFF6B7280), // Grey icon
+                        size: 20.sp,
+                      ),
+                      SizedBox(width: 6.w),
+                      AppText(
                         semester.name,
                         style: font14w600.copyWith(
                           color: const Color(0xFF1E1E2D),
                         ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               );
             }).toList();
           },
@@ -103,13 +103,8 @@ class _SemesterFilterDropdownState extends State<SemesterFilterDropdown> {
               child: Container(
                 width: double.infinity,
                 alignment: Alignment.centerRight,
-                padding: EdgeInsets.symmetric(
-                  vertical: 10.h,
-                  horizontal: 12.w,
-                ),
-                decoration: const BoxDecoration(
-                  color: Colors.transparent,
-                ),
+                padding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 12.w),
+                decoration: const BoxDecoration(color: Colors.transparent),
                 child: AppText(
                   semester.name,
                   style: font12w700.copyWith(
@@ -127,7 +122,9 @@ class _SemesterFilterDropdownState extends State<SemesterFilterDropdown> {
               setState(() {
                 selectedSemester = value;
               });
-              context.read<CoursesListCubit>().updateFilters(semester: value.id);
+              context.read<CoursesListCubit>().updateFilters(
+                semester: value.id,
+              );
             }
           },
         ),

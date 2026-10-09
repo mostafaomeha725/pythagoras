@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
@@ -15,6 +17,7 @@ import 'package:pythagoras/features/courses/presentation/widgets/video_player/ad
 /// Manages the state and logic for the unified video player.
 class CourseVideoPlayerManager extends ChangeNotifier {
   VideoProviderType providerType = VideoProviderType.unknown;
+  bool _isDisposed = false;
 
   // Controllers
   CourseVideoAdapter? adapter;
@@ -22,12 +25,86 @@ class CourseVideoPlayerManager extends ChangeNotifier {
   VideoPlayerController? nativeController;
   WebViewController? webViewController;
 
-  // GlobalKey to maintain player state across route changes (Fullscreen)
-  final GlobalKey playerKey = GlobalKey();
+  // Key to maintain player state across route changes (Fullscreen)
+  // We refresh this key when switching videos to ensure a clean UI state.
+  GlobalKey playerKey = GlobalKey();
 
   bool isFullScreen = false;
+  bool isInitializing = false;
   String? errorMessage;
   String? currentVideoUrl;
+  Timer? _networkTimer;
+
+  Future<bool> _hasInternetConnection() async {
+    try {
+      final result = await InternetAddress.lookup(
+        'google.com',
+      ).timeout(const Duration(seconds: 3));
+      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+        return true;
+      }
+    } catch (_) {
+      return false;
+    }
+    return false;
+  }
+
+  Future<void> _handleError(String fallbackMsg, String url) async {
+    if (_isDisposed || currentVideoUrl != url) return;
+
+    final hasInternet = await _hasInternetConnection();
+    if (_isDisposed || currentVideoUrl != url) return;
+
+    if (!hasInternet) {
+      errorMessage = 'لا يوجد اتصال بالإنترنت، تأكد من اتصالك وحاول مرة أخرى.';
+    } else {
+      errorMessage = fallbackMsg;
+    }
+    isInitializing = false;
+    _disposePlayers(keepScreenProtection: true);
+    notifyListeners();
+  }
+
+  void _startTimeoutTimer(String url) {
+    _networkTimer?.cancel();
+    _networkTimer = Timer(const Duration(seconds: 15), () async {
+      // Allow timeout if it's still initializing OR if it's stuck buffering
+      final isStuck = isInitializing || (adapter?.isBuffering ?? true);
+      if (currentVideoUrl != url || _isDisposed || !isStuck) return;
+
+      final hasInternet = await _hasInternetConnection();
+      if (currentVideoUrl != url ||
+          _isDisposed ||
+          (!isInitializing && !(adapter?.isBuffering ?? true))) {
+        return;
+      }
+
+      isInitializing = false;
+      if (!hasInternet) {
+        errorMessage =
+            'لا يوجد اتصال بالإنترنت، تأكد من اتصالك وحاول مرة أخرى.';
+      } else {
+        errorMessage =
+            'استغرق تحميل الفيديو وقتاً طويلاً. يرجى إعادة المحاولة.';
+      }
+      _disposePlayers(keepScreenProtection: true);
+      notifyListeners();
+    });
+  }
+
+  void _startImmediateNetworkCheck(String url) async {
+    final hasInternet = await _hasInternetConnection();
+    final isStuck = isInitializing || (adapter?.isBuffering ?? true);
+    if (_isDisposed || currentVideoUrl != url || !isStuck) return;
+
+    if (!hasInternet) {
+      _networkTimer?.cancel();
+      isInitializing = false;
+      errorMessage = 'لا يوجد اتصال بالإنترنت، تأكد من اتصالك وحاول مرة أخرى.';
+      _disposePlayers(keepScreenProtection: true);
+      notifyListeners();
+    }
+  }
 
   void initPlayer(String? videoUrl, [String? videoTypeStr]) async {
     if (videoUrl == currentVideoUrl && errorMessage == null) {
@@ -42,35 +119,51 @@ class CourseVideoPlayerManager extends ChangeNotifier {
       return;
     }
 
-    // Enable Screen Protection
-    await ScreenProtector.protectDataLeakageOn();
-    await ScreenProtector.preventScreenshotOn();
+    // 1. Force Loading immediately to avoid Empty Image before async tasks
+    currentVideoUrl = videoUrl;
+    isInitializing = true;
+    notifyListeners();
+
+    // Start immediate network check (takes max 3s)
+    _startImmediateNetworkCheck(videoUrl);
+
+    // Start robust timeout monitoring (15s)
+    _startTimeoutTimer(videoUrl);
+
+    // Enable Screen Protection safely without crashing
+    try {
+      await ScreenProtector.protectDataLeakageOn();
+      await ScreenProtector.preventScreenshotOn();
+    } catch (e) {
+      debugPrint('ScreenProtector init failed: $e');
+    }
+
+    // 2. Race condition check: abort if user selected another video while awaiting
+    if (currentVideoUrl != videoUrl) return;
 
     final newProviderType = determineVideoProvider(videoUrl, videoTypeStr);
-    final actualNewProviderType = _isDirectVideo(videoUrl) ? VideoProviderType.bunny : newProviderType;
+    final actualNewProviderType = _isDirectVideo(videoUrl)
+        ? VideoProviderType.native
+        : newProviderType;
 
-    // Reuse existing YouTube controller if switching between YouTube videos
-    if (providerType == VideoProviderType.youtube &&
-        actualNewProviderType == VideoProviderType.youtube &&
-        ytController != null) {
-      final youtubeId = YoutubePlayerController.convertUrlToId(videoUrl) ?? videoUrl;
-      ytController!.loadVideoById(videoId: youtubeId);
-      currentVideoUrl = videoUrl;
-      notifyListeners();
-      return;
-    }
+    // We no longer reuse the YouTube controller. Reusing it causes the old
+    // video's last frame to remain visible because state listeners leak the old state.
 
     providerType = actualNewProviderType;
 
     _disposePlayers(keepScreenProtection: true); // Clear previous controllers
 
     try {
+      isInitializing = true;
       switch (providerType) {
         case VideoProviderType.youtube:
           _initYoutube(videoUrl);
           break;
-        case VideoProviderType.bunny:
+        case VideoProviderType.native:
           _initNative(videoUrl);
+          break;
+        case VideoProviderType.bunny:
+          _initWebView(videoUrl, isVimeo: false);
           break;
         case VideoProviderType.vimeo:
           final embedUrl = formatEmbedUrl(videoUrl, providerType);
@@ -83,7 +176,7 @@ class CourseVideoPlayerManager extends ChangeNotifier {
           break;
       }
     } catch (e) {
-      errorMessage = 'عذراً، حدثت مشكلة في تهيئة الفيديو.';
+      _handleError('عذراً، حدثت مشكلة في تهيئة الفيديو.', videoUrl);
     }
 
     notifyListeners();
@@ -98,22 +191,30 @@ class CourseVideoPlayerManager extends ChangeNotifier {
         showFullscreenButton: false,
         mute: false,
         showControls: false,
+        showVideoAnnotations: false,
         strictRelatedVideos: true,
         pointerEvents: PointerEvents.initial,
+        enableKeyboard: false,
       ),
     );
     adapter = CourseYoutubeAdapter(ytController!);
+    notifyListeners();
 
     ytController!.listen((value) {
       bool needsNotify = false;
 
-      if (value.error != YoutubeError.none) {
-        final newError =
-            'عذراً، حدثت مشكلة في تحميل هذا الفيديو. (السبب: ${value.error.name})';
-        if (errorMessage != newError) {
-          errorMessage = newError;
-          needsNotify = true;
-        }
+      if (value.error != YoutubeError.none && errorMessage == null) {
+        _handleError(
+          'عذراً، حدثت مشكلة في تحميل هذا الفيديو. (السبب: ${value.error.name})',
+          url,
+        );
+      }
+
+      if (isInitializing &&
+          (value.playerState == PlayerState.playing ||
+              value.playerState == PlayerState.paused)) {
+        isInitializing = false;
+        needsNotify = true;
       }
 
       if (needsNotify) notifyListeners();
@@ -122,38 +223,50 @@ class CourseVideoPlayerManager extends ChangeNotifier {
 
   void _initNative(String url) {
     nativeController = VideoPlayerController.networkUrl(Uri.parse(url));
-    nativeController!
+    final controller = nativeController!;
+
+    controller
         .initialize()
         .then((_) {
+          if (nativeController != controller) return;
+          isInitializing = false;
           notifyListeners();
         })
         .catchError((e) {
-          errorMessage = 'عذراً، تعذر تشغيل الفيديو.';
-          notifyListeners();
+          if (nativeController != controller) return;
+          _handleError('عذراً، تعذر تشغيل الفيديو.', url);
         });
-    nativeController!.addListener(() {
-      if (nativeController!.value.hasError) {
-        errorMessage = 'عذراً، حدث خطأ أثناء تشغيل الفيديو.';
-        notifyListeners();
+    controller.addListener(() {
+      if (nativeController != controller) return;
+      if (controller.value.hasError && errorMessage == null) {
+        _handleError(
+          'عذراً، انقطع الاتصال أو حدث خطأ أثناء تشغيل الفيديو.',
+          url,
+        );
       }
     });
-    adapter = CourseNativeAdapter(nativeController!);
+    adapter = CourseNativeAdapter(controller);
+    notifyListeners();
   }
 
   void _initWebView(String url, {bool isVimeo = false}) {
     debugPrint('Init WebView with URL: $url (isVimeo: $isVimeo)');
 
     webViewController = WebViewController()
+      ..setBackgroundColor(Colors.black)
       ..setJavaScriptMode(JavaScriptMode.unrestricted);
 
-    if (webViewController!.platform is AndroidWebViewController) {
-      (webViewController!.platform as AndroidWebViewController)
+    final controller = webViewController!;
+
+    if (controller.platform is AndroidWebViewController) {
+      (controller.platform as AndroidWebViewController)
           .setMediaPlaybackRequiresUserGesture(false);
     }
 
-    adapter = CourseWebViewAdapter(webViewController!, isVimeo: isVimeo);
+    adapter = CourseWebViewAdapter(controller, isVimeo: isVimeo);
+    notifyListeners();
 
-    webViewController!.setNavigationDelegate(
+    controller.setNavigationDelegate(
       NavigationDelegate(
         onNavigationRequest: (NavigationRequest request) {
           debugPrint('WebView NavigationRequest: \${request.url}');
@@ -165,14 +278,27 @@ class CourseVideoPlayerManager extends ChangeNotifier {
           }
           return NavigationDecision.navigate;
         },
-        onWebResourceError: (WebResourceError error) {
-          debugPrint(
-            'WebView Error: URL: $url | ErrorCode: \${error.errorCode} | Description: \${error.description}',
-          );
-          if (error.errorCode != -2 && error.description.isNotEmpty) {
-            errorMessage =
-                'WebView Error: \${error.errorCode} - \${error.description}';
+        onPageFinished: (String url) {
+          if (webViewController != controller) return;
+          // For non-Vimeo webviews (like Bunny stream links), we hide loader on page finish.
+          // For Vimeo, we wait for the JS 'ready' message to hide the loader.
+          if (!isVimeo && isInitializing) {
+            isInitializing = false;
             notifyListeners();
+          }
+        },
+        onWebResourceError: (WebResourceError error) {
+          if (webViewController != controller) return;
+          debugPrint(
+            'WebView Error: URL: $url | ErrorCode: ${error.errorCode} | Description: ${error.description}',
+          );
+          // Only show fatal errors that affect the main frame to prevent
+          // blocking the video just because a background tracker failed to load.
+          if (error.isForMainFrame == true && errorMessage == null) {
+            _handleError(
+              'عذراً، حدثت مشكلة أثناء تحميل الفيديو. يرجى المحاولة مرة أخرى.',
+              url,
+            );
           }
         },
       ),
@@ -180,7 +306,8 @@ class CourseVideoPlayerManager extends ChangeNotifier {
 
     if (isVimeo) {
       final videoId = _extractVimeoId(url);
-      final html = '''
+      final html =
+          '''
         <!DOCTYPE html>
         <html>
         <head>
@@ -223,14 +350,24 @@ class CourseVideoPlayerManager extends ChangeNotifier {
         </body>
         </html>
       ''';
-      webViewController!.addJavaScriptChannel('VimeoFlutterChannel', onMessageReceived: (msg) {
-        if (adapter is CourseWebViewAdapter) {
-          (adapter as CourseWebViewAdapter).handleVimeoMessage(msg.message);
-        }
-      });
-      webViewController!.loadHtmlString(html);
+      controller.addJavaScriptChannel(
+        'VimeoFlutterChannel',
+        onMessageReceived: (msg) {
+          if (webViewController != controller) return;
+
+          if (isInitializing) {
+            isInitializing = false;
+            notifyListeners();
+          }
+
+          if (adapter is CourseWebViewAdapter) {
+            (adapter as CourseWebViewAdapter).handleVimeoMessage(msg.message);
+          }
+        },
+      );
+      controller.loadHtmlString(html);
     } else {
-      webViewController!.loadRequest(Uri.parse(url));
+      controller.loadRequest(Uri.parse(url));
     }
   }
 
@@ -267,10 +404,16 @@ class CourseVideoPlayerManager extends ChangeNotifier {
   }
 
   void _disposePlayers({bool keepScreenProtection = false}) {
+    playerKey = GlobalKey(); // Force widget tree to drop the old player state
+
     adapter?.disposeAdapter();
     adapter = null;
 
-    ytController?.close();
+    try {
+      ytController?.close();
+    } catch (e) {
+      debugPrint('YoutubePlayer close exception: $e');
+    }
     ytController = null;
 
     nativeController?.dispose();
@@ -286,7 +429,15 @@ class CourseVideoPlayerManager extends ChangeNotifier {
 
   @override
   void dispose() {
+    _isDisposed = true;
+    _networkTimer?.cancel();
     _disposePlayers();
     super.dispose();
+  }
+
+  @override
+  void notifyListeners() {
+    if (_isDisposed) return;
+    super.notifyListeners();
   }
 }
