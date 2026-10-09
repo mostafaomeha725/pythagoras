@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_resource.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -24,7 +26,11 @@ class CourseResourceCardAction extends StatelessWidget {
             EasyLoading.show(status: 'جاري التحضير...');
           } else if (state is DownloadResourceSuccess) {
             EasyLoading.dismiss();
-            showSuccess('تم البدء في تحميل الملف (انظر قائمة الإشعارات)');
+            if (!kIsWeb && Platform.isIOS) {
+              showSuccess('تم الحفظ بنجاح');
+            } else {
+              showSuccess('تم البدء في تحميل الملف (انظر قائمة الإشعارات)');
+            }
           } else if (state is DownloadResourceError) {
             EasyLoading.dismiss();
             showError(state.message);

@@ -43,7 +43,7 @@ class AssignmentCardActions extends StatelessWidget {
               );
               EasyLoading.dismiss();
               if (success && !kIsWeb && Platform.isIOS) {
-                // share_plus opens the UI
+                EasyLoading.showSuccess('تم الحفظ بنجاح');
               } else if (success) {
                 EasyLoading.showSuccess('تم البدء في تحميل الملف');
               } else {
