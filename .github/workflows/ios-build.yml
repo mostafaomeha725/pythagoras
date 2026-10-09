@@ -1,14 +1,14 @@
-name: iOS Build (Unsigned IPA)
+name: iOS TestFlight Build & Upload
 
 on:
-  workflow_dispatch: # Allows manual trigger
-  push:
-    branches:
-      - main # Or your default branch
+  workflow_dispatch: # Manual trigger only for App Store uploads
+  # push:
+  #   branches:
+  #     - main
 
 jobs:
-  build-ios:
-    name: Build iOS App
+  build_and_upload:
+    name: Build & Upload to TestFlight
     runs-on: macos-latest
 
     steps:
@@ -19,28 +19,86 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          # You can specify a version if needed, e.g., flutter-version: '3.19.0'
 
       - name: Install Dependencies
         run: flutter pub get
 
-      # Since we don't have Apple certificates, we must build without code signing.
-      # `flutter build ipa` normally requires signing to export the final .ipa.
-      # By using `--no-codesign`, it stops at generating the .xcarchive.
-      - name: Build iOS Archive (Unsigned)
-        run: flutter build ipa --release --no-codesign
-
-      # To create an .ipa from the unsigned .xcarchive, we manually package the Runner.app
-      - name: Package Application into IPA
+      - name: Install Apple Certificate and Provisioning Profile
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          mkdir -p build/ios/ipa/Payload
-          cp -r build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app build/ios/ipa/Payload/
-          cd build/ios/ipa
-          zip -qr app-unsigned.ipa Payload
-        
+          # Create variables
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          # Import certificate and provisioning profile from secrets
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o $PP_PATH
+
+          # Create temporary keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Import certificate to keychain
+          security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Apply provisioning profile
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      - name: Create ExportOptions.plist
+        run: |
+          cat << 'PLIST' > ios/ExportOptions.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>teamID</key>
+            <string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.mostafaomeha725.pythagoras</key>
+              <string>${{ secrets.PROVISIONING_PROFILE_NAME }}</string>
+            </dict>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>uploadBitcode</key>
+            <false/>
+          </dict>
+          </plist>
+          PLIST
+
+      - name: Build Signed IPA
+        # Use GITHUB_RUN_NUMBER as the build number to ensure uniqueness for TestFlight
+        run: flutter build ipa --release --build-number=$GITHUB_RUN_NUMBER --export-options-plist=ios/ExportOptions.plist
+
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-unsigned-ipa
-          path: build/ios/ipa/app-unsigned.ipa
+          name: Pythagoras-iOS-Release
+          path: build/ios/ipa/*.ipa
           retention-days: 7
+
+      - name: Upload to TestFlight
+        uses: apple-actions/upload-testflight-build@v1
+        with:
+          # Flutter 3.x usually places the ipa inside build/ios/ipa/*.ipa
+          # The filename is usually the product name, but we can use wildcard if the action supports it,
+          # or exact path if known. Let's assume pythagoras.ipa or Runner.ipa.
+          # flutter build ipa usually generates app name based on CFBundleName, which we changed to Pythagoras.ipa
+          app-path: 'build/ios/ipa/Pythagoras.ipa'
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
