@@ -41,6 +41,12 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Pythagoras requires access to your camera to capture photos for your profile and assignment submissions.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Pythagoras requires access to your photo library to let you select and upload photos for your profile and assignment submissions.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Pythagoras requires access to your microphone for video playback and recording video assignments.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
