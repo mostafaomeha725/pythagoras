@@ -25,7 +25,7 @@ class CourseDetailBottomButton extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: AppButton(
-          text: course.isEnrolled ? 'عرض الدورة' : 'شراء الدورة',
+          text: course.isEnrolled ? 'عرض الدورة' : 'طلب الدورة',
           onPressed: () async {
             if (course.isEnrolled) {
               context.push(Routes.courseSectionsScreen, extra: course);

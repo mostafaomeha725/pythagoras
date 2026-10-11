@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:pythagoras/core/theme/styles.dart';
 import 'package:pythagoras/core/widgets/bouncing_widgets.dart';
 import 'package:pythagoras/core/widgets/custom_text.dart';
 import 'package:pythagoras/core/theme/light_colors.dart';
 
 class SubmitAssignmentFilePicker extends StatelessWidget {
-  final XFile? pickedFile;
+  final PlatformFile? pickedFile;
   final VoidCallback onPickFile;
   final VoidCallback onRemoveFile;
 

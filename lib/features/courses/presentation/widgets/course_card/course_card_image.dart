@@ -8,7 +8,12 @@ class CourseCardImage extends StatelessWidget {
   final String? imageUrl;
   final bool isEnrolled;
   final String? requestStatus;
-  const CourseCardImage({super.key, required this.imageUrl, required this.isEnrolled, this.requestStatus});
+  const CourseCardImage({
+    super.key,
+    required this.imageUrl,
+    required this.isEnrolled,
+    this.requestStatus,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +21,14 @@ class CourseCardImage extends StatelessWidget {
       children: [
         ClipRRect(
           borderRadius: BorderRadius.vertical(top: Radius.circular(14.r)),
-          child: AppImage(imageUrl: imageUrl ?? '', height: 140.h, width: double.infinity, fit: BoxFit.cover),
+          child: AspectRatio(
+            aspectRatio: 2.0,
+            child: AppImage(
+              imageUrl: imageUrl ?? '',
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
+          ),
         ),
         if (isEnrolled)
           Positioned(
@@ -27,13 +39,29 @@ class CourseCardImage extends StatelessWidget {
               decoration: BoxDecoration(
                 color: const Color(0xFF059669),
                 borderRadius: BorderRadius.circular(8.r),
-                boxShadow: [BoxShadow(color: const Color(0xFF059669).withValues(alpha: 0.3), blurRadius: 8.r, offset: const Offset(0, 4))],
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF059669).withValues(alpha: 0.3),
+                    blurRadius: 8.r,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.check_circle_rounded, color: Colors.white, size: 14.sp),
-                SizedBox(width: 4.w),
-                AppText('مسجل', style: font12w700.copyWith(color: Colors.white)),
-              ]),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.check_circle_rounded,
+                    color: Colors.white,
+                    size: 14.sp,
+                  ),
+                  SizedBox(width: 4.w),
+                  AppText(
+                    'مسجل',
+                    style: font12w700.copyWith(color: Colors.white),
+                  ),
+                ],
+              ),
             ),
           )
         else if (requestStatus == 'pending')
@@ -45,13 +73,29 @@ class CourseCardImage extends StatelessWidget {
               decoration: BoxDecoration(
                 color: const Color(0xFFD97706), // Premium orange/amber
                 borderRadius: BorderRadius.circular(8.r),
-                boxShadow: [BoxShadow(color: const Color(0xFFD97706).withValues(alpha: 0.3), blurRadius: 8.r, offset: const Offset(0, 4))],
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFD97706).withValues(alpha: 0.3),
+                    blurRadius: 8.r,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.pending_actions_rounded, color: Colors.white, size: 14.sp),
-                SizedBox(width: 4.w),
-                AppText('قيد الانتظار', style: font12w700.copyWith(color: Colors.white)),
-              ]),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.pending_actions_rounded,
+                    color: Colors.white,
+                    size: 14.sp,
+                  ),
+                  SizedBox(width: 4.w),
+                  AppText(
+                    'قيد الانتظار',
+                    style: font12w700.copyWith(color: Colors.white),
+                  ),
+                ],
+              ),
             ),
           ),
       ],

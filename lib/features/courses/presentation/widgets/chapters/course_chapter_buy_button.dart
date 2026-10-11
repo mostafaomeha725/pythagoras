@@ -28,7 +28,7 @@ class CourseChapterBuyButton extends StatelessWidget {
       child: AppButton(
         text: isEnrolled
             ? 'عرض الحصة'
-            : (requestStatus == 'pending' ? 'قيد الانتظار' : 'شراء الحصة ($parsedPrice $currencyLabel)'),
+            : (requestStatus == 'pending' ? 'قيد الانتظار' : 'طلب الحصة ($parsedPrice $currencyLabel)'),
         onPressed: requestStatus == 'pending' ? () {} : (onPressed ?? () {}),
         radius: 12.r,
         textSize: 15.sp,

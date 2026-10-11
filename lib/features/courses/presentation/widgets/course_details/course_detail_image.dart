@@ -17,11 +17,13 @@ class CourseDetailImage extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          AppImage(
-            imageUrl: course.imageUrl ?? '',
-            height: 200.h,
-            width: double.infinity,
-            fit: BoxFit.cover,
+          AspectRatio(
+            aspectRatio: 2.0,
+            child: AppImage(
+              imageUrl: course.imageUrl ?? '',
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
           ),
 
           if (course.isEnrolled)
@@ -29,10 +31,7 @@ class CourseDetailImage extends StatelessWidget {
               top: 12.h,
               right: 12.w,
               child: Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: 10.w,
-                  vertical: 6.h,
-                ),
+                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
                 decoration: BoxDecoration(
                   color: const Color(0xFF059669),
                   borderRadius: BorderRadius.circular(8.r),
@@ -66,10 +65,7 @@ class CourseDetailImage extends StatelessWidget {
               top: 12.h,
               right: 12.w,
               child: Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: 10.w,
-                  vertical: 6.h,
-                ),
+                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
                 decoration: BoxDecoration(
                   color: const Color(0xFFD97706),
                   borderRadius: BorderRadius.circular(8.r),

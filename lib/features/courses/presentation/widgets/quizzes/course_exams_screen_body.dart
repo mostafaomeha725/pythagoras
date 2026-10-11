@@ -14,6 +14,7 @@ import 'package:pythagoras/features/courses/presentation/widgets/quizzes/course_
 import 'package:pythagoras/features/courses/presentation/widgets/quizzes/exams_screen_widgets.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/quizzes/course_exams_shimmer.dart';
 
+
 class CourseExamsScreenBody extends StatelessWidget {
   final CourseDetail course;
 

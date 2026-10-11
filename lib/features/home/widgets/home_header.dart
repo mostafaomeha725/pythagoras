@@ -24,7 +24,7 @@ class HomeHeader extends StatelessWidget {
         final token = prefs.getUserToken();
         final isGuest = token == null || token.isEmpty;
 
-        String fullName = isGuest ? 'يا ضيف' : (prefs.getUserName() ?? 'طالب');
+        String fullName = isGuest ? 'يا زائر' : (prefs.getUserName() ?? 'طالب');
         String branchName = isGuest ? 'تصفح كورساتنا الآن' : (prefs.getBranchName() ?? 'طالبنا المميز');
         String? avatarUrl;
         int? classId;

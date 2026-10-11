@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:pythagoras/core/di/services_locator.dart';
 import 'package:pythagoras/core/theme/styles.dart';
 import 'package:pythagoras/core/widgets/custom_text.dart';
@@ -54,7 +54,7 @@ class SubmitAssignmentSheet extends StatefulWidget {
 
 class _SubmitAssignmentSheetState extends State<SubmitAssignmentSheet> {
   final _notesController = TextEditingController();
-  XFile? _pickedFile;
+  PlatformFile? _pickedFile;
 
   @override
   void dispose() {
@@ -63,10 +63,11 @@ class _SubmitAssignmentSheetState extends State<SubmitAssignmentSheet> {
   }
 
   Future<void> _pickFile() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickMedia();
-    if (picked != null) {
-      setState(() => _pickedFile = picked);
+    final result = await FilePicker.pickFiles(
+      type: FileType.any,
+    );
+    if (result != null && result.files.isNotEmpty) {
+      setState(() => _pickedFile = result.files.first);
     }
   }
 

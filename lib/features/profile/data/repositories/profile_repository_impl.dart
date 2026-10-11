@@ -27,7 +27,9 @@ class ProfileRepositoryImpl implements ProfileRepository {
   });
 
   @override
-  Future<Either<Failure, UserProfile>> getAccountInfo({bool fromCache = false}) async {
+  Future<Either<Failure, UserProfile>> getAccountInfo({
+    bool fromCache = false,
+  }) async {
     final cacheKey = PreferencesKeys.cachedAccountInfo.name;
 
     if (fromCache) {
@@ -40,13 +42,12 @@ class ProfileRepositoryImpl implements ProfileRepository {
       }
     }
 
-    final response = await networkService.getData(
-      endPoint: EndPoints.account,
-    );
+    final response = await networkService.getData(endPoint: EndPoints.account);
 
     return response.fold(
       (failure) async {
-        if (failure.message.contains('401') || failure.message.contains('SESSION_REVOKED')) {
+        if (failure.message.contains('401') ||
+            failure.message.contains('SESSION_REVOKED')) {
           await _clearLocalSessionData();
           return Left(Failure('SESSION_EXPIRED'));
         }
@@ -60,7 +61,8 @@ class ProfileRepositoryImpl implements ProfileRepository {
 
           final success = data['success'];
           if (success == false) {
-            final msg = data['message']?.toString() ?? 'فشل في جلب بيانات الحساب';
+            final msg =
+                data['message']?.toString() ?? 'فشل في جلب بيانات الحساب';
             return Left(Failure(msg));
           }
 
@@ -81,9 +83,12 @@ class ProfileRepositoryImpl implements ProfileRepository {
           }
 
           final userProfile = UserProfileModel.fromJson(user);
-          
+
           // Update local cache
-          cacheService.saveString(PreferencesKeys.cachedAccountInfo.name, jsonEncode(user));
+          cacheService.saveString(
+            PreferencesKeys.cachedAccountInfo.name,
+            jsonEncode(user),
+          );
           await preferencesStorage.saveUserProfile(jsonEncode(user));
           await preferencesStorage.saveUserId(userProfile.id);
           await preferencesStorage.saveUserName(userProfile.name);
@@ -103,6 +108,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
     await preferencesStorage.deleteUserId();
     networkService.removeToken();
   }
+
   @override
   Future<Either<Failure, String>> uploadProfilePicture(File image) async {
     try {
@@ -116,17 +122,16 @@ class ProfileRepositoryImpl implements ProfileRepository {
         formData: formData,
       );
 
-      return response.fold(
-        (failure) => Left(failure),
-        (data) {
-          if (data['success'] == true) {
-            final url = data['data']['profile_picture_url'] as String;
-            return Right(url);
-          } else {
-            return Left(Failure(data['message']?.toString() ?? 'فشل في رفع الصورة'));
-          }
-        },
-      );
+      return response.fold((failure) => Left(failure), (data) {
+        if (data['success'] == true) {
+          final url = data['data']['profile_picture_url'] as String;
+          return Right(url);
+        } else {
+          return Left(
+            Failure(data['message']?.toString() ?? 'فشل في رفع الصورة'),
+          );
+        }
+      });
     } catch (e) {
       debugPrint('🔴 ProfileRepositoryImpl.uploadProfilePicture error: $e');
       return Left(Failure(e.toString()));
@@ -134,7 +139,10 @@ class ProfileRepositoryImpl implements ProfileRepository {
   }
 
   @override
-  Future<Either<Failure, UserProfile>> updatePersonalProfile({required String name, String? password}) async {
+  Future<Either<Failure, UserProfile>> updatePersonalProfile({
+    required String name,
+    String? password,
+  }) async {
     try {
       final data = {'name': name};
       if (password != null && password.isNotEmpty) {
@@ -146,29 +154,31 @@ class ProfileRepositoryImpl implements ProfileRepository {
         data: data,
       );
 
-      return response.fold(
-        (failure) => Left(failure),
-        (responseData) async {
-          if (responseData != null && responseData['success'] == true) {
-            final dataMap = responseData['data'] as Map<String, dynamic>;
-            final user = dataMap['user'] as Map<String, dynamic>;
-            final role = dataMap['role'] as String?;
-            if (role != null) {
-              user['role'] = role;
-            }
-
-            final userProfile = UserProfileModel.fromJson(user);
-            
-            // Update local cache
-            await preferencesStorage.saveUserProfile(jsonEncode(user));
-            await preferencesStorage.saveUserName(userProfile.name);
-
-            return Right(userProfile);
-          } else {
-            return Left(Failure(responseData?['message']?.toString() ?? 'فشل في تحديث بيانات الحساب'));
+      return response.fold((failure) => Left(failure), (responseData) async {
+        if (responseData != null && responseData['success'] == true) {
+          final dataMap = responseData['data'] as Map<String, dynamic>;
+          final user = dataMap['user'] as Map<String, dynamic>;
+          final role = dataMap['role'] as String?;
+          if (role != null) {
+            user['role'] = role;
           }
-        },
-      );
+
+          final userProfile = UserProfileModel.fromJson(user);
+
+          // Update local cache
+          await preferencesStorage.saveUserProfile(jsonEncode(user));
+          await preferencesStorage.saveUserName(userProfile.name);
+
+          return Right(userProfile);
+        } else {
+          return Left(
+            Failure(
+              responseData?['message']?.toString() ??
+                  'فشل في تحديث بيانات الحساب',
+            ),
+          );
+        }
+      });
     } catch (e) {
       debugPrint('🔴 ProfileRepositoryImpl.updatePersonalProfile error: $e');
       return Left(Failure(e.toString()));
@@ -176,10 +186,12 @@ class ProfileRepositoryImpl implements ProfileRepository {
   }
 
   @override
-  Future<Either<Failure, List<MyCourseEnrollment>>> getMyCourses({bool fromCache = false}) async {
+  Future<Either<Failure, List<MyCourseEnrollment>>> getMyCourses({
+    bool fromCache = false,
+  }) async {
     try {
       final cacheKey = PreferencesKeys.cachedMyCourses.name;
-      
+
       if (fromCache) {
         final cachedString = cacheService.getString(cacheKey);
         if (cachedString != null && cachedString.isNotEmpty) {
@@ -197,54 +209,55 @@ class ProfileRepositoryImpl implements ProfileRepository {
         endPoint: EndPoints.myCourses,
       );
 
-      return response.fold(
-        (failure) => Left(failure),
-        (responseData) async {
-          if (responseData != null && responseData['success'] == true) {
-            final List<dynamic> dataList = responseData['data'] ?? [];
-            
-            await cacheService.saveString(
-              cacheKey,
-              json.encode(dataList),
-            );
+      return response.fold((failure) => Left(failure), (responseData) async {
+        if (responseData != null && responseData['success'] == true) {
+          final List<dynamic> dataList = responseData['data'] ?? [];
 
-            final enrollments = dataList
-                .map((json) => MyCourseEnrollmentModel.fromJson(json))
-                .toList();
-            return Right(enrollments);
-          } else {
-            return Left(Failure(responseData?['message']?.toString() ?? 'فشل في جلب الدوراتي'));
-          }
-        },
-      );
+          await cacheService.saveString(cacheKey, json.encode(dataList));
+
+          final enrollments = dataList
+              .map((json) => MyCourseEnrollmentModel.fromJson(json))
+              .toList();
+          return Right(enrollments);
+        } else {
+          return Left(
+            Failure(
+              responseData?['message']?.toString() ?? 'فشل في جلب الدوراتي',
+            ),
+          );
+        }
+      });
     } catch (e) {
       debugPrint('🔴 ProfileRepositoryImpl.getMyCourses error: $e');
       return Left(Failure(e.toString()));
     }
   }
+
   @override
-  Future<Either<Failure, String>> submitContactUs({required String name, required String email, required String message}) async {
+  Future<Either<Failure, String>> submitContactUs({
+    required String name,
+    required String email,
+    required String message,
+  }) async {
     try {
       final response = await networkService.postData(
         endPoint: EndPoints.contact,
-        data: {
-          'name': name,
-          'email': email,
-          'message': message,
-        },
+        data: {'name': name, 'email': email, 'message': message},
       );
 
-      return response.fold(
-        (failure) => Left(failure),
-        (responseData) {
-          if (responseData != null && responseData['success'] == true) {
-            final msg = responseData['message']?.toString() ?? 'تم إرسال الرسالة بنجاح.';
-            return Right(msg);
-          } else {
-            return Left(Failure(responseData?['message']?.toString() ?? 'فشل في إرسال الرسالة'));
-          }
-        },
-      );
+      return response.fold((failure) => Left(failure), (responseData) {
+        if (responseData != null && responseData['success'] == true) {
+          final msg =
+              responseData['message']?.toString() ?? 'تم إرسال الرسالة بنجاح.';
+          return Right(msg);
+        } else {
+          return Left(
+            Failure(
+              responseData?['message']?.toString() ?? 'فشل في إرسال الرسالة',
+            ),
+          );
+        }
+      });
     } catch (e) {
       debugPrint('🔴 ProfileRepositoryImpl.submitContactUs error: $e');
       return Left(Failure(e.toString()));

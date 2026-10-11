@@ -14,7 +14,6 @@ import 'package:pythagoras/features/profile/presentation/screens/my_courses_scre
 import 'package:pythagoras/features/profile/presentation/screens/edit_profile_screen.dart';
 import 'package:pythagoras/features/profile/presentation/screens/contact_us_screen.dart';
 import 'package:pythagoras/features/home/screens/home_screen.dart';
-import 'package:pythagoras/features/splash/presentation/screens/splash_screen.dart';
 import 'package:pythagoras/features/courses/presentation/screens/pdf_viewer_screen.dart';
 import 'package:pythagoras/features/courses/presentation/screens/webview_screen.dart';
 import 'package:pythagoras/features/courses/presentation/screens/quiz_screen.dart';
@@ -41,10 +40,10 @@ GoRouter createRouter() {
       // customGoRouterObserver,
     ],
     routes: [
-      GoRoute(
-        path: Routes.splashScreen,
-        builder: (context, state) => const SplashScreen(),
-      ),
+      // GoRoute(
+      //   path: Routes.splashScreen,
+      //   builder: (context, state) => const SplashScreen(),
+      // ),
       GoRoute(
         path: Routes.loginScreen,
         builder: (context, state) {
@@ -173,7 +172,10 @@ GoRouter createRouter() {
           final extra = state.extra as Map<String, dynamic>;
           final courseId = extra['courseId'] as int;
           final courseTitle = extra['courseTitle'] as String;
-          return CourseReviewsScreen(courseId: courseId, courseTitle: courseTitle);
+          return CourseReviewsScreen(
+            courseId: courseId,
+            courseTitle: courseTitle,
+          );
         },
       ),
     ],

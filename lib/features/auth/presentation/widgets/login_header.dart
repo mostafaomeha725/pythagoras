@@ -53,7 +53,7 @@ class LoginHeader extends StatelessWidget {
         // Logo
         Align(
           alignment: Alignment.center,
-          child: AppAsset(assetName: Assets.logo, height: 140.h),
+          child: AppAsset(assetName: Assets.logoapp, height: 140.h),
         ),
 
         SizedBox(height: 22.h),

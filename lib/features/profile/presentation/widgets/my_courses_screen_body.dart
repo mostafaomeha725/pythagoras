@@ -19,11 +19,21 @@ class MyCoursesScreenBody extends StatelessWidget {
           return const MyCoursesShimmer();
         } else if (state is MyCoursesError) {
           return Center(
-              child: AppText(state.message,
-                  style: font16w700, alignment: AlignmentDirectional.center));
+            child: AppText(
+              state.message,
+              style: font16w700,
+              alignment: AlignmentDirectional.center,
+            ),
+          );
         } else if (state is MyCoursesLoaded) {
           if (state.enrollments.isEmpty) {
-            return Center(child: AppText('لا توجد دورات مسجلة', style: font16w700));
+            return Center(
+              child: AppText(
+                'لا توجد دورات مسجلة',
+                style: font16w700,
+                alignment: AlignmentDirectional.center,
+              ),
+            );
           }
 
           return ListView.builder(

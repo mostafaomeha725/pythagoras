@@ -24,7 +24,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   PlatformDispatcher.instance.onError = (error, stack) {
     if (error.toString().contains('YouTube player failed to initialize')) {
       return true;
@@ -34,14 +34,16 @@ Future<void> main() async {
 
   final originalOnError = FlutterError.onError;
   FlutterError.onError = (FlutterErrorDetails details) {
-    if (details.exceptionAsString().contains('YouTube player failed to initialize')) {
+    if (details.exceptionAsString().contains(
+      'YouTube player failed to initialize',
+    )) {
       return;
     }
     if (originalOnError != null) {
       originalOnError(details);
     }
   };
-  
+
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -77,7 +79,10 @@ class DefaultApp extends StatelessWidget {
             BlocProvider(
               create: (context) => ClassesCubit(
                 GetClassesUseCase(
-                  CoursesRepositoryImpl(networkService: sl(), cacheService: sl()),
+                  CoursesRepositoryImpl(
+                    networkService: sl(),
+                    cacheService: sl(),
+                  ),
                 ),
               ),
             ),

@@ -1,18 +1,20 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:video_player/video_player.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
-import 'package:screen_protector/screen_protector.dart';
 
 import 'package:pythagoras/features/courses/presentation/widgets/video_player/video_provider_type.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/video_player/adapters/course_video_adapter.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/video_player/adapters/course_youtube_adapter.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/video_player/adapters/course_native_adapter.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/video_player/adapters/course_webview_adapter.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/video_player/utils/course_video_screen_security.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/video_player/utils/course_video_network_checker.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/video_player/utils/course_video_url_helper.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/video_player/utils/course_vimeo_embed_builder.dart';
 
 /// Manages the state and logic for the unified video player.
 class CourseVideoPlayerManager extends ChangeNotifier {
@@ -35,24 +37,10 @@ class CourseVideoPlayerManager extends ChangeNotifier {
   String? currentVideoUrl;
   Timer? _networkTimer;
 
-  Future<bool> _hasInternetConnection() async {
-    try {
-      final result = await InternetAddress.lookup(
-        'google.com',
-      ).timeout(const Duration(seconds: 3));
-      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
-        return true;
-      }
-    } catch (_) {
-      return false;
-    }
-    return false;
-  }
-
   Future<void> _handleError(String fallbackMsg, String url) async {
     if (_isDisposed || currentVideoUrl != url) return;
 
-    final hasInternet = await _hasInternetConnection();
+    final hasInternet = await CourseVideoNetworkChecker.hasInternetConnection();
     if (_isDisposed || currentVideoUrl != url) return;
 
     if (!hasInternet) {
@@ -72,7 +60,7 @@ class CourseVideoPlayerManager extends ChangeNotifier {
       final isStuck = isInitializing || (adapter?.isBuffering ?? true);
       if (currentVideoUrl != url || _isDisposed || !isStuck) return;
 
-      final hasInternet = await _hasInternetConnection();
+      final hasInternet = await CourseVideoNetworkChecker.hasInternetConnection();
       if (currentVideoUrl != url ||
           _isDisposed ||
           (!isInitializing && !(adapter?.isBuffering ?? true))) {
@@ -93,7 +81,7 @@ class CourseVideoPlayerManager extends ChangeNotifier {
   }
 
   void _startImmediateNetworkCheck(String url) async {
-    final hasInternet = await _hasInternetConnection();
+    final hasInternet = await CourseVideoNetworkChecker.hasInternetConnection();
     final isStuck = isInitializing || (adapter?.isBuffering ?? true);
     if (_isDisposed || currentVideoUrl != url || !isStuck) return;
 
@@ -131,18 +119,13 @@ class CourseVideoPlayerManager extends ChangeNotifier {
     _startTimeoutTimer(videoUrl);
 
     // Enable Screen Protection safely without crashing
-    try {
-      await ScreenProtector.protectDataLeakageOn();
-      await ScreenProtector.preventScreenshotOn();
-    } catch (e) {
-      debugPrint('ScreenProtector init failed: $e');
-    }
+    await CourseVideoScreenSecurity.enable();
 
     // 2. Race condition check: abort if user selected another video while awaiting
     if (currentVideoUrl != videoUrl) return;
 
     final newProviderType = determineVideoProvider(videoUrl, videoTypeStr);
-    final actualNewProviderType = _isDirectVideo(videoUrl)
+    final actualNewProviderType = CourseVideoUrlHelper.isDirectVideo(videoUrl)
         ? VideoProviderType.native
         : newProviderType;
 
@@ -269,7 +252,7 @@ class CourseVideoPlayerManager extends ChangeNotifier {
     controller.setNavigationDelegate(
       NavigationDelegate(
         onNavigationRequest: (NavigationRequest request) {
-          debugPrint('WebView NavigationRequest: \${request.url}');
+          debugPrint('WebView NavigationRequest: ${request.url}');
 
           if (request.url.startsWith('intent://') ||
               request.url.startsWith('mailto:') ||
@@ -305,51 +288,8 @@ class CourseVideoPlayerManager extends ChangeNotifier {
     );
 
     if (isVimeo) {
-      final videoId = _extractVimeoId(url);
-      final html =
-          '''
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
-          <style>body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: black; overflow: hidden; }</style>
-        </head>
-        <body>
-          <iframe id="vimeo-player" src="https://player.vimeo.com/video/$videoId?controls=0&autoplay=1&playsinline=1" width="100%" height="100%" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
-          <script src="https://player.vimeo.com/api/player.js"></script>
-          <script>
-            var iframe = document.querySelector('iframe');
-            var player = new Vimeo.Player(iframe);
-            
-            player.on('timeupdate', function(data) {
-               window.VimeoFlutterChannel.postMessage(JSON.stringify({
-                  event: 'timeupdate',
-                  duration: data.duration,
-                  currentTime: data.seconds
-               }));
-            });
-            player.on('play', function() {
-               window.VimeoFlutterChannel.postMessage(JSON.stringify({ event: 'play' }));
-            });
-            player.on('pause', function() {
-               window.VimeoFlutterChannel.postMessage(JSON.stringify({ event: 'pause' }));
-            });
-            
-            window.flutterPlay = function() { player.play(); };
-            window.flutterPause = function() { player.pause(); };
-            window.flutterSeek = function(sec) { player.setCurrentTime(sec); };
-            window.flutterVolume = function(vol) { player.setVolume(vol); };
-            
-            player.getDuration().then(function(dur) {
-                window.VimeoFlutterChannel.postMessage(JSON.stringify({
-                  event: 'ready',
-                  duration: dur
-               }));
-            }).catch(function() {});
-          </script>
-        </body>
-        </html>
-      ''';
+      final videoId = CourseVimeoEmbedBuilder.extractVimeoId(url);
+      final html = CourseVimeoEmbedBuilder.buildHtml(videoId);
       controller.addJavaScriptChannel(
         'VimeoFlutterChannel',
         onMessageReceived: (msg) {
@@ -369,24 +309,6 @@ class CourseVideoPlayerManager extends ChangeNotifier {
     } else {
       controller.loadRequest(Uri.parse(url));
     }
-  }
-
-  String _extractVimeoId(String url) {
-    final regex = RegExp(r'vimeo\.com/(?:video/)?(\d+)');
-    final match = regex.firstMatch(url);
-    if (match != null) {
-      return match.group(1) ?? url;
-    }
-    // fallback
-    return url;
-  }
-
-  bool _isDirectVideo(String url) {
-    final lower = url.toLowerCase();
-    return lower.endsWith('.mp4') ||
-        lower.endsWith('.m3u8') ||
-        lower.contains('.mp4?') ||
-        lower.contains('.m3u8?');
   }
 
   void _toggleFullScreen(bool fullScreen) {
@@ -422,8 +344,7 @@ class CourseVideoPlayerManager extends ChangeNotifier {
     webViewController = null;
 
     if (!keepScreenProtection) {
-      ScreenProtector.protectDataLeakageOff();
-      ScreenProtector.preventScreenshotOff();
+      CourseVideoScreenSecurity.disable();
     }
   }
 
