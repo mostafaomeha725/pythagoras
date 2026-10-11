@@ -35,7 +35,6 @@ class EndPoints {
   static String startQuizAttempt(int id) => 'api/quizzes/$id/start';
   static String submitAnswer(int id) => 'api/quizzes/$id/answer';
   static String submitQuiz(int id) => 'api/quizzes/$id/submit';
-  static String quizResult(int id) => 'api/quizzes/$id/result';
   static const String requestCourse = 'api/request/course';
   static const String requestChapter = 'api/request/chapter';
   

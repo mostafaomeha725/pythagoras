@@ -717,9 +717,11 @@ class CoursesRepositoryImpl implements CoursesRepository {
       );
       return response.fold((failure) => Left(failure), (data) {
         if (data != null && data['success'] == true) {
-          final result = QuizResultModel.fromJson(
-            data['data'] as Map<String, dynamic>,
-          );
+          final dataMap = data['data'] as Map<String, dynamic>;
+          final result = QuizResultModel.fromJson(dataMap);
+          // Cache the result so getQuizResult can return it without a separate API call
+          final cacheKey = '${PreferencesKeys.cachedQuizResult.name}_$quizId';
+          cacheService.saveString(cacheKey, json.encode(dataMap));
           return Right(result);
         } else {
           return Left(
@@ -737,41 +739,21 @@ class CoursesRepositoryImpl implements CoursesRepository {
     int quizId, {
     bool fromCache = false,
   }) async {
+    // Results are cached by submitQuiz after a successful submission.
+    // We only read from cache — the api/quizzes/{id}/result endpoint is not used.
     try {
       final cacheKey = '${PreferencesKeys.cachedQuizResult.name}_$quizId';
+      final cachedString = cacheService.getString(cacheKey);
 
-      if (fromCache) {
-        final cachedString = cacheService.getString(cacheKey);
-        if (cachedString != null && cachedString.isNotEmpty) {
-          final dataMap = json.decode(cachedString);
-          final result = QuizResultModel.fromJson(
-            dataMap as Map<String, dynamic>,
-          );
-          return Right(result);
-        } else {
-          return Left(Failure('No cached data'));
-        }
+      if (cachedString != null && cachedString.isNotEmpty) {
+        final dataMap = json.decode(cachedString);
+        final result = QuizResultModel.fromJson(
+          dataMap as Map<String, dynamic>,
+        );
+        return Right(result);
       }
 
-      final response = await networkService.getData(
-        endPoint: EndPoints.quizResult(quizId),
-      );
-      return response.fold((failure) => Left(failure), (data) async {
-        if (data != null && data['success'] == true) {
-          final dataMap = data['data'] as Map<String, dynamic>;
-
-          await cacheService.saveString(cacheKey, json.encode(dataMap));
-
-          final result = QuizResultModel.fromJson(dataMap);
-          return Right(result);
-        } else {
-          return Left(
-            Failure(
-              data?['message']?.toString() ?? 'فشل في جلب نتائج الامتحان',
-            ),
-          );
-        }
-      });
+      return Left(Failure('No cached data'));
     } catch (e) {
       return Left(Failure(e.toString()));
     }

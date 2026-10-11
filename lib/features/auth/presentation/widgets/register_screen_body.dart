@@ -40,90 +40,95 @@ class RegisterScreenBody extends StatelessWidget {
         }
       },
       child: SafeArea(
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 20.w),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(height: 32.h),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20.w),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(height: 32.h),
 
-            // Logo
-            Align(
-              alignment: Alignment.center,
-              child: AppAsset(assetName: Assets.logo, height: 140.h),
-            ),
+              // Logo
+              Align(
+                alignment: Alignment.center,
+                child: AppAsset(assetName: Assets.logoapp, height: 140.h),
+              ),
 
-            SizedBox(height: 32.h),
+              SizedBox(height: 32.h),
 
-            // Heading
-            AppText(
-              "إنشاء حساب جديد",
-              style: font24w800.copyWith(color: const Color(0xFF1E1E2D)),
-              alignment: AlignmentDirectional.center,
-            ),
+              // Heading
+              AppText(
+                "إنشاء حساب جديد",
+                style: font24w800.copyWith(color: const Color(0xFF1E1E2D)),
+                alignment: AlignmentDirectional.center,
+              ),
 
-            SizedBox(height: 8.h),
+              SizedBox(height: 8.h),
 
-            // Subtitle
-            AppText(
-              "تواصل معنا عبر واتساب لإكمال تسجيل حسابك بسهولة",
-              style: font14w500.copyWith(color: const Color(0xFF6B7280)),
-              alignment: AlignmentDirectional.center,
-            ),
+              // Subtitle
+              AppText(
+                "تواصل معنا عبر واتساب لإكمال تسجيل حسابك بسهولة",
+                style: font14w500.copyWith(color: const Color(0xFF6B7280)),
+                alignment: AlignmentDirectional.center,
+              ),
 
-            SizedBox(height: 40.h),
+              SizedBox(height: 40.h),
 
-            // WhatsApp Card
-            WhatsAppRegisterCard(onTap: () => _openWhatsApp(context)),
-            SizedBox(height: 32.h),
-            BlocBuilder<WhatsappRegisterCubit, WhatsappRegisterState>(
-              builder: (context, state) {
-                return Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16.r),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppLightColors.primary.withValues(alpha: 0.25),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: AppButton(
-                    text: state is WhatsappRegisterLoading ? "جاري التحميل..." : "إنشاء حساب عبر واتساب",
-                    onPressed: state is WhatsappRegisterLoading ? null : () => _openWhatsApp(context),
-                    radius: 16.r,
-                    height: 56.h,
-                    textColor: Colors.white,
-                    textSize: 16.sp,
-                    textWeight: FontWeight.bold,
-                  ),
-                );
-              },
-            ),
+              // WhatsApp Card
+              WhatsAppRegisterCard(onTap: () => _openWhatsApp(context)),
+              SizedBox(height: 32.h),
+              BlocBuilder<WhatsappRegisterCubit, WhatsappRegisterState>(
+                builder: (context, state) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16.r),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppLightColors.primary.withValues(alpha: 0.25),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: AppButton(
+                      text: state is WhatsappRegisterLoading
+                          ? "جاري التحميل..."
+                          : "إنشاء حساب عبر واتساب",
+                      onPressed: state is WhatsappRegisterLoading
+                          ? null
+                          : () => _openWhatsApp(context),
+                      radius: 16.r,
+                      height: 56.h,
+                      textColor: Colors.white,
+                      textSize: 16.sp,
+                      textWeight: FontWeight.bold,
+                    ),
+                  );
+                },
+              ),
 
-            SizedBox(height: 16.h),
+              SizedBox(height: 16.h),
 
-            // Secondary Button (Back to Login)
-            AppButton(
-              text: "العودة إلى تسجيل الدخول",
-              onPressed: () {
-                context.go(Routes.loginScreen);
-              },
-              color: Colors.transparent,
-              borderColor: const Color(0xFFE5E7EB),
-              textColor: AppLightColors.primary,
-              radius: 16.r,
-              height: 56.h,
-              textSize: 16.sp,
-              textWeight: FontWeight.w700,
-              elevation: 0,
-            ),
+              // Secondary Button (Back to Login)
+              AppButton(
+                text: "العودة إلى تسجيل الدخول",
+                onPressed: () {
+                  context.go(Routes.loginScreen);
+                },
+                color: Colors.transparent,
+                borderColor: const Color(0xFFE5E7EB),
+                textColor: AppLightColors.primary,
+                radius: 16.r,
+                height: 56.h,
+                textSize: 16.sp,
+                textWeight: FontWeight.w700,
+                elevation: 0,
+              ),
 
-            SizedBox(height: 24.h),
-          ],
+              SizedBox(height: 24.h),
+            ],
+          ),
         ),
       ),
-    ));
+    );
   }
 }

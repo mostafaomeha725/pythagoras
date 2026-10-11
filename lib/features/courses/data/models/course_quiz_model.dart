@@ -1,5 +1,6 @@
 import 'package:pythagoras/features/courses/domain/entities/course_quiz.dart';
 import 'package:pythagoras/features/courses/data/models/quiz_active_attempt_model.dart';
+import 'package:pythagoras/features/courses/data/models/quiz_inline_result_model.dart';
 
 class CourseQuizModel extends CourseQuiz {
   const CourseQuizModel({
@@ -18,6 +19,7 @@ class CourseQuizModel extends CourseQuiz {
     super.courseId,
     super.chapterId,
     super.activeAttempt,
+    super.inlineResult,
   });
 
   factory CourseQuizModel.fromJson(Map<String, dynamic> json) {
@@ -38,6 +40,11 @@ class CourseQuizModel extends CourseQuiz {
       chapterId: json['chapter_id'] as int?,
       activeAttempt: json['active_attempt'] != null
           ? QuizActiveAttemptModel.fromJson(json['active_attempt'])
+          : null,
+      inlineResult: json['result'] != null
+          ? QuizInlineResultModel.fromJson(
+              json['result'] as Map<String, dynamic>,
+            )
           : null,
     );
   }

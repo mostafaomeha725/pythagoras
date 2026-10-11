@@ -436,8 +436,20 @@ class NetworkService {
     }
   }
 
-  String _extractErrorMessage(dynamic data, {required String fallback}) {
-    if (data is Map<String, dynamic>) {
+  String _extractErrorMessage(dynamic rawData, {required String fallback}) {
+    Map<String, dynamic>? data;
+    if (rawData is Map<String, dynamic>) {
+      data = rawData;
+    } else if (rawData is String && rawData.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawData);
+        if (decoded is Map<String, dynamic>) {
+          data = decoded;
+        }
+      } catch (_) {}
+    }
+
+    if (data != null) {
       final errors = data['errors'];
 
       if (errors is List && errors.isNotEmpty) {

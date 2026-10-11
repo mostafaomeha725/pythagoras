@@ -46,8 +46,11 @@ class ProfileRepositoryImpl implements ProfileRepository {
 
     return response.fold(
       (failure) async {
+        final lowerMsg = failure.message.toLowerCase();
         if (failure.message.contains('401') ||
-            failure.message.contains('SESSION_REVOKED')) {
+            failure.message.contains('SESSION_REVOKED') ||
+            failure.message.contains('SESSION_REVOKED_ELSEWHERE') ||
+            lowerMsg.contains('unauthenticated')) {
           await _clearLocalSessionData();
           return Left(Failure('SESSION_EXPIRED'));
         }
@@ -103,10 +106,11 @@ class ProfileRepositoryImpl implements ProfileRepository {
   }
 
   Future<void> _clearLocalSessionData() async {
-    await preferencesStorage.deleteUserToken();
-    await preferencesStorage.deleteUserProfile();
-    await preferencesStorage.deleteUserId();
+    await preferencesStorage.clearUserSessionData();
     networkService.removeToken();
+    try {
+      await cacheService.clear();
+    } catch (_) {}
   }
 
   @override

@@ -11,6 +11,25 @@ class PreferencesStorage {
     await _preferences.clear();
   }
 
+  /// ================= CLEAR USER SESSION =================
+  Future<void> clearUserSessionData() async {
+    await deleteUserToken();
+    await deleteRefreshToken();
+    await deleteUserProfile();
+    await deleteUserId();
+    await deleteUserRole();
+    await deleteUserSecretKey();
+    await _preferences.remove(PreferencesKeys.name.name);
+    await _preferences.remove(PreferencesKeys.email.name);
+    await _preferences.remove(PreferencesKeys.phone.name);
+    await _preferences.remove(PreferencesKeys.picture.name);
+    await _preferences.remove(PreferencesKeys.userType.name);
+    await _preferences.remove(PreferencesKeys.roleId.name);
+    await _preferences.remove(PreferencesKeys.branchId.name);
+    await _preferences.remove(PreferencesKeys.branchName.name);
+    await _preferences.remove(PreferencesKeys.isEmailConfirmed.name);
+  }
+
   /// ================= BOOLEAN =================
   Future<void> putBoolean({
     required PreferencesKeys key,

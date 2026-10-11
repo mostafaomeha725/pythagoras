@@ -28,24 +28,37 @@ class ProfileCubit extends Cubit<ProfileState> {
 
     // 2. Fetch from remote in background
     final result = await getAccountInfoUseCase(fromCache: false);
-    
+
     _isFetchingRemote = false;
     if (isClosed) return;
 
     result.fold(
       (failure) {
-        if (state is! ProfileLoaded) {
-          final isSessionExpired = failure.message == 'SESSION_EXPIRED';
-          emit(ProfileFailure(
-            isSessionExpired ? 'انتهت صلاحية الجلسة' : failure.message,
-            isSessionExpired: isSessionExpired,
-          ));
+        final lowerMsg = failure.message.toLowerCase();
+        final isSessionExpired =
+            failure.message == 'SESSION_EXPIRED' ||
+            failure.message.contains('SESSION_REVOKED') ||
+            failure.message.contains('SESSION_REVOKED_ELSEWHERE') ||
+            lowerMsg.contains('unauthenticated') ||
+            failure.message.contains('401');
+        if (isSessionExpired || state is! ProfileLoaded) {
+          emit(
+            ProfileFailure(
+              isSessionExpired ? 'انتهت صلاحية الجلسة' : failure.message,
+              isSessionExpired: isSessionExpired,
+            ),
+          );
         }
       },
       (userProfile) {
         emit(ProfileLoaded(userProfile));
       },
     );
+  }
+
+  void emitSessionExpired() {
+    if (isClosed) return;
+    emit(const ProfileFailure('انتهت صلاحية الجلسة', isSessionExpired: true));
   }
 
   void resetProfile() {

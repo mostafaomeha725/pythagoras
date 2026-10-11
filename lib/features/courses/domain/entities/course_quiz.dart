@@ -1,4 +1,5 @@
 import 'package:pythagoras/features/courses/domain/entities/quiz_active_attempt.dart';
+import 'package:pythagoras/features/courses/domain/entities/quiz_inline_result.dart';
 
 class CourseQuiz {
   final int id;
@@ -16,6 +17,7 @@ class CourseQuiz {
   final int? courseId;
   final int? chapterId;
   final QuizActiveAttempt? activeAttempt;
+  final QuizInlineResult? inlineResult;
 
   const CourseQuiz({
     required this.id,
@@ -33,5 +35,6 @@ class CourseQuiz {
     this.courseId,
     this.chapterId,
     this.activeAttempt,
+    this.inlineResult,
   });
 }

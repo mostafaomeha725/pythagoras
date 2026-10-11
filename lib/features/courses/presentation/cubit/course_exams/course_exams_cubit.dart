@@ -2,7 +2,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/get_course_assignments_use_case.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/get_assignment_submissions_use_case.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/get_course_quizzes_use_case.dart';
-import 'package:pythagoras/features/courses/domain/use_cases/get_quiz_result_use_case.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/course_exams/course_exams_state.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_assignment.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_quiz.dart';
@@ -11,13 +10,11 @@ class CourseExamsCubit extends Cubit<CourseExamsState> {
   final GetCourseAssignmentsUseCase getCourseAssignmentsUseCase;
   final GetAssignmentSubmissionsUseCase getAssignmentSubmissionsUseCase;
   final GetCourseQuizzesUseCase getCourseQuizzesUseCase;
-  final GetQuizResultUseCase getQuizResultUseCase;
 
   CourseExamsCubit({
     required this.getCourseAssignmentsUseCase,
     required this.getAssignmentSubmissionsUseCase,
     required this.getCourseQuizzesUseCase,
-    required this.getQuizResultUseCase,
   }) : super(CourseExamsInitial());
 
   bool _isFetchingRemote = false;
@@ -117,29 +114,19 @@ class CourseExamsCubit extends Cubit<CourseExamsState> {
         final List<CourseQuiz> quizList = quizzes;
         if (quizList.isNotEmpty) dataFound = true;
 
-        final completedQuizzes = quizList.where((q) => !q.canAttempt).toList();
-        final upcomingQuizzes = quizList.where((q) => q.canAttempt).toList();
+        for (final quiz in quizList) {
+          // If the student still has remaining attempts, show in upcoming tasks
+          if (quiz.canAttempt) {
+            upcoming.add(CourseTaskItem.quiz(quiz: quiz));
+          }
 
-        for (final quiz in upcomingQuizzes) {
-          upcoming.add(CourseTaskItem.quiz(quiz: quiz));
-        }
-
-        if (completedQuizzes.isNotEmpty) {
-          final resultFutures = completedQuizzes
-              .map((q) => getQuizResultUseCase(q.id, fromCache: fromCache))
-              .toList();
-          final results = await Future.wait(resultFutures);
-
-          if (isClosed) return;
-
-          for (var i = 0; i < completedQuizzes.length; i++) {
-            final quiz = completedQuizzes[i];
-            final quizRes = results[i];
-
-            quizRes.fold(
-              (l) => completed.add(CourseTaskItem.quiz(quiz: quiz)),
-              (r) =>
-                  completed.add(CourseTaskItem.quiz(quiz: quiz, quizResult: r)),
+          // If the student already completed an attempt (has an inline result or currentAttempts > 0),
+          // OR if the quiz can no longer be attempted (!canAttempt), show in completed tasks
+          final hasAttempted =
+              quiz.inlineResult != null || quiz.currentAttempts > 0;
+          if (hasAttempted || !quiz.canAttempt) {
+            completed.add(
+              CourseTaskItem.quiz(quiz: quiz, quizResult: quiz.inlineResult),
             );
           }
         }

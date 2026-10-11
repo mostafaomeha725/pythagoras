@@ -63,9 +63,7 @@ class _SubmitAssignmentSheetState extends State<SubmitAssignmentSheet> {
   }
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.any,
-    );
+    final result = await FilePicker.pickFiles(type: FileType.any);
     if (result != null && result.files.isNotEmpty) {
       setState(() => _pickedFile = result.files.first);
     }
@@ -157,6 +155,7 @@ class _SubmitAssignmentSheetState extends State<SubmitAssignmentSheet> {
               ),
               SizedBox(height: 28.h),
               SubmitAssignmentButton(onSubmit: () => _submit(context)),
+              SizedBox(height: 28.h),
             ],
           ),
         ),

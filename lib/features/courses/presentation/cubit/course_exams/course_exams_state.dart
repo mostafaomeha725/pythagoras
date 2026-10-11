@@ -1,7 +1,7 @@
 import 'package:pythagoras/features/courses/domain/entities/course_assignment.dart';
 import 'package:pythagoras/features/courses/domain/entities/assignment_submission.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_quiz.dart';
-import 'package:pythagoras/features/courses/domain/entities/quiz_result.dart';
+import 'package:pythagoras/features/courses/domain/entities/quiz_inline_result.dart';
 
 enum CourseTaskType { assignment, quiz }
 
@@ -14,7 +14,7 @@ class CourseTaskItem {
   
   // Quiz specific
   final CourseQuiz? quiz;
-  final QuizResult? quizResult;
+  final QuizInlineResult? quizResult;
 
   CourseTaskItem.assignment({
     required this.assignment,

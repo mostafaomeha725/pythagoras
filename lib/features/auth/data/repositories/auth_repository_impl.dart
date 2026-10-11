@@ -28,93 +28,79 @@ class AuthRepositoryImpl implements AuthRepository {
       },
     );
 
-    return response.fold(
-      (failure) => Left(failure),
-      (data) async {
-        try {
-          if (data is! Map<String, dynamic>) {
-            return const Left(Failure('استجابة غير متوقعة من السيرفر'));
-          }
-
-          // API: { "success": true, "message": "...", "data": { "user": {...}, "token": "..." } }
-          final success = data['success'];
-          if (success == false) {
-            final msg = data['message']?.toString() ?? 'فشل تسجيل الدخول';
-            return Left(Failure(msg));
-          }
-
-          final dataMap = data['data'] as Map<String, dynamic>?;
-          if (dataMap == null) {
-            return const Left(Failure('بيانات الاستجابة غير صالحة'));
-          }
-
-          final token = dataMap['token'] as String?;
-          final user = dataMap['user'] as Map<String, dynamic>?;
-
-          if (token == null || token.isEmpty) {
-            return const Left(Failure('لم يتم استلام رمز الدخول'));
-          }
-
-          // Clear previous user data and cache to start fresh
-          await _clearLocalSessionData();
-
-          await preferencesStorage.saveUserToken(token);
-          networkService.addToken(token);
-
-          if (user != null) {
-            await preferencesStorage.saveUserProfile(jsonEncode(user));
-            final userId = user['id'];
-            if (userId != null) {
-              await preferencesStorage.saveUserId(userId is int ? userId : int.tryParse(userId.toString()) ?? 0);
-            }
-            final name = user['name'] as String?;
-            if (name != null && name.isNotEmpty) {
-              await preferencesStorage.saveUserName(name);
-            }
-          }
-
-          debugPrint('✅ Login successful — user saved');
-          return const Right(null);
-        } catch (e) {
-          debugPrint('🔴 AuthRepositoryImpl.login error: $e');
-          return Left(Failure(e.toString()));
+    return response.fold((failure) => Left(failure), (data) async {
+      try {
+        if (data is! Map<String, dynamic>) {
+          return const Left(Failure('استجابة غير متوقعة من السيرفر'));
         }
-      },
-    );
+
+        // API: { "success": true, "message": "...", "data": { "user": {...}, "token": "..." } }
+        final success = data['success'];
+        if (success == false) {
+          final msg = data['message']?.toString() ?? 'فشل تسجيل الدخول';
+          return Left(Failure(msg));
+        }
+
+        final dataMap = data['data'] as Map<String, dynamic>?;
+        if (dataMap == null) {
+          return const Left(Failure('بيانات الاستجابة غير صالحة'));
+        }
+
+        final token = dataMap['token'] as String?;
+        final user = dataMap['user'] as Map<String, dynamic>?;
+
+        if (token == null || token.isEmpty) {
+          return const Left(Failure('لم يتم استلام رمز الدخول'));
+        }
+
+        // Clear previous user data and cache to start fresh
+        await _clearLocalSessionData();
+
+        await preferencesStorage.saveUserToken(token);
+        networkService.addToken(token);
+
+        if (user != null) {
+          await preferencesStorage.saveUserProfile(jsonEncode(user));
+          final userId = user['id'];
+          if (userId != null) {
+            await preferencesStorage.saveUserId(
+              userId is int ? userId : int.tryParse(userId.toString()) ?? 0,
+            );
+          }
+          final name = user['name'] as String?;
+          if (name != null && name.isNotEmpty) {
+            await preferencesStorage.saveUserName(name);
+          }
+        }
+
+        debugPrint('✅ Login successful — user saved');
+        return const Right(null);
+      } catch (e) {
+        debugPrint('🔴 AuthRepositoryImpl.login error: $e');
+        return Left(Failure(e.toString()));
+      }
+    });
   }
 
   @override
   Future<Either<Failure, void>> logout() async {
-    final response = await networkService.postData(
-      endPoint: EndPoints.logout,
-    );
+    // Always clear the local session first, regardless of server response.
+    // This prevents the user from being trapped if the token is already expired
+    // (401) or the server times out.
+    await _clearLocalSessionData();
 
-    return response.fold(
-      (failure) async {
-        // Handle 401 or session revoked
-        if (failure.message.contains('401') || failure.message.contains('SESSION_REVOKED')) {
-          await _clearLocalSessionData();
-          return const Right(null);
-        }
-        return Left(failure);
-      },
-      (data) async {
-        try {
-          if (data is Map<String, dynamic> && data['success'] == true) {
-            await _clearLocalSessionData();
-            return const Right(null);
-          }
-          return const Left(Failure('استجابة غير متوقعة عند تسجيل الخروج'));
-        } catch (e) {
-          debugPrint('🔴 AuthRepositoryImpl.logout error: $e');
-          return Left(Failure(e.toString()));
-        }
-      },
-    );
+    // Best-effort: notify the server to invalidate the token.
+    // We intentionally ignore any error here because the local session is
+    // already clean and the user is effectively logged out.
+    try {
+      await networkService.postData(endPoint: EndPoints.logout);
+    } catch (_) {}
+
+    return const Right(null);
   }
 
   Future<void> _clearLocalSessionData() async {
-    await preferencesStorage.clear();
+    await preferencesStorage.clearUserSessionData();
     networkService.removeToken();
     try {
       await Hive.box(HiveBoxes.cacheBox).clear();
@@ -127,19 +113,16 @@ class AuthRepositoryImpl implements AuthRepository {
       endPoint: EndPoints.registerWhatsapp,
     );
 
-    return response.fold(
-      (failure) => Left(failure),
-      (data) {
-        try {
-          if (data is Map<String, dynamic> && data.containsKey('whatsappUrl')) {
-            return Right(data['whatsappUrl'] as String);
-          }
-          return const Left(Failure('استجابة غير متوقعة من السيرفر'));
-        } catch (e) {
-          debugPrint('🔴 AuthRepositoryImpl.getWhatsappRegisterUrl error: $e');
-          return Left(Failure(e.toString()));
+    return response.fold((failure) => Left(failure), (data) {
+      try {
+        if (data is Map<String, dynamic> && data.containsKey('whatsappUrl')) {
+          return Right(data['whatsappUrl'] as String);
         }
-      },
-    );
+        return const Left(Failure('استجابة غير متوقعة من السيرفر'));
+      } catch (e) {
+        debugPrint('🔴 AuthRepositoryImpl.getWhatsappRegisterUrl error: $e');
+        return Left(Failure(e.toString()));
+      }
+    });
   }
 }

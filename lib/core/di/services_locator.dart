@@ -46,7 +46,6 @@ import 'package:pythagoras/features/courses/domain/use_cases/get_quiz_questions_
 import 'package:pythagoras/features/courses/domain/use_cases/start_quiz_attempt_use_case.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/submit_answer_use_case.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/submit_quiz_use_case.dart';
-import 'package:pythagoras/features/courses/domain/use_cases/get_quiz_result_use_case.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/get_course_reviews_use_case.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/add_course_review_use_case.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/course_reviews/course_reviews_cubit.dart';
@@ -142,7 +141,6 @@ class ServiceLocator {
     sl.registerLazySingleton(() => StartQuizAttemptUseCase(sl()));
     sl.registerLazySingleton(() => SubmitAnswerUseCase(sl()));
     sl.registerLazySingleton(() => SubmitQuizUseCase(sl()));
-    sl.registerLazySingleton(() => GetQuizResultUseCase(sl()));
     sl.registerLazySingleton(() => GetLiveSessionsUseCase(sl()));
 
     sl.registerFactory(() => ClassesCubit(sl()));
@@ -157,7 +155,6 @@ class ServiceLocator {
         getCourseAssignmentsUseCase: sl(),
         getAssignmentSubmissionsUseCase: sl(),
         getCourseQuizzesUseCase: sl(),
-        getQuizResultUseCase: sl(),
       ),
     );
     sl.registerFactory(() => SubmitAssignmentCubit(sl(), sl()));

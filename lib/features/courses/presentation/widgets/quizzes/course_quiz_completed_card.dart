@@ -3,12 +3,12 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pythagoras/core/theme/styles.dart';
 import 'package:pythagoras/core/widgets/custom_text.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_quiz.dart';
-import 'package:pythagoras/features/courses/domain/entities/quiz_result.dart';
+import 'package:pythagoras/features/courses/domain/entities/quiz_inline_result.dart';
 import 'package:pythagoras/core/utils/date_formatter.dart';
 
 class CourseQuizCompletedCard extends StatelessWidget {
   final CourseQuiz quiz;
-  final QuizResult? result;
+  final QuizInlineResult? result;
 
   const CourseQuizCompletedCard({
     super.key,
