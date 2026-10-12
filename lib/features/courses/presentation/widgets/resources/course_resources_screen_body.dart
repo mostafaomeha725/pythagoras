@@ -10,6 +10,7 @@ import 'package:pythagoras/features/courses/presentation/cubit/course_resources/
 import 'package:pythagoras/features/courses/presentation/widgets/resources/course_resource_card.dart';
 import 'package:pythagoras/core/widgets/empty_state_widget.dart';
 
+import 'package:pythagoras/core/widgets/no_internet_widget.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/resources/course_resources_shimmer.dart';
 
 class CourseResourcesScreenBody extends StatelessWidget {
@@ -28,12 +29,11 @@ class CourseResourcesScreenBody extends StatelessWidget {
           }
 
           if (state is CourseResourcesError) {
-            return Center(
-              child: AppText(
-                state.message,
-                style: font14w500.copyWith(color: const Color(0xFF6B7280)),
-                alignment: AlignmentDirectional.center,
-              ),
+            return NoInternetWidget(
+              message: state.message,
+              onRetry: () => context
+                  .read<CourseResourcesCubit>()
+                  .getResources(course.id),
             );
           }
 

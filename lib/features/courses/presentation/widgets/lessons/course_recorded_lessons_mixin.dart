@@ -19,7 +19,7 @@ mixin CourseRecordedLessonsMixin on State<CourseRecordedLessonsScreenBody> {
     super.initState();
     _initSecurity();
     _selectFirstAvailableVideo();
-    
+
     // Fetch videos for all chapters in bulk so the UI can show the Skeleton Shimmer!
     final cubit = context.read<ChapterVideosCubit>();
     final chapterIds = widget.course.chapters.map((c) => c.id).toList();
@@ -30,7 +30,8 @@ mixin CourseRecordedLessonsMixin on State<CourseRecordedLessonsScreenBody> {
     // If a specific chapter was selected, try to find its first video
     if (widget.selectedChapterId != null) {
       for (final chapter in widget.course.chapters) {
-        if (chapter.id == widget.selectedChapterId && chapter.videos.isNotEmpty) {
+        if (chapter.id == widget.selectedChapterId &&
+            chapter.videos.isNotEmpty) {
           setState(() {
             selectedLesson = chapter.videos.first;
             selectedChapterId = chapter.id;
@@ -40,7 +41,7 @@ mixin CourseRecordedLessonsMixin on State<CourseRecordedLessonsScreenBody> {
         }
       }
     }
-    
+
     // Fallback: just pick the first available video in the course
     for (final chapter in widget.course.chapters) {
       if (chapter.videos.isNotEmpty) {
@@ -67,7 +68,9 @@ mixin CourseRecordedLessonsMixin on State<CourseRecordedLessonsScreenBody> {
   CourseDetail getUpdatedCourse() {
     return widget.course.copyWith(
       chapters: widget.course.chapters.map((chapter) {
-        final fetchedVideos = context.read<ChapterVideosCubit>().getVideosForChapter(chapter.id);
+        final fetchedVideos = context
+            .read<ChapterVideosCubit>()
+            .getVideosForChapter(chapter.id);
         return chapter.copyWith(videos: fetchedVideos ?? chapter.videos);
       }).toList(),
     );
@@ -75,9 +78,13 @@ mixin CourseRecordedLessonsMixin on State<CourseRecordedLessonsScreenBody> {
 
   void syncSelectedLessonWithUpdates() {
     if (selectedLesson != null && selectedChapterId != null) {
-      final fetchedVideos = context.read<ChapterVideosCubit>().getVideosForChapter(selectedChapterId!);
+      final fetchedVideos = context
+          .read<ChapterVideosCubit>()
+          .getVideosForChapter(selectedChapterId!);
       if (fetchedVideos != null) {
-        final index = fetchedVideos.indexWhere((v) => v.id == selectedLesson!.id);
+        final index = fetchedVideos.indexWhere(
+          (v) => v.id == selectedLesson!.id,
+        );
         if (index != -1) {
           selectedLesson = fetchedVideos[index];
         }
@@ -94,7 +101,7 @@ mixin CourseRecordedLessonsMixin on State<CourseRecordedLessonsScreenBody> {
         break;
       }
     }
-    
+
     // 2. Update UI State
     setState(() {
       selectedLesson = lesson;
@@ -102,38 +109,43 @@ mixin CourseRecordedLessonsMixin on State<CourseRecordedLessonsScreenBody> {
         selectedChapterId = chapterId;
       }
     });
-    
+
     // 3. Complete video if not already completed
     if (lesson.status != CourseLessonStatus.completed && chapterId != null) {
       _handleVideoCompletion(lesson.id, chapterId, updatedCourse);
     }
   }
 
-  void _handleVideoCompletion(String lessonIdStr, int chapterId, CourseDetail updatedCourse) {
+  void _handleVideoCompletion(
+    String lessonIdStr,
+    int chapterId,
+    CourseDetail updatedCourse,
+  ) {
     final videoId = int.tryParse(lessonIdStr);
     if (videoId == null) return;
 
     // Optimistic UI update
     context.read<ChapterVideosCubit>().markVideoCompleted(chapterId, videoId);
-    
+
     final completeVideoCubit = context.read<CompleteVideoCubit>();
     final completeLessonCubit = context.read<CompleteLessonCubit>();
-    
+
     completeVideoCubit.completeVideo(videoId).then((_) {
       if (!mounted) return;
-      
+
       // Check if ALL videos in the chapter are now completed.
-      // Since 'updatedCourse' holds the state before this optimistic update, 
-      // we consider a video completed if its status is already 'completed' 
+      // Since 'updatedCourse' holds the state before this optimistic update,
+      // we consider a video completed if its status is already 'completed'
       // OR if it's the current video we are completing right now.
       final chap = updatedCourse.chapters.firstWhere((c) => c.id == chapterId);
-      
-      final allVideosCompleted = chap.videos.every((v) => 
-          v.status == CourseLessonStatus.completed || v.id == lessonIdStr);
-          
+
+      final allVideosCompleted = chap.videos.every(
+        (v) => v.status == CourseLessonStatus.completed || v.id == lessonIdStr,
+      );
+
       if (chap.videos.isNotEmpty && allVideosCompleted) {
-          // User has finished ALL videos in this chapter, call completeLesson
-          completeLessonCubit.completeLesson(chapterId);
+        // User has finished ALL videos in this chapter, call completeLesson
+        completeLessonCubit.completeLesson(chapterId);
       }
     });
   }

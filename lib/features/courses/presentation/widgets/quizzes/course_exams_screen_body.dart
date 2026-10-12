@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:pythagoras/core/theme/styles.dart';
-import 'package:pythagoras/core/widgets/custom_text.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_detail.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/course_exams/course_exams_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/course_exams/course_exams_state.dart';
@@ -12,6 +10,7 @@ import 'package:pythagoras/features/courses/presentation/widgets/quizzes/course_
 import 'package:pythagoras/features/courses/presentation/widgets/completed_cards/course_task_completed_card.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/quizzes/course_quiz_completed_card.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/quizzes/exams_screen_widgets.dart';
+import 'package:pythagoras/core/widgets/no_internet_widget.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/quizzes/course_exams_shimmer.dart';
 
 
@@ -29,12 +28,11 @@ class CourseExamsScreenBody extends StatelessWidget {
         }
 
         if (state is CourseExamsError) {
-          return Center(
-            child: AppText(
-              state.message,
-              style: font14w500.copyWith(color: const Color(0xFF6B7280)),
-              alignment: AlignmentDirectional.center,
-            ),
+          return NoInternetWidget(
+            message: state.message,
+            onRetry: () => context
+                .read<CourseExamsCubit>()
+                .fetchExamsAndAssignments(course.id, showLoading: true),
           );
         }
 

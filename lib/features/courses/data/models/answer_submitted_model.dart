@@ -12,10 +12,10 @@ class AnswerSubmittedModel extends AnswerSubmitted {
 
   factory AnswerSubmittedModel.fromJson(Map<String, dynamic> json) {
     return AnswerSubmittedModel(
-      id: json['id'] as int,
-      quizAttemptId: json['quiz_attempt_id'] as int,
-      questionId: json['question_id'] as int,
-      optionId: json['option_id'] as int,
+      id: json['id'] as int? ?? 0,
+      quizAttemptId: json['quiz_attempt_id'] as int? ?? 0,
+      questionId: json['question_id'] as int? ?? 0,
+      optionId: json['option_id'] as int? ?? 0,
       selectedAnswer: json['selected_answer']?.toString(),
       isCorrect: json['is_correct'] as bool? ?? false,
     );

@@ -19,23 +19,37 @@ class QuizResultModel extends QuizResult {
   });
 
   factory QuizResultModel.fromJson(Map<String, dynamic> json) {
+    final summaryJson = json['summary'] is Map<String, dynamic>
+        ? json['summary'] as Map<String, dynamic>
+        : <String, dynamic>{};
+    final quizJson = json['quiz'] is Map<String, dynamic>
+        ? json['quiz'] as Map<String, dynamic>
+        : <String, dynamic>{};
+    final userJson = json['user'] is Map<String, dynamic>
+        ? json['user'] as Map<String, dynamic>
+        : <String, dynamic>{};
+
+    final totalPointsEarned = summaryJson['total_points_earned'] as num? ?? 0;
+    final totalPossiblePoints = summaryJson['total_possible_points'] as num? ?? 0;
+
     return QuizResultModel(
-      id: json['id'] as int,
-      quizId: json['quiz_id'] as int,
-      userId: json['user_id'] as int,
-      score: json['score'] as num? ?? 0,
-      maxScore: json['max_score'] as num? ?? 0,
-      percentage: json['percentage'] as num? ?? 0,
+      id: json['id'] as int? ?? 0,
+      quizId: json['quiz_id'] as int? ?? 0,
+      userId: json['user_id'] as int? ?? 0,
+      score: json['score'] as num? ?? totalPointsEarned,
+      maxScore: json['max_score'] as num? ?? totalPossiblePoints,
+      percentage: json['percentage'] as num? ??
+          (totalPossiblePoints > 0 ? (totalPointsEarned / totalPossiblePoints) * 100 : 0),
       attempts: json['attempts'] as int? ?? 1,
       completedAt: json['completed_at'] as String? ?? '',
-      isPassed: json['is_passed'] as bool? ?? false,
-      quiz: QuizResultDetailsModel.fromJson(json['quiz'] as Map<String, dynamic>),
-      user: QuizUserModel.fromJson(json['user'] as Map<String, dynamic>),
+      isPassed: json['is_passed'] as bool? ?? true,
+      quiz: QuizResultDetailsModel.fromJson(quizJson),
+      user: QuizUserModel.fromJson(userJson),
       answers: (json['answers'] as List<dynamic>?)
               ?.map((e) => QuizResultAnswerModel.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      summary: QuizSummaryModel.fromJson(json['summary'] as Map<String, dynamic>),
+      summary: QuizSummaryModel.fromJson(summaryJson),
     );
   }
 }
@@ -52,7 +66,7 @@ class QuizResultDetailsModel extends QuizResultDetails {
 
   factory QuizResultDetailsModel.fromJson(Map<String, dynamic> json) {
     return QuizResultDetailsModel(
-      id: json['id'] as int,
+      id: json['id'] as int? ?? 0,
       title: json['title'] as String? ?? '',
       description: json['description'] as String?,
       passingScore: json['passing_score'] as int? ?? 0,
@@ -72,7 +86,7 @@ class QuizUserModel extends QuizUser {
 
   factory QuizUserModel.fromJson(Map<String, dynamic> json) {
     return QuizUserModel(
-      id: json['id'] as int,
+      id: json['id'] as int? ?? 0,
       name: json['name'] as String? ?? '',
       email: json['email'] as String?,
       avatar: json['avatar'] as String?,
@@ -97,8 +111,8 @@ class QuizResultAnswerModel extends QuizResultAnswer {
 
   factory QuizResultAnswerModel.fromJson(Map<String, dynamic> json) {
     return QuizResultAnswerModel(
-      id: json['id'] as int,
-      questionId: json['question_id'] as int,
+      id: json['id'] as int? ?? 0,
+      questionId: json['question_id'] as int? ?? 0,
       questionText: json['question_text'] as String?,
       questionImageUrl: json['question_image_url'] as String?,
       questionType: json['question_type'] as String? ?? 'multiple_choice',

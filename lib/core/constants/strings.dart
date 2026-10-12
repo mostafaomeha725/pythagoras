@@ -18,4 +18,7 @@ class AppStrings {
   static const String fontFamily = 'Tajawal';
   static const String enPrivacyPolicy = '';
   static const String arPrivacyPolicy = '';
+
+  static const String noInternetConnection =
+      'لا يوجد اتصال بالإنترنت، يرجى التحقق من اتصالك والمحاولة مرة أخرى';
 }

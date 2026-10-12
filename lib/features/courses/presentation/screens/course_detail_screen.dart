@@ -13,6 +13,7 @@ import 'package:pythagoras/features/courses/presentation/cubit/request_enrollmen
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_shimmer.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/courses_list/courses_list_cubit.dart';
+import 'package:pythagoras/core/widgets/no_internet_widget.dart';
 
 class CourseDetailScreen extends StatefulWidget {
   final int courseId;
@@ -95,17 +96,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> with WidgetsBin
               if (state is CourseDetailsLoading) {
                 return const CourseDetailShimmer();
               } else if (state is CourseDetailsError) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(state.message),
-                      ElevatedButton(
-                        onPressed: () => _courseDetailsCubit.fetchCourseDetails(widget.courseId),
-                        child: const Text('إعادة المحاولة'),
-                      ),
-                    ],
-                  ),
+                return NoInternetWidget(
+                  message: state.message,
+                  onRetry: () => _courseDetailsCubit.fetchCourseDetails(widget.courseId),
                 );
               } else if (state is CourseDetailsLoaded) {
                 // Use the CourseDetail directly from the API which contains the fresh request_status

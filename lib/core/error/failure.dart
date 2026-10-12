@@ -37,6 +37,16 @@ class UserCancelledFailure extends Failure {
   List<Object> get props => [];
 }
 
+class NoInternetConnectionFailure extends Failure {
+  const NoInternetConnectionFailure([
+    super.message =
+        'لا يوجد اتصال بالإنترنت، يرجى التحقق من اتصالك والمحاولة مرة أخرى',
+  ]);
+
+  @override
+  List<Object> get props => [message];
+}
+
 // String mapFailureToMessage(Failure failure) {
 //   switch (failure.runtimeType) {
 //     case ServerFailure:

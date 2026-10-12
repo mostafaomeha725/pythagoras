@@ -33,10 +33,8 @@ class SaveProfileButton extends StatelessWidget {
 
         final password = passwordController.text.trim();
         final originalName = userProfile?.name ?? '';
-        final hasImageChanged =
-            context.read<EditProfileCubit>().selectedImage != null;
 
-        if (name == originalName && password.isEmpty && !hasImageChanged) {
+        if (name == originalName && password.isEmpty) {
           showError('لم تقم بإجراء أي تغييرات');
           return;
         }

@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
+import 'package:pythagoras/core/constants/strings.dart';
+
+DateTime? _lastErrorTime;
+String? _lastErrorMessage;
 
 /// ===============================
 /// CONFIGURATION
@@ -41,6 +45,15 @@ void hideLoading() {
 /// ERROR
 /// ===============================
 void showError(String message) {
+  final now = DateTime.now();
+  if (_lastErrorMessage == message &&
+      _lastErrorTime != null &&
+      now.difference(_lastErrorTime!) < const Duration(seconds: 2)) {
+    return;
+  }
+  _lastErrorMessage = message;
+  _lastErrorTime = now;
+
   hideLoading();
 
   EasyLoading.showError(
@@ -48,6 +61,30 @@ void showError(String message) {
     duration: const Duration(seconds: 2),
     dismissOnTap: true,
     maskType: EasyLoadingMaskType.black,
+  );
+}
+
+/// ===============================
+/// NO INTERNET ERROR
+/// ===============================
+void showNoInternetError([String? message]) {
+  final msg = message ?? AppStrings.noInternetConnection;
+  final now = DateTime.now();
+  if (_lastErrorMessage == msg &&
+      _lastErrorTime != null &&
+      now.difference(_lastErrorTime!) < const Duration(seconds: 3)) {
+    return;
+  }
+  _lastErrorMessage = msg;
+  _lastErrorTime = now;
+
+  hideLoading();
+
+  EasyLoading.showError(
+    msg,
+    duration: const Duration(seconds: 3),
+    dismissOnTap: true,
+    maskType: EasyLoadingMaskType.none,
   );
 }
 

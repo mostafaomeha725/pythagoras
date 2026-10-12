@@ -67,10 +67,7 @@ class _ChooseUserTypeBodyState extends State<ChooseUserTypeBody> {
             // Logo
             Align(
               alignment: Alignment.center,
-              child: AppAsset(
-                assetName: Assets.logo,
-                height: 85.h,
-              ),
+              child: AppAsset(assetName: Assets.logoapp, height: 85.h),
             ),
 
             SizedBox(height: 32.h),
@@ -78,9 +75,7 @@ class _ChooseUserTypeBodyState extends State<ChooseUserTypeBody> {
             // Heading
             AppText(
               "أنت تستخدم Eelu ك؟",
-              style: font24w800.copyWith(
-                color: const Color(0xFF1E1E2D),
-              ),
+              style: font24w800.copyWith(color: const Color(0xFF1E1E2D)),
               alignment: AlignmentDirectional.center,
             ),
 
@@ -89,9 +84,7 @@ class _ChooseUserTypeBodyState extends State<ChooseUserTypeBody> {
             // Subtitle
             AppText(
               "اختر نوع الحساب لتخصيص تجربتك التعليمية",
-              style: font14w500.copyWith(
-                color: const Color(0xFF6B7280),
-              ),
+              style: font14w500.copyWith(color: const Color(0xFF6B7280)),
               alignment: AlignmentDirectional.center,
             ),
 

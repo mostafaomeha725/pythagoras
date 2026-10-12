@@ -58,8 +58,27 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Clean build environment & caches
+        run: |
+          set -euo pipefail
+          echo "Cleaning Flutter and native build caches..."
+          flutter clean
+          rm -rf build/
+          rm -rf ios/Pods/
+          rm -rf ~/Library/Developer/Xcode/DerivedData
+          pod cache clean --all || true
+
       - name: Install Flutter dependencies
         run: flutter pub get
+
+      - name: Verify pubspec.lock has no Stripe
+        run: |
+          set -euo pipefail
+          if grep -i "stripe" pubspec.lock; then
+            echo "::error::stripe detected in pubspec.lock!"
+            exit 1
+          fi
+          echo "Verified: pubspec.lock contains zero Stripe references."
 
 
       - name: Check iOS project
@@ -196,6 +215,20 @@ jobs:
             --release \
             --build-number="$GITHUB_RUN_NUMBER" \
             --export-options-plist=ios/ExportOptions.plist
+
+      - name: Audit resolved iOS Pods in build
+        run: |
+          set -euo pipefail
+          echo "Verifying resolved iOS Pods in generated build..."
+          if [ -f ios/Podfile.lock ]; then
+            if grep -i "stripe" ios/Podfile.lock; then
+              echo "::error::stripe detected in ios/Podfile.lock!"
+              exit 1
+            fi
+            echo "Resolved iOS Pods list in final build:"
+            grep " - " ios/Podfile.lock || true
+          fi
+          echo "Verified: No Stripe pods present in resolved CocoaPods."
 
       - name: Locate IPA file
         id: locate_ipa

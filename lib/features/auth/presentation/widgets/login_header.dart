@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:pythagoras/core/theme/light_colors.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pythagoras/core/constants/app_assets.dart';
 import 'package:pythagoras/core/theme/styles.dart';
 import 'package:pythagoras/core/widgets/app_asset.dart';
-import 'package:pythagoras/core/widgets/bouncing_widgets.dart';
 import 'package:pythagoras/core/widgets/custom_text.dart';
-import 'package:go_router/go_router.dart';
 
 class LoginHeader extends StatelessWidget {
   const LoginHeader({super.key});

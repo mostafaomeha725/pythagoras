@@ -689,10 +689,11 @@ class CoursesRepositoryImpl implements CoursesRepository {
         data: body,
       );
       return response.fold((failure) => Left(failure), (data) {
-        if (data != null && data['success'] == true) {
-          final answer = AnswerSubmittedModel.fromJson(
-            data['data'] as Map<String, dynamic>,
-          );
+        if (data != null && (data['success'] == true || data['data'] != null)) {
+          final dataMap = data['data'] is Map<String, dynamic>
+              ? data['data'] as Map<String, dynamic>
+              : (data is Map<String, dynamic> ? data : <String, dynamic>{});
+          final answer = AnswerSubmittedModel.fromJson(dataMap);
           return Right(answer);
         } else {
           return Left(
@@ -716,8 +717,13 @@ class CoursesRepositoryImpl implements CoursesRepository {
         data: {'quiz_id': quizId, 'answers': answers},
       );
       return response.fold((failure) => Left(failure), (data) {
-        if (data != null && data['success'] == true) {
-          final dataMap = data['data'] as Map<String, dynamic>;
+        if (data != null &&
+            (data['success'] == true ||
+                data['summary'] != null ||
+                data['data'] != null)) {
+          final dataMap = data['data'] is Map<String, dynamic>
+              ? data['data'] as Map<String, dynamic>
+              : (data is Map<String, dynamic> ? data : <String, dynamic>{});
           final result = QuizResultModel.fromJson(dataMap);
           // Cache the result so getQuizResult can return it without a separate API call
           final cacheKey = '${PreferencesKeys.cachedQuizResult.name}_$quizId';

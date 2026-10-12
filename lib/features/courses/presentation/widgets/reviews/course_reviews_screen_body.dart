@@ -12,6 +12,7 @@ import 'package:pythagoras/features/courses/presentation/widgets/reviews/course_
 import 'package:pythagoras/features/courses/presentation/widgets/reviews/course_review_item_card.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/reviews/course_add_review_form_card.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/reviews/course_reviews_shimmer.dart';
+import 'package:pythagoras/core/widgets/no_internet_widget.dart';
 
 class CourseReviewsScreenBody extends StatefulWidget {
   final int courseId;
@@ -50,7 +51,12 @@ class _CourseReviewsScreenBodyState extends State<CourseReviewsScreenBody> {
               if (state is CourseReviewsLoading) {
                 return const CourseReviewsShimmer();
               } else if (state is CourseReviewsError) {
-                return Center(child: Text(state.message));
+                return NoInternetWidget(
+                  message: state.message,
+                  onRetry: () => context
+                      .read<CourseReviewsCubit>()
+                      .fetchCourseReviews(widget.courseId),
+                );
               } else if (state is CourseReviewsLoaded) {
                 final data = state.reviewsData;
 

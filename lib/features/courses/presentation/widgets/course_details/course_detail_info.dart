@@ -9,6 +9,10 @@ import 'package:pythagoras/features/courses/presentation/widgets/course_details/
 import 'package:go_router/go_router.dart';
 import 'package:pythagoras/core/routes/route_paths.dart';
 
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/course_details/course_details_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/courses_list/courses_list_cubit.dart';
+
 class CourseDetailInfo extends StatelessWidget {
   final CourseDetail course;
 
@@ -37,14 +41,20 @@ class CourseDetailInfo extends StatelessWidget {
               label: course.instructor?.name ?? '',
             ),
             GestureDetector(
-              onTap: () {
-                context.push(
+              onTap: () async {
+                await context.push(
                   Routes.courseReviewsScreen,
                   extra: {
                     'courseId': course.id,
                     'courseTitle': course.title,
                   },
                 );
+                if (context.mounted) {
+                  context.read<CourseDetailsCubit>().fetchCourseDetails(course.id);
+                  try {
+                    context.read<CoursesListCubit>().fetchCourses();
+                  } catch (_) {}
+                }
               },
               child: CourseStarRow(rating: course.rating.toDouble()),
             ),

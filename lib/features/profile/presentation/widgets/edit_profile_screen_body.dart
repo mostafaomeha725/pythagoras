@@ -45,10 +45,8 @@ class _EditProfileScreenBodyState extends State<EditProfileScreenBody> {
     final name = nameController.text.trim();
     final password = passwordController.text.trim();
     final originalName = widget.userProfile?.name ?? '';
-    final hasImageChanged =
-        context.read<EditProfileCubit>().selectedImage != null;
 
-    return name != originalName || password.isNotEmpty || hasImageChanged;
+    return name != originalName || password.isNotEmpty;
   }
 
   bool _forcePop = false;

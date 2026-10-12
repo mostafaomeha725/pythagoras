@@ -9,8 +9,6 @@ import 'package:pythagoras/core/widgets/custom_text.dart';
 import 'package:pythagoras/core/utils/class_name_helper.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pythagoras/features/profile/presentation/cubit/profile/profile_cubit.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:pythagoras/core/constants/strings.dart';
 import 'package:pythagoras/features/profile/presentation/cubit/profile/profile_state.dart';
 
 class HomeHeader extends StatelessWidget {
@@ -26,7 +24,6 @@ class HomeHeader extends StatelessWidget {
 
         String fullName = isGuest ? 'يا زائر' : (prefs.getUserName() ?? 'طالب');
         String branchName = isGuest ? 'تصفح كورساتنا الآن' : (prefs.getBranchName() ?? 'طالبنا المميز');
-        String? avatarUrl;
         int? classId;
 
         // Fallback to cached preferences
@@ -34,10 +31,6 @@ class HomeHeader extends StatelessWidget {
         if (profileJson != null) {
           try {
             final userMap = jsonDecode(profileJson);
-            avatarUrl = userMap['profile_picture_url'] ??
-                userMap['avatar_url'] ??
-                userMap['avatar'] ??
-                userMap['image'];
             classId = userMap['class_id'];
           } catch (_) {}
         }
@@ -45,17 +38,9 @@ class HomeHeader extends StatelessWidget {
         // Override with loaded state if available
         if (state is ProfileLoaded && !isGuest) {
           fullName = state.userProfile.name;
-          if (state.userProfile.profilePictureUrl != null &&
-              state.userProfile.profilePictureUrl!.isNotEmpty) {
-            avatarUrl = state.userProfile.profilePictureUrl;
-          }
           if (state.userProfile.classId != null) {
             classId = state.userProfile.classId;
           }
-        }
-
-        if (avatarUrl != null && !avatarUrl.startsWith('http')) {
-          avatarUrl = '${AppStrings.baseUrl}$avatarUrl';
         }
 
         String displaySubtitle = branchName;
@@ -88,42 +73,32 @@ class HomeHeader extends StatelessWidget {
               // Avatars / Icons
               Row(
                 children: [
-                  if (avatarUrl != null && avatarUrl.isNotEmpty)
-                    Container(
-                      width: 40.w,
-                      height: 40.w,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppLightColors.primary, width: 1.w),
-                      ),
-                      child: ClipOval(
-                        child: CachedNetworkImage(
-                          imageUrl: avatarUrl,
-                          fit: BoxFit.cover,
-                          errorWidget: (context, url, error) => Center(
-                            child: Text("👨‍🎓", style: TextStyle(fontSize: 20.sp)),
-                          ),
-                          placeholder: (context, url) => Center(
-                            child: CircularProgressIndicator(
-                              color: AppLightColors.primary,
-                              strokeWidth: 2.w,
-                            ),
-                          ),
+                  Container(
+                    width: 44.w,
+                    height: 44.w,
+                    padding: EdgeInsets.all(2.w),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      border: Border.all(color: AppLightColors.primary, width: 1.5.w),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppLightColors.primary.withValues(alpha: 0.1),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: ClipOval(
+                      child: Padding(
+                        padding: EdgeInsets.all(2.w),
+                        child: Image.asset(
+                          'assets/logoapp.jpeg',
+                          fit: BoxFit.contain,
                         ),
                       ),
-                    )
-                  else
-                    Container(
-                      width: 40.w,
-                      height: 40.w,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFFCEEFA),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text("👨‍🎓", style: TextStyle(fontSize: 20.sp)),
-                      ),
                     ),
+                  ),
                 ],
               ),
             ],

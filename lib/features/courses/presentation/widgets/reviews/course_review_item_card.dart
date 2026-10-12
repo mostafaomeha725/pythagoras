@@ -99,16 +99,17 @@ class CourseReviewItemCard extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: 16.h),
-          
           // Review Text
-          Text(
-            reviewText,
-            style: font12w400.copyWith(
-              color: const Color(0xFF4B5563),
-              height: 1.6,
+          if (reviewText.trim().isNotEmpty) ...[
+            SizedBox(height: 16.h),
+            Text(
+              reviewText,
+              style: font12w400.copyWith(
+                color: const Color(0xFF4B5563),
+                height: 1.6,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

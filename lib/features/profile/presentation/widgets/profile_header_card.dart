@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:pythagoras/core/theme/styles.dart';
 import 'package:pythagoras/core/widgets/custom_text.dart';
 
@@ -41,29 +40,29 @@ class ProfileHeaderCard extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(color: const Color(0xFF832561), width: 2.5.w),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0x12832561),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: Container(
-              width: 72.w,
-              height: 72.w,
+              width: 80.w,
+              height: 80.w,
               decoration: const BoxDecoration(
-                color: Color(0xFFFDF4FA),
+                color: Colors.white,
                 shape: BoxShape.circle,
               ),
               child: ClipOval(
-                child: profilePictureUrl != null && profilePictureUrl!.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: profilePictureUrl!,
-                        fit: BoxFit.cover,
-                        errorWidget: (context, url, error) => Center(
-                          child: Text('🧑‍🎓', style: TextStyle(fontSize: 40.sp)),
-                        ),
-                        placeholder: (context, url) => Center(
-                          child: CircularProgressIndicator(color: const Color(0xFF832561), strokeWidth: 2.w),
-                        ),
-                      )
-                    : Center(
-                        child: Text('🧑‍🎓', style: TextStyle(fontSize: 40.sp)),
-                      ),
+                child: Padding(
+                  padding: EdgeInsets.all(4.w),
+                  child: Image.asset(
+                    'assets/logoapp.jpeg',
+                    fit: BoxFit.contain,
+                  ),
+                ),
               ),
             ),
           ),

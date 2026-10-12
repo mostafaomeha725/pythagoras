@@ -15,6 +15,7 @@ import '/core/di/services_locator.dart';
 import '/core/error/failure.dart';
 import '/core/network/endpoints.dart';
 import 'authorization_interceptor.dart';
+import 'connectivity_interceptor.dart';
 
 class NetworkService {
   final Dio dio;
@@ -34,6 +35,7 @@ class NetworkService {
   }
 
   void addInterceptors() {
+    dio.interceptors.add(ConnectivityInterceptor());
     dio.interceptors.add(AuthorizationInterceptor());
     // if (isDevEnviroment()) {
     dio.interceptors.add(ChuckerDioInterceptor());
@@ -99,7 +101,7 @@ class NetworkService {
         return Left(Failure(_extractMsgFromBody(body)));
       }
     } on SocketException {
-      return const Left(Failure('لا يوجد اتصال بالإنترنت'));
+      return const Left(Failure(AppStrings.noInternetConnection));
     } on FormatException {
       return const Left(Failure('استجابة السيرفر غير صالحة'));
     } on DioException catch (e) {
@@ -169,7 +171,7 @@ class NetworkService {
         return Left(Failure(response.data['message'].toString()));
       }
     } on SocketException {
-      return const Left(Failure("No Internet Connection"));
+      return const Left(Failure(AppStrings.noInternetConnection));
     } on FormatException {
       return const Left(Failure("Format Exception"));
     } on DioException catch (e) {
@@ -193,7 +195,7 @@ class NetworkService {
       );
       return Right(response.data);
     } on SocketException {
-      return const Left(Failure("No Internet Connection"));
+      return const Left(Failure(AppStrings.noInternetConnection));
     } on FormatException {
       return const Left(Failure("Format Exception"));
     } on DioException catch (e) {
@@ -249,7 +251,7 @@ class NetworkService {
       );
       return Right(response.data);
     } on SocketException {
-      return const Left(Failure("No Internet Connection"));
+      return const Left(Failure(AppStrings.noInternetConnection));
     } on FormatException {
       return const Left(Failure("Format Exception"));
     } on DioException catch (e) {
@@ -278,10 +280,13 @@ class NetworkService {
       );
       return Right(response.data);
     } on SocketException {
-      return const Left("No Internet Connection");
+      return const Left(AppStrings.noInternetConnection);
     } on FormatException {
       return const Left("Format Exception");
     } on DioException catch (e) {
+      if (ConnectivityInterceptor.isConnectionError(e)) {
+        return const Left(AppStrings.noInternetConnection);
+      }
       if (e.type == DioExceptionType.badResponse) {
         final message = _extractErrorMessage(
           e.response?.data,
@@ -289,11 +294,9 @@ class NetworkService {
         );
         return Left(message);
       } else if (e.type == DioExceptionType.connectionTimeout) {
-        // safePrint('check your connection');
-        return const Left("Check your connection");
+        return const Left(AppStrings.noInternetConnection);
       } else if (e.type == DioExceptionType.receiveTimeout) {
-        // safePrint('unable to connect to the server');
-        return const Left("Unable to connect to the server");
+        return const Left("انتهت مهلة الانتظار، حاول مرة أخرى");
       } else {
         return Left(e.message ?? "");
       }
@@ -316,10 +319,13 @@ class NetworkService {
       );
       return Right(response.data);
     } on SocketException {
-      return const Left("No Internet Connection");
+      return const Left(AppStrings.noInternetConnection);
     } on FormatException {
       return const Left("Format Exception");
     } on DioException catch (e) {
+      if (ConnectivityInterceptor.isConnectionError(e)) {
+        return const Left(AppStrings.noInternetConnection);
+      }
       if (e.type == DioExceptionType.badResponse) {
         final message = _extractErrorMessage(
           e.response?.data,
@@ -327,11 +333,9 @@ class NetworkService {
         );
         return Left(message);
       } else if (e.type == DioExceptionType.connectionTimeout) {
-        // safePrint('check your connection');
-        return const Left("Check your connection");
+        return const Left(AppStrings.noInternetConnection);
       } else if (e.type == DioExceptionType.receiveTimeout) {
-        // safePrint('unable to connect to the server');
-        return const Left("Unable to connect to the server");
+        return const Left("انتهت مهلة الانتظار، حاول مرة أخرى");
       } else {
         return Left(e.message ?? "");
       }
@@ -357,32 +361,20 @@ class NetworkService {
         return Left(Failure(message));
       }
     } on SocketException {
-      return const Left(Failure("No Internet Connection"));
+      return const Left(Failure(AppStrings.noInternetConnection));
     } on FormatException {
       return const Left(Failure("Format Exception"));
     } on DioException catch (e) {
-      if (e.type == DioExceptionType.badResponse) {
-        final message = _extractErrorMessage(
-          e.response?.data,
-          fallback: e.message ?? 'Bad response',
-        );
-        return Left(Failure(message));
-        // return Left(_l)(e.message);
-      } else if (e.type == DioExceptionType.connectionTimeout) {
-        // safePrint('check your connection');
-        return const Left(Failure("Check your connection"));
-      } else if (e.type == DioExceptionType.receiveTimeout) {
-        return const Left(Failure("Unable to connect to the server"));
-      } else {
-        return Left(Failure(e.message ?? ""));
-        // return const Left("Check internet connection");
-      }
+      return handleDioExceoptions(e);
     } catch (e) {
       return Left(Failure(e.toString()));
     }
   }
 
   Left<Failure, dynamic> handleDioExceoptions(DioException e) {
+    if (ConnectivityInterceptor.isConnectionError(e)) {
+      return const Left(Failure(AppStrings.noInternetConnection));
+    }
     if (e.type == DioExceptionType.badResponse) {
       final rawData = e.response?.data;
       Map<String, dynamic>? data;
@@ -428,7 +420,7 @@ class NetworkService {
       }
       return Left(Failure(e.message ?? 'Something went wrong'));
     } else if (e.type == DioExceptionType.connectionTimeout) {
-      return const Left(Failure("تحقق من اتصالك بالإنترنت"));
+      return const Left(Failure(AppStrings.noInternetConnection));
     } else if (e.type == DioExceptionType.receiveTimeout) {
       return const Left(Failure("انتهت مهلة الانتظار، حاول مرة أخرى"));
     } else {
