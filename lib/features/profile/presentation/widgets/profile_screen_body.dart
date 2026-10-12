@@ -46,7 +46,7 @@ class ProfileScreenBody extends StatelessWidget {
         final token = prefs.getUserToken();
         final isGuest = token == null || token.isEmpty;
 
-        String name = isGuest ? 'يا ضيف' : 'جارٍ التحميل...';
+        String name = isGuest ? 'يا زائر  ' : 'جارٍ التحميل...';
         String grade = isGuest ? 'سجل الدخول للمزيد من الميزات' : '';
         String? profilePictureUrl;
         UserProfile? currentUserProfile;

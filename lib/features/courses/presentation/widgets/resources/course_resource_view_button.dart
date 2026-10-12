@@ -18,10 +18,10 @@ class CourseResourceViewButton extends StatelessWidget {
 
   Future<void> _launchUrl(BuildContext context, String url) async {
     EasyLoading.show(status: 'جاري التحميل...');
-    
+
     // Add a small delay for UX so the loading shows before freezing if external app opens
     await Future.delayed(const Duration(milliseconds: 500));
-    
+
     if (url.isNotEmpty && await canLaunchUrlString(url)) {
       await launchUrlString(url, mode: LaunchMode.externalApplication);
       EasyLoading.dismiss();
@@ -37,31 +37,25 @@ class CourseResourceViewButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return BounceIt(
       onPressed: () async {
-        final ext = resource.file?.extension?.toLowerCase() ?? resource.type?.toLowerCase() ?? '';
-        final isPdf = ext == 'pdf' || resource.fileUrl.toLowerCase().endsWith('.pdf');
-        
-        final docExtensions = ['ppt', 'pptx', 'doc', 'docx', 'xls', 'xlsx'];
-        final isDoc = docExtensions.contains(ext) || docExtensions.any((e) => resource.fileUrl.toLowerCase().endsWith('.$e'));
-        
-        if (isPdf) {
+        if (resource.isPdf) {
           EasyLoading.show(status: 'جاري فتح الملف...');
           await Future.delayed(const Duration(milliseconds: 200));
           EasyLoading.dismiss();
           if (context.mounted) {
-            context.push(Routes.pdfViewerScreen, extra: {
-              'url': resource.fileUrl,
-              'title': resource.title,
-            });
+            context.push(
+              Routes.pdfViewerScreen,
+              extra: {'url': resource.fileUrl, 'title': resource.title},
+            );
           }
-        } else if (isDoc) {
+        } else if (resource.isDoc) {
           EasyLoading.show(status: 'جاري فتح العرض...');
           await Future.delayed(const Duration(milliseconds: 200));
           EasyLoading.dismiss();
           if (context.mounted) {
-            context.push(Routes.webViewScreen, extra: {
-              'url': resource.fileUrl,
-              'title': resource.title,
-            });
+            context.push(
+              Routes.webViewScreen,
+              extra: {'url': resource.fileUrl, 'title': resource.title},
+            );
           }
         } else {
           // If it's an image or something else, use external viewer
@@ -69,10 +63,7 @@ class CourseResourceViewButton extends StatelessWidget {
         }
       },
       child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: 16.w,
-          vertical: 10.h,
-        ),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
         decoration: BoxDecoration(
           color: AppLightColors.primary.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12.r),

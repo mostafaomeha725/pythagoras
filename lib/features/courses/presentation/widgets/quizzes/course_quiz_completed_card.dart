@@ -10,18 +10,18 @@ class CourseQuizCompletedCard extends StatelessWidget {
   final CourseQuiz quiz;
   final QuizInlineResult? result;
 
-  const CourseQuizCompletedCard({
-    super.key,
-    required this.quiz,
-    this.result,
-  });
+  const CourseQuizCompletedCard({super.key, required this.quiz, this.result});
 
   @override
   Widget build(BuildContext context) {
     final bool isFailed = result != null && !result!.isPassed;
-    final Color primaryColor = isFailed ? const Color(0xFFEF4444) : const Color(0xFF059669);
-    final Color bgColor = isFailed ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4);
-    
+    final Color primaryColor = isFailed
+        ? const Color(0xFFEF4444)
+        : const Color(0xFF059669);
+    final Color bgColor = isFailed
+        ? const Color(0xFFFEF2F2)
+        : const Color(0xFFF0FDF4);
+
     return Container(
       margin: EdgeInsets.only(bottom: 16.h),
       padding: EdgeInsets.all(14.w),
@@ -49,14 +49,20 @@ class CourseQuizCompletedCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 8.w,
+                        vertical: 3.h,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFDF4FA),
                         borderRadius: BorderRadius.circular(6.r),
                       ),
                       child: AppText(
                         'امتحان',
-                        style: font10w700.copyWith(color: const Color(0xFF832561), fontSize: 10.sp),
+                        style: font10w700.copyWith(
+                          color: const Color(0xFF832561),
+                          fontSize: 10.sp,
+                        ),
                       ),
                     ),
                     SizedBox(height: 8.h),
@@ -67,7 +73,9 @@ class CourseQuizCompletedCard extends StatelessWidget {
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        isFailed ? Icons.cancel_outlined : Icons.check_circle_outline_rounded,
+                        isFailed
+                            ? Icons.cancel_outlined
+                            : Icons.check_circle_outline_rounded,
                         color: primaryColor,
                         size: 22.sp,
                       ),
@@ -89,7 +97,8 @@ class CourseQuizCompletedCard extends StatelessWidget {
                         ),
                         maxLines: 2,
                       ),
-                      if (quiz.description != null && quiz.description!.isNotEmpty) ...[
+                      if (quiz.description != null &&
+                          quiz.description!.isNotEmpty) ...[
                         SizedBox(height: 4.h),
                         AppText(
                           quiz.description!,
@@ -127,14 +136,23 @@ class CourseQuizCompletedCard extends StatelessWidget {
                 ),
                 SizedBox(height: 6.h),
                 AppText(
-                  result != null ? '${result!.score}/${quiz.totalMarks}' : '-/${quiz.totalMarks}',
-                  style: font14w700.copyWith(color: primaryColor, fontSize: 16.sp, fontWeight: FontWeight.w800),
+                  result != null
+                      ? '${result!.score}/${quiz.totalMarks}'
+                      : '-/${quiz.totalMarks}',
+                  style: font14w700.copyWith(
+                    color: primaryColor,
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 if (result != null) ...[
                   SizedBox(height: 6.h),
                   AppText(
-                    DateFormatter.formatYMD(result!.completedAt),
-                    style: font10w500.copyWith(color: const Color(0xFF6B7280), fontSize: 11.sp),
+                    DateFormatter.format(result!.completedAt),
+                    style: font10w500.copyWith(
+                      color: const Color(0xFF6B7280),
+                      fontSize: 11.sp,
+                    ),
                   ),
                 ],
               ],

@@ -3,10 +3,7 @@ import 'package:flutter/material.dart';
 class CourseYoutubeTouchBlockers extends StatelessWidget {
   final VoidCallback onToggleControls;
 
-  const CourseYoutubeTouchBlockers({
-    super.key,
-    required this.onToggleControls,
-  });
+  const CourseYoutubeTouchBlockers({super.key, required this.onToggleControls});
 
   @override
   Widget build(BuildContext context) {

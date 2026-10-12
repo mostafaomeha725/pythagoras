@@ -22,21 +22,18 @@ class CourseResourceDownloadButton extends StatelessWidget {
           onPressed: state is DownloadResourceLoading
               ? null
               : () {
-                  final ext = resource.file?.extension?.toLowerCase() ?? resource.type?.toLowerCase() ?? 'file';
+                  final ext = resource.fileExtension.toLowerCase();
                   final title = resource.title;
                   final fileName = '${title.replaceAll(' ', '_')}.$ext';
-                  
+
                   context.read<DownloadResourceCubit>().downloadResource(
-                        resourceId: resource.id,
-                        title: title,
-                        fileName: fileName,
-                      );
+                    resourceId: resource.id,
+                    title: title,
+                    fileName: fileName,
+                  );
                 },
           child: Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: 16.w,
-              vertical: 10.h,
-            ),
+            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
             decoration: BoxDecoration(
               color: AppLightColors.primary,
               borderRadius: BorderRadius.circular(12.r),

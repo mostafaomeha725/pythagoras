@@ -11,7 +11,7 @@ class PreferencesStorage {
     await _preferences.clear();
   }
 
-  /// ================= CLEAR USER SESSION =================
+  /// ================= CLEAR USER SESord SION =================
   Future<void> clearUserSessionData() async {
     await deleteUserToken();
     await deleteRefreshToken();
