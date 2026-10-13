@@ -33,6 +33,11 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 flutter_ios_podfile_setup
 
 target 'Runner' do
+  # Fix: FirebaseCoreInternal depends on GoogleUtilities which requires modular headers.
+  # Using targeted :modular_headers instead of global use_modular_headers! to avoid
+  # breaking other Flutter plugins that don't support global modular header compilation.
+  pod 'GoogleUtilities', :modular_headers => true
+
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do
     inherit! :search_paths
