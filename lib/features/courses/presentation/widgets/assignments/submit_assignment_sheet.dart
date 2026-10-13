@@ -94,7 +94,13 @@ class _SubmitAssignmentSheetState extends State<SubmitAssignmentSheet> {
     }
   }
 
+  void _dismissKeyboard() {
+    FocusScope.of(context).unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
   void _showFileSourceSheet() {
+    _dismissKeyboard();
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -184,6 +190,7 @@ class _SubmitAssignmentSheetState extends State<SubmitAssignmentSheet> {
   void _removeFile() => setState(() => _pickedFile = null);
 
   void _submit(BuildContext context) {
+    _dismissKeyboard();
     final notes = _notesController.text.trim();
     if (notes.isEmpty && _pickedFile == null) {
       showError('الرجاء إضافة ملاحظات أو رفع ملف');
@@ -198,6 +205,7 @@ class _SubmitAssignmentSheetState extends State<SubmitAssignmentSheet> {
   }
 
   void _showMySubmissions(BuildContext context) {
+    _dismissKeyboard();
     SubmissionListSheet.show(
       context,
       assignmentId: widget.assignmentId,
@@ -210,8 +218,10 @@ class _SubmitAssignmentSheetState extends State<SubmitAssignmentSheet> {
     return BlocListener<SubmitAssignmentCubit, SubmitAssignmentState>(
       listener: (context, state) {
         if (state is SubmitAssignmentLoading) {
+          _dismissKeyboard();
           EasyLoading.show(status: 'جاري التسليم...');
         } else if (state is SubmitAssignmentSuccess) {
+          _dismissKeyboard();
           EasyLoading.dismiss();
           context.pop();
           showSuccess('تم تسليم الواجب بنجاح');
@@ -221,54 +231,59 @@ class _SubmitAssignmentSheetState extends State<SubmitAssignmentSheet> {
           showError(state.message);
         }
       },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
-        ),
-        padding: EdgeInsets.only(
-          left: 24.w,
-          right: 24.w,
-          top: 24.h,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 24.h,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 40.w,
-                  height: 4.h,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE5E7EB),
-                    borderRadius: BorderRadius.circular(2.r),
+      child: GestureDetector(
+        onTap: _dismissKeyboard,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
+          ),
+          padding: EdgeInsets.only(
+            left: 24.w,
+            right: 24.w,
+            top: 24.h,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24.h,
+          ),
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40.w,
+                    height: 4.h,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE5E7EB),
+                      borderRadius: BorderRadius.circular(2.r),
+                    ),
                   ),
                 ),
-              ),
-              SizedBox(height: 24.h),
-              SubmitAssignmentHeader(
-                assignmentTitle: widget.assignmentTitle,
-                onMySubmissions: () => _showMySubmissions(context),
-              ),
-              SizedBox(height: 24.h),
-              SubmitAssignmentNotesField(controller: _notesController),
-              SizedBox(height: 24.h),
-              AppText(
-                'رفع ملف (اختياري)',
-                style: font14w700.copyWith(color: const Color(0xFF1E1E2D)),
-              ),
-              SizedBox(height: 8.h),
-              SubmitAssignmentFilePicker(
-                pickedFile: _pickedFile,
-                onPickFile: _showFileSourceSheet,
-                onRemoveFile: _removeFile,
-              ),
-              SizedBox(height: 28.h),
-              SubmitAssignmentButton(onSubmit: () => _submit(context)),
-              SizedBox(height: 28.h),
-            ],
+                SizedBox(height: 24.h),
+                SubmitAssignmentHeader(
+                  assignmentTitle: widget.assignmentTitle,
+                  onMySubmissions: () => _showMySubmissions(context),
+                ),
+                SizedBox(height: 24.h),
+                SubmitAssignmentNotesField(controller: _notesController),
+                SizedBox(height: 24.h),
+                AppText(
+                  'رفع ملف (اختياري)',
+                  style: font14w700.copyWith(color: const Color(0xFF1E1E2D)),
+                ),
+                SizedBox(height: 8.h),
+                SubmitAssignmentFilePicker(
+                  pickedFile: _pickedFile,
+                  onPickFile: _showFileSourceSheet,
+                  onRemoveFile: _removeFile,
+                ),
+                SizedBox(height: 28.h),
+                SubmitAssignmentButton(onSubmit: () => _submit(context)),
+                SizedBox(height: 28.h),
+              ],
+            ),
           ),
         ),
       ),

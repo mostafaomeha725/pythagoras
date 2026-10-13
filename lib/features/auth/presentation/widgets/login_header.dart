@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pythagoras/core/constants/app_assets.dart';
+import 'package:pythagoras/core/theme/light_colors.dart';
 import 'package:pythagoras/core/theme/styles.dart';
 import 'package:pythagoras/core/widgets/app_asset.dart';
+import 'package:pythagoras/core/widgets/bouncing_widgets.dart';
 import 'package:pythagoras/core/widgets/custom_text.dart';
 
 class LoginHeader extends StatelessWidget {
@@ -15,36 +18,34 @@ class LoginHeader extends StatelessWidget {
       children: [
         SizedBox(height: 16.h),
 
-        // Top Right Back Button
-        // Align(
-        //   alignment: AlignmentDirectional.centerStart,
-        //   child: BounceIt(
-        //     child: InkWell(
-        //       onTap: () {
-        //         if (context.canPop()) {
-        //           context.pop();
-        //         }
-        //       },
-        //       borderRadius: BorderRadius.circular(50.r),
-        //       child: Container(
-        //         width: 36.w,
-        //         height: 36.w,
-        //         decoration: const BoxDecoration(
-        //           color: Color(0xFF
-        // FCEEFA),
-        //           shape: BoxShape.circle,
-        //         ),
-        //         child: Center(
-        //           child: Icon(
-        //             Icons.arrow_back_ios_new,
-        //             color: AppLightColors.primary,
-        //             size: 16.sp,
-        //           ),
-        //         ),
-        //       ),
-        //     ),
-        //   ),
-        // ),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: BounceIt(
+            child: InkWell(
+              onTap: () {
+                if (context.canPop()) {
+                  context.pop();
+                }
+              },
+              borderRadius: BorderRadius.circular(50.r),
+              child: Container(
+                width: 36.w,
+                height: 36.w,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFCEEFA),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.arrow_back_ios_new,
+                    color: AppLightColors.primary,
+                    size: 16.sp,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
         SizedBox(height: 8.h),
 
         // Logo

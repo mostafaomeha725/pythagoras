@@ -7,10 +7,7 @@ import 'package:pythagoras/core/widgets/custom_text.dart';
 class AssignmentCardDueDate extends StatelessWidget {
   final String dueDate;
 
-  const AssignmentCardDueDate({
-    super.key,
-    required this.dueDate,
-  });
+  const AssignmentCardDueDate({super.key, required this.dueDate});
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +21,7 @@ class AssignmentCardDueDate extends StatelessWidget {
         SizedBox(width: 6.w),
         Flexible(
           child: AppText(
-            'التسليم: ${DateFormatter.formatYMD(dueDate)}',
+            ' التسليم قبل: ${DateFormatter.formatYMDWithTime(dueDate)}',
             style: font12w500.copyWith(color: const Color(0xFF6B7280)),
             maxLines: 1,
           ),

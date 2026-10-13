@@ -12,8 +12,27 @@ class DateFormatter {
   static String formatYMD(String? dateStr) {
     if (dateStr == null || dateStr.isEmpty) return '';
     try {
-      final dt = DateTime.parse(dateStr);
+      final dt = DateTime.parse(dateStr).toLocal();
       return '${dt.year}/${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return dateStr;
+    }
+  }
+
+  static String formatYMDWithTime(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty) return '';
+    try {
+      final dt = DateTime.parse(dateStr).toLocal();
+      final date =
+          '${dt.year}/${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}';
+      if (!dateStr.contains('T') && !dateStr.contains(':')) {
+        return date;
+      }
+      final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+      final minute = dt.minute.toString().padLeft(2, '0');
+      final period = dt.hour >= 12 ? 'م' : 'ص';
+      final hourStr = hour12.toString().padLeft(2, '0');
+      return '$date - $hourStr:$minute $period';
     } catch (_) {
       return dateStr;
     }

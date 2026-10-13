@@ -1,26 +1,31 @@
+import 'package:pythagoras/features/courses/domain/entities/student_class.dart';
+
 class ClassNameHelper {
-  static String? getClassName(int classId) {
-    switch (classId) {
-      case 1:
-        return 'الصف العاشر';
-      case 2:
-        return 'الصف الحادي عشر - علمي';
-      case 3:
-        return 'الصف الحادي عشر - أدبي';
-      case 4:
-        return 'الصف الثاني عشر - علمي';
-      case 5:
-        return 'الصف الثاني عشر - أدبي';
-      case 6:
-        return 'الصف السادس';
-      case 7:
-        return 'الصف السابع';
-      case 8:
-        return 'الصف الثامن';
-      case 9:
-        return 'الصف التاسع';
-      default:
-        return null;
+  /// Resolves the class name dynamically from [classes] (from API/cache).
+  /// Falls back to the static map if [classes] is empty or id not found.
+  static String? getClassName(int classId, {List<StudentClass>? classes}) {
+    // 1. Dynamic lookup from loaded classes list (preferred)
+    if (classes != null && classes.isNotEmpty) {
+      try {
+        final match = classes.firstWhere((c) => c.id == classId);
+        return match.name;
+      } catch (_) {
+        // id not found in list – fall through to static fallback
+      }
     }
+
+    // 2. Static fallback map (used only when classes list unavailable)
+    const staticMap = <int, String>{
+      1: 'الصف العاشر',
+      2: 'الصف الحادي عشر - علمي',
+      3: 'الصف الحادي عشر - أدبي',
+      4: 'الصف الثاني عشر - علمي',
+      5: 'الصف الثاني عشر - أدبي',
+      6: 'الصف السادس',
+      7: 'الصف السابع',
+      8: 'الصف الثامن',
+      9: 'الصف التاسع',
+    };
+    return staticMap[classId];
   }
 }
