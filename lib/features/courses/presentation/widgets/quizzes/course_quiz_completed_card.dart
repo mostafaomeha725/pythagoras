@@ -109,6 +109,37 @@ class CourseQuizCompletedCard extends StatelessWidget {
                           maxLines: 2,
                         ),
                       ],
+                      if (quiz.hasAttemptLimit) ...[
+                        SizedBox(height: 6.h),
+                        AppText(
+                          'المحاولة ${quiz.currentAttempts} من ${quiz.maxAttempts}',
+                          style: font10w500.copyWith(
+                            color: const Color(0xFF6B7280),
+                            fontSize: 11.sp,
+                          ),
+                        ),
+                      ],
+                      if (quiz.hasAttemptLimit ||
+                          quiz.remainingAttempts != null) ...[
+                        SizedBox(height: 4.h),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.replay_rounded,
+                              size: 13.sp,
+                              color: const Color(0xFF832561),
+                            ),
+                            SizedBox(width: 4.w),
+                            AppText(
+                              quiz.remainingAttemptsLabel,
+                              style: font10w700.copyWith(
+                                color: const Color(0xFF832561),
+                                fontSize: 11.sp,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),

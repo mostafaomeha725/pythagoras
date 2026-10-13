@@ -34,10 +34,9 @@ class CourseCard extends StatelessWidget {
             // Course Image with Badge
             CourseCardImage(
               imageUrl: course.imageUrl,
-              isEnrolled: course.isEnrolled,
-              requestStatus: course.requestStatus,
+              badgeType: course.badgeType,
             ),
-            
+
             // Course Details
             CourseCardDetails(course: course),
           ],

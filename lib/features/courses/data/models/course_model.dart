@@ -11,6 +11,7 @@ class CourseModel extends Course {
     super.className,
     super.semester,
     super.requestStatus,
+    super.chapterRequest,
     super.finalPrice,
     super.currencyLabel,
     super.studentsCount,
@@ -28,7 +29,9 @@ class CourseModel extends Course {
       className: json['class_name'],
       semester: json['semester'],
       requestStatus: json['request_status'],
-      finalPrice: double.tryParse(json['final_price']?.toString() ?? '0') ?? 0.0,
+      chapterRequest: json['chapter_request'],
+      finalPrice:
+          double.tryParse(json['final_price']?.toString() ?? '0') ?? 0.0,
       currencyLabel: json['currency_label'] ?? '',
       studentsCount: json['students_count'] ?? 0,
       isSaved: json['is_saved'] ?? false,

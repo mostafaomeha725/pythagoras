@@ -28,12 +28,10 @@ class RegisterScreenBody extends StatelessWidget {
     return BlocListener<WhatsappRegisterCubit, WhatsappRegisterState>(
       listener: (context, state) async {
         if (state is WhatsappRegisterSuccess) {
-          try {
-            await UrlLauncherUtil.launchAnyUrl(state.whatsappUrl);
-          } catch (e) {
-            if (context.mounted) {
-              showError("تعذر فتح واتساب، يرجى التأكد من تثبيت التطبيق.");
-            }
+          final launched =
+              await UrlLauncherUtil.openWhatsAppUrl(state.whatsappUrl);
+          if (!launched && context.mounted) {
+            showError("تعذر فتح واتساب، يرجى التأكد من تثبيت التطبيق.");
           }
         } else if (state is WhatsappRegisterError) {
           showError(state.message);

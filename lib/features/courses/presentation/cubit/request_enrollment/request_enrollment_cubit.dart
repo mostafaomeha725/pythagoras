@@ -10,21 +10,33 @@ class RequestEnrollmentCubit extends Cubit<RequestEnrollmentState> {
   RequestEnrollmentCubit(this.requestCourseUseCase, this.requestChapterUseCase)
       : super(RequestEnrollmentInitial());
 
-  Future<void> requestCourse(int courseId) async {
+  Future<void> requestCourse(int courseId, {String? courseTitle}) async {
     emit(RequestEnrollmentLoading());
     final result = await requestCourseUseCase(courseId);
     result.fold(
       (failure) => emit(RequestEnrollmentError(failure.message)),
-      (whatsappUrl) => emit(RequestEnrollmentSuccess(whatsappUrl)),
+      (whatsappUrl) => emit(
+        RequestEnrollmentSuccess(
+          whatsappUrl,
+          courseTitle: courseTitle,
+          isChapter: false,
+        ),
+      ),
     );
   }
 
-  Future<void> requestChapter(int chapterId) async {
+  Future<void> requestChapter(int chapterId, {String? chapterTitle}) async {
     emit(RequestEnrollmentLoading());
     final result = await requestChapterUseCase(chapterId);
     result.fold(
       (failure) => emit(RequestEnrollmentError(failure.message)),
-      (whatsappUrl) => emit(RequestEnrollmentSuccess(whatsappUrl)),
+      (whatsappUrl) => emit(
+        RequestEnrollmentSuccess(
+          whatsappUrl,
+          chapterTitle: chapterTitle,
+          isChapter: true,
+        ),
+      ),
     );
   }
 }

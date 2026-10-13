@@ -1,3 +1,4 @@
+import 'package:pythagoras/features/courses/domain/entities/course_badge_type.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_chapter.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_detail_instructor.dart';
 
@@ -18,6 +19,7 @@ class CourseDetail {
   final int studentsCount;
   final bool isSaved;
   final String? requestStatus;
+  final String? chapterRequest;
 
   final num rating;
   final String category;
@@ -42,6 +44,7 @@ class CourseDetail {
     required this.studentsCount,
     required this.isSaved,
     this.requestStatus,
+    this.chapterRequest,
     required this.rating,
     required this.category,
     this.instructor,
@@ -65,6 +68,7 @@ class CourseDetail {
     int? studentsCount,
     bool? isSaved,
     String? requestStatus,
+    String? chapterRequest,
     num? rating,
     String? category,
     CourseDetailInstructor? instructor,
@@ -87,11 +91,57 @@ class CourseDetail {
       studentsCount: studentsCount ?? this.studentsCount,
       isSaved: isSaved ?? this.isSaved,
       requestStatus: requestStatus ?? this.requestStatus,
+      chapterRequest: chapterRequest ?? this.chapterRequest,
       rating: rating ?? this.rating,
       category: category ?? this.category,
       instructor: instructor ?? this.instructor,
       chapters: chapters ?? this.chapters,
     );
   }
-}
 
+  /// Evaluates request status for course and chapter according to business rules:
+  /// - Course accepted / enrolled -> [CourseBadgeType.courseEnrolled] ('مسجل')
+  /// - Course pending -> [CourseBadgeType.coursePending] ('قيد الانتظار')
+  /// - Course not_requested -> looks at chapter_request:
+  ///     - Chapter accepted -> [CourseBadgeType.chapterEnrolled] ('حصة مسجلة')
+  ///     - Chapter pending -> [CourseBadgeType.chapterPending] ('حصة قيد الانتظار', yellow)
+  ///     - Chapter not_requested -> [CourseBadgeType.none] (no badge shown)
+  CourseBadgeType get badgeType {
+    final req = requestStatus?.trim().toLowerCase();
+    final chap = (chapterRequest ?? _derivedChapterRequest)
+        ?.trim()
+        .toLowerCase();
+
+    // 1. Full course accepted or already enrolled
+    if (isEnrolled || req == 'accepted') {
+      return CourseBadgeType.courseEnrolled;
+    }
+
+    // 2. Full course pending
+    if (req == 'pending') {
+      return CourseBadgeType.coursePending;
+    }
+
+    // 3. Fallback to chapter request when course is not requested
+    if (chap == 'accepted') {
+      return CourseBadgeType.chapterEnrolled;
+    }
+    if (chap == 'pending') {
+      return CourseBadgeType.chapterPending;
+    }
+
+    return CourseBadgeType.none;
+  }
+
+  String? get _derivedChapterRequest {
+    for (final chapter in chapters) {
+      final s = chapter.requestStatus.trim().toLowerCase();
+      if (s == 'accepted') return 'accepted';
+    }
+    for (final chapter in chapters) {
+      final s = chapter.requestStatus.trim().toLowerCase();
+      if (s == 'pending') return 'pending';
+    }
+    return null;
+  }
+}

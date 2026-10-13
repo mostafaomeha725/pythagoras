@@ -20,6 +20,7 @@ class CourseDetailModel extends CourseDetail {
     required super.studentsCount,
     required super.isSaved,
     super.requestStatus,
+    super.chapterRequest,
     required super.rating,
     required super.category,
     super.instructor,
@@ -39,7 +40,9 @@ class CourseDetailModel extends CourseDetail {
       imageUrl: json['image_url'] as String?,
       introVideoUrl: json['intro_video_url'] as String?,
       introVideoType: json['intro_video_type'] as String?,
-      isEnrolled: json['is_enrolled'] as bool? ?? (json['request_status'] == 'accepted'),
+      isEnrolled:
+          json['is_enrolled'] as bool? ??
+          (json['request_status'] == 'accepted'),
       price: json['price'] as String? ?? '0',
       discountPrice: json['discount_price'] as String?,
       finalPrice: json['final_price'] as num? ?? 0,
@@ -47,12 +50,15 @@ class CourseDetailModel extends CourseDetail {
       studentsCount: json['students_count'] as int? ?? 0,
       isSaved: json['is_saved'] as bool? ?? false,
       requestStatus: json['request_status'] as String?,
+      chapterRequest: json['chapter_request'] as String?,
       rating: general['rating'] as num? ?? 0,
       category: general['category'] as String? ?? '',
       instructor: json['instructor'] != null
           ? CourseDetailInstructorModel.fromJson(json['instructor'])
           : null,
-      chapters: chaptersData.map((e) => CourseChapterModel.fromJson(e)).toList(),
+      chapters: chaptersData
+          .map((e) => CourseChapterModel.fromJson(e))
+          .toList(),
     );
   }
 }

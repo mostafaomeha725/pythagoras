@@ -101,7 +101,10 @@ class CourseExamsScreenBody extends StatelessWidget {
                   );
                 } else if (task.type == CourseTaskType.quiz &&
                     task.quiz != null) {
-                  return CourseQuizCard(quiz: task.quiz!);
+                  return CourseQuizCard(
+                    quiz: task.quiz!,
+                    courseId: course.id,
+                  );
                 }
                 return const SizedBox.shrink();
               }),

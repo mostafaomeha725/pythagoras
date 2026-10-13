@@ -37,4 +37,41 @@ class CourseQuiz {
     this.activeAttempt,
     this.inlineResult,
   });
+
+  /// Whether this is the student's first attempt (not taken yet).
+  bool get isFirstAttempt => currentAttempts == 0;
+
+  /// Whether the quiz has a set maximum number of attempts.
+  bool get hasAttemptLimit => maxAttempts > 0;
+
+  /// Returns the number of remaining attempts safely calculated.
+  int get calculatedRemainingAttempts {
+    if (remainingAttempts != null) {
+      return remainingAttempts! > 0 ? remainingAttempts! : 0;
+    }
+    if (maxAttempts > 0) {
+      final rem = maxAttempts - currentAttempts;
+      return rem > 0 ? rem : 0;
+    }
+    return 0;
+  }
+
+  /// Human-readable label for remaining attempts in Arabic.
+  String get remainingAttemptsLabel {
+    final remaining = calculatedRemainingAttempts;
+    if (maxAttempts > 0 || remainingAttempts != null) {
+      if (remaining <= 0) {
+        return 'لا توجد محاولات متبقية';
+      } else if (remaining == 1) {
+        return 'باقي محاولة واحدة';
+      } else if (remaining == 2) {
+        return 'باقي محاولتان';
+      } else if (remaining >= 3 && remaining <= 10) {
+        return 'باقي $remaining محاولات';
+      } else {
+        return 'باقي $remaining محاولة';
+      }
+    }
+    return 'محاولات غير محدودة';
+  }
 }

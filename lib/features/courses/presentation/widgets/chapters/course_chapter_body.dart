@@ -90,7 +90,10 @@ class CourseChapterBody extends StatelessWidget {
             requestStatus: chapter.requestStatus,
             onPressed: () async {
               final didLogin = await AuthGuard.checkAuthAndExecute(context, () {
-                context.read<RequestEnrollmentCubit>().requestChapter(chapter.id);
+                context.read<RequestEnrollmentCubit>().requestChapter(
+                  chapter.id,
+                  chapterTitle: chapter.title,
+                );
               });
 
               if (didLogin == true && context.mounted) {

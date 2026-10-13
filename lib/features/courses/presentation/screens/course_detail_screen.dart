@@ -11,7 +11,7 @@ import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/request_enrollment/request_enrollment_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/request_enrollment/request_enrollment_state.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_shimmer.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:pythagoras/core/utils/url_launcher_util.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/courses_list/courses_list_cubit.dart';
 import 'package:pythagoras/core/widgets/no_internet_widget.dart';
 
@@ -76,12 +76,16 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> with WidgetsBin
             EasyLoading.show(status: 'جاري التحميل...');
           } else if (state is RequestEnrollmentSuccess) {
             EasyLoading.dismiss();
-            final url = Uri.parse(state.whatsappUrl);
-            if (await canLaunchUrl(url)) {
+            final launched = await UrlLauncherUtil.openWhatsAppUrl(
+              state.whatsappUrl,
+              chapterTitle: state.chapterTitle,
+              courseTitle: state.courseTitle,
+              isChapter: state.isChapter,
+            );
+            if (launched) {
               _isWaitingForWhatsApp = true;
-              await launchUrl(url, mode: LaunchMode.externalApplication);
             } else {
-              EasyLoading.showError('لا يمكن فتح الواتساب');
+              EasyLoading.showError('تعذر فتح الواتساب، يرجى التأكد من تثبيت التطبيق');
             }
           } else if (state is RequestEnrollmentError) {
             EasyLoading.showError(state.message);

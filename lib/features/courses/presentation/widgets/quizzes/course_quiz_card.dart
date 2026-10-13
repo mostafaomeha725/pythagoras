@@ -10,11 +10,22 @@ import 'package:pythagoras/features/courses/presentation/cubit/course_exams/cour
 
 class CourseQuizCard extends StatelessWidget {
   final CourseQuiz quiz;
+  final int? courseId;
 
-  const CourseQuizCard({super.key, required this.quiz});
+  const CourseQuizCard({
+    super.key,
+    required this.quiz,
+    this.courseId,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final bool isFirstAttempt = quiz.isFirstAttempt;
+    final String buttonText = isFirstAttempt ? 'ابدأ' : 'حاول مرة أخرى';
+    final IconData buttonIcon =
+        isFirstAttempt ? Icons.play_arrow_rounded : Icons.replay_rounded;
+    final int? targetCourseId = courseId ?? quiz.courseId;
+
     return Container(
       margin: EdgeInsets.only(bottom: 16.h),
       padding: EdgeInsets.all(16.w),
@@ -66,12 +77,18 @@ class CourseQuizCard extends StatelessWidget {
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF9E6),
+                  color: isFirstAttempt
+                      ? const Color(0xFFFFF9E6)
+                      : const Color(0xFFFDF4FA),
                   borderRadius: BorderRadius.circular(20.r),
                 ),
                 child: AppText(
-                  'قادم',
-                  style: font12w700.copyWith(color: const Color(0xFFD97706)),
+                  isFirstAttempt ? 'قادم' : 'إعادة محاولة',
+                  style: font12w700.copyWith(
+                    color: isFirstAttempt
+                        ? const Color(0xFFD97706)
+                        : const Color(0xFF832561),
+                  ),
                 ),
               ),
             ],
@@ -79,20 +96,51 @@ class CourseQuizCard extends StatelessWidget {
           SizedBox(height: 16.h),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.access_time,
-                    size: 14.sp,
-                    color: const Color(0xFF9CA3AF),
-                  ),
-                  SizedBox(width: 6.w),
-                  AppText(
-                    'الوقت: ${quiz.duration} دقيقة',
-                    style: font12w500.copyWith(color: const Color(0xFF6B7280)),
-                  ),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.access_time_rounded,
+                          size: 14.sp,
+                          color: const Color(0xFF9CA3AF),
+                        ),
+                        SizedBox(width: 6.w),
+                        AppText(
+                          'الوقت: ${quiz.duration} دقيقة',
+                          style: font12w500.copyWith(
+                            color: const Color(0xFF6B7280),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (quiz.hasAttemptLimit ||
+                        quiz.remainingAttempts != null) ...[
+                      SizedBox(height: 6.h),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.replay_rounded,
+                            size: 14.sp,
+                            color: const Color(0xFF832561),
+                          ),
+                          SizedBox(width: 6.w),
+                          AppText(
+                            quiz.remainingAttemptsLabel,
+                            style: font12w700.copyWith(
+                              color: const Color(0xFF832561),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
               ),
               InkWell(
                 onTap: () async {
@@ -102,9 +150,9 @@ class CourseQuizCard extends StatelessWidget {
                   );
                   if (result == true &&
                       context.mounted &&
-                      quiz.courseId != null) {
+                      targetCourseId != null) {
                     context.read<CourseExamsCubit>().fetchExamsAndAssignments(
-                      quiz.courseId!,
+                      targetCourseId,
                       showLoading: true,
                     );
                   }
@@ -112,7 +160,7 @@ class CourseQuizCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(24.r),
                 child: Container(
                   padding: EdgeInsets.symmetric(
-                    horizontal: 24.w,
+                    horizontal: isFirstAttempt ? 24.w : 16.w,
                     vertical: 10.h,
                   ),
                   decoration: BoxDecoration(
@@ -120,16 +168,18 @@ class CourseQuizCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(24.r),
                   ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
-                        Icons.play_arrow,
+                      Icon(
+                        buttonIcon,
                         color: Colors.white,
-                        size: 16,
+                        size: 15.sp,
                       ),
-                      SizedBox(width: 8.w),
+                      SizedBox(width: 6.w),
                       AppText(
-                        'ابدأ',
-                        style: font14w700.copyWith(color: Colors.white),
+                        buttonText,
+                        style: (isFirstAttempt ? font13w700 : font12w700)
+                            .copyWith(color: Colors.white),
                       ),
                     ],
                   ),

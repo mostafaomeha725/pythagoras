@@ -46,8 +46,10 @@ class CourseDetailBottomButton extends StatelessWidget {
               return;
             }
 
-            // Authenticated user, request enrollment
-            context.read<RequestEnrollmentCubit>().requestCourse(course.id);
+            context.read<RequestEnrollmentCubit>().requestCourse(
+              course.id,
+              courseTitle: course.title,
+            );
           },
           radius: 14.r,
           height: 52.h,

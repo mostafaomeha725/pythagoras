@@ -14,6 +14,8 @@ import 'package:pythagoras/features/courses/presentation/widgets/assignments/sub
 import 'package:pythagoras/features/courses/presentation/widgets/assignments/submit_assignment_notes_field.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/assignments/submit_assignment_widgets.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:pythagoras/core/theme/light_colors.dart';
 
 class SubmitAssignmentSheet extends StatefulWidget {
   final int assignmentId;
@@ -62,11 +64,121 @@ class _SubmitAssignmentSheetState extends State<SubmitAssignmentSheet> {
     super.dispose();
   }
 
-  Future<void> _pickFile() async {
-    final result = await FilePicker.pickFiles(type: FileType.any);
-    if (result != null && result.files.isNotEmpty) {
-      setState(() => _pickedFile = result.files.first);
+  Future<void> _pickFromGallery() async {
+    try {
+      final picker = ImagePicker();
+      final image = await picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        final length = await image.length();
+        setState(() {
+          _pickedFile = PlatformFile(
+            name: image.name,
+            path: image.path,
+            size: length,
+          );
+        });
+      }
+    } catch (_) {
+      showError('تعذر فتح معرض الصور');
     }
+  }
+
+  Future<void> _pickFromFileSystem() async {
+    try {
+      final result = await FilePicker.pickFiles(type: FileType.any);
+      if (result != null && result.files.isNotEmpty) {
+        setState(() => _pickedFile = result.files.first);
+      }
+    } catch (_) {
+      showError('تعذر فتح مستعرض الملفات');
+    }
+  }
+
+  void _showFileSourceSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+        ),
+        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36.w,
+              height: 4.h,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE5E7EB),
+                borderRadius: BorderRadius.circular(2.r),
+              ),
+            ),
+            SizedBox(height: 16.h),
+            AppText(
+              'اختر طريقة الرفع',
+              style: font16w700.copyWith(color: const Color(0xFF1E1E2D)),
+            ),
+            SizedBox(height: 16.h),
+            ListTile(
+              leading: Container(
+                padding: EdgeInsets.all(8.w),
+                decoration: BoxDecoration(
+                  color: AppLightColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10.r),
+                ),
+                child: Icon(
+                  Icons.photo_library_outlined,
+                  color: AppLightColors.primary,
+                  size: 24.sp,
+                ),
+              ),
+              title: AppText(
+                'معرض الصور (Photos)',
+                style: font14w600.copyWith(color: const Color(0xFF1E1E2D)),
+              ),
+              subtitle: AppText(
+                'اختيار صورة من ألبوم الصور مباشرة',
+                style: font12w400.copyWith(color: const Color(0xFF6B7280)),
+              ),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _pickFromGallery();
+              },
+            ),
+            Divider(height: 1.h, color: const Color(0xFFF3F4F6)),
+            ListTile(
+              leading: Container(
+                padding: EdgeInsets.all(8.w),
+                decoration: BoxDecoration(
+                  color: AppLightColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10.r),
+                ),
+                child: Icon(
+                  Icons.folder_open_outlined,
+                  color: AppLightColors.primary,
+                  size: 24.sp,
+                ),
+              ),
+              title: AppText(
+                'الملفات والمستندات (Files)',
+                style: font14w600.copyWith(color: const Color(0xFF1E1E2D)),
+              ),
+              subtitle: AppText(
+                'تصفح المستندات و iCloud Drive وملفات الجهاز',
+                style: font12w400.copyWith(color: const Color(0xFF6B7280)),
+              ),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _pickFromFileSystem();
+              },
+            ),
+            SizedBox(height: 12.h),
+          ],
+        ),
+      ),
+    );
   }
 
   void _removeFile() => setState(() => _pickedFile = null);
@@ -150,7 +262,7 @@ class _SubmitAssignmentSheetState extends State<SubmitAssignmentSheet> {
               SizedBox(height: 8.h),
               SubmitAssignmentFilePicker(
                 pickedFile: _pickedFile,
-                onPickFile: _pickFile,
+                onPickFile: _showFileSourceSheet,
                 onRemoveFile: _removeFile,
               ),
               SizedBox(height: 28.h),

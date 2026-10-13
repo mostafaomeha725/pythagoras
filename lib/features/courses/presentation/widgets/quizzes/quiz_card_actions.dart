@@ -8,30 +8,66 @@ import 'package:pythagoras/features/courses/presentation/cubit/course_exams/cour
 import 'package:go_router/go_router.dart';
 import 'package:pythagoras/core/routes/route_paths.dart';
 
-/// Bottom row of [CourseQuizCard]: duration info + start button.
+/// Bottom row of [CourseQuizCard]: duration & attempts info + start/retry button.
 class QuizCardActions extends StatelessWidget {
   final CourseQuiz quiz;
+  final int? courseId;
 
-  const QuizCardActions({super.key, required this.quiz});
+  const QuizCardActions({super.key, required this.quiz, this.courseId});
 
   @override
   Widget build(BuildContext context) {
+    final bool isFirstAttempt = quiz.isFirstAttempt;
+    final String buttonText = isFirstAttempt ? 'ابدأ' : 'حاول مرة أخرى';
+    final IconData buttonIcon = isFirstAttempt
+        ? Icons.play_arrow_rounded
+        : Icons.replay_rounded;
+    final int? targetCourseId = courseId ?? quiz.courseId;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Row(
-          children: [
-            Icon(
-              Icons.access_time,
-              size: 14.sp,
-              color: const Color(0xFF9CA3AF),
-            ),
-            SizedBox(width: 6.w),
-            AppText(
-              'الوقت: ${quiz.duration} دقيقة',
-              style: font12w500.copyWith(color: const Color(0xFF6B7280)),
-            ),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.access_time_rounded,
+                    size: 14.sp,
+                    color: const Color(0xFF9CA3AF),
+                  ),
+                  SizedBox(width: 6.w),
+                  AppText(
+                    'الوقت: ${quiz.duration} دقيقة',
+                    style: font12w500.copyWith(color: const Color(0xFF6B7280)),
+                  ),
+                ],
+              ),
+              if (quiz.hasAttemptLimit || quiz.remainingAttempts != null) ...[
+                SizedBox(height: 6.h),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.replay_rounded,
+                      size: 14.sp,
+                      color: const Color(0xFF832561),
+                    ),
+                    SizedBox(width: 6.w),
+                    AppText(
+                      quiz.remainingAttemptsLabel,
+                      style: font12w700.copyWith(
+                        color: const Color(0xFF832561),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
         ),
         InkWell(
           onTap: () async {
@@ -39,27 +75,31 @@ class QuizCardActions extends StatelessWidget {
               Routes.quizScreen,
               extra: quiz,
             );
-            if (result == true && context.mounted && quiz.courseId != null) {
+            if (result == true && context.mounted && targetCourseId != null) {
               context.read<CourseExamsCubit>().fetchExamsAndAssignments(
-                quiz.courseId!,
+                targetCourseId,
                 showLoading: true,
               );
             }
           },
           borderRadius: BorderRadius.circular(24.r),
           child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 10.h),
+            padding: EdgeInsets.symmetric(
+              horizontal: isFirstAttempt ? 24.w : 16.w,
+              vertical: 10.h,
+            ),
             decoration: BoxDecoration(
               color: const Color(0xFF832561),
               borderRadius: BorderRadius.circular(24.r),
             ),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.play_arrow, color: Colors.white, size: 16),
-                SizedBox(width: 8.w),
+                Icon(buttonIcon, color: Colors.white, size: 15.sp),
+                SizedBox(width: 6.w),
                 AppText(
-                  'ابدأ',
-                  style: font14w700.copyWith(color: Colors.white),
+                  buttonText,
+                  style: font12w700.copyWith(color: Colors.white),
                 ),
               ],
             ),

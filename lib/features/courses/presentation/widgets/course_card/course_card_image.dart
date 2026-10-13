@@ -1,22 +1,51 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:pythagoras/core/theme/styles.dart';
 import 'package:pythagoras/core/widgets/app_image.dart';
-import 'package:pythagoras/core/widgets/custom_text.dart';
+import 'package:pythagoras/features/courses/domain/entities/course_badge_type.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/course_card/course_card_badge.dart';
 
 class CourseCardImage extends StatelessWidget {
   final String? imageUrl;
+  final CourseBadgeType? badgeType;
   final bool isEnrolled;
   final String? requestStatus;
+  final String? chapterRequest;
+
   const CourseCardImage({
     super.key,
     required this.imageUrl,
-    required this.isEnrolled,
+    this.badgeType,
+    this.isEnrolled = false,
     this.requestStatus,
+    this.chapterRequest,
   });
+
+  CourseBadgeType get _effectiveBadge {
+    if (badgeType != null) {
+      return badgeType!;
+    }
+    final req = requestStatus?.trim().toLowerCase();
+    final chap = chapterRequest?.trim().toLowerCase();
+
+    if (isEnrolled || req == 'accepted') {
+      return CourseBadgeType.courseEnrolled;
+    }
+    if (req == 'pending') {
+      return CourseBadgeType.coursePending;
+    }
+    if (chap == 'accepted') {
+      return CourseBadgeType.chapterEnrolled;
+    }
+    if (chap == 'pending') {
+      return CourseBadgeType.chapterPending;
+    }
+    return CourseBadgeType.none;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final effectiveBadge = _effectiveBadge;
+
     return Stack(
       children: [
         ClipRRect(
@@ -30,73 +59,11 @@ class CourseCardImage extends StatelessWidget {
             ),
           ),
         ),
-        if (isEnrolled)
+        if (effectiveBadge != CourseBadgeType.none)
           Positioned(
             top: 12.h,
             right: 12.w,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
-              decoration: BoxDecoration(
-                color: const Color(0xFF059669),
-                borderRadius: BorderRadius.circular(8.r),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF059669).withValues(alpha: 0.3),
-                    blurRadius: 8.r,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.check_circle_rounded,
-                    color: Colors.white,
-                    size: 14.sp,
-                  ),
-                  SizedBox(width: 4.w),
-                  AppText(
-                    'مسجل',
-                    style: font12w700.copyWith(color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
-          )
-        else if (requestStatus == 'pending')
-          Positioned(
-            top: 12.h,
-            right: 12.w,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
-              decoration: BoxDecoration(
-                color: const Color(0xFFD97706), // Premium orange/amber
-                borderRadius: BorderRadius.circular(8.r),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFD97706).withValues(alpha: 0.3),
-                    blurRadius: 8.r,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.pending_actions_rounded,
-                    color: Colors.white,
-                    size: 14.sp,
-                  ),
-                  SizedBox(width: 4.w),
-                  AppText(
-                    'قيد الانتظار',
-                    style: font12w700.copyWith(color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
+            child: CourseCardBadge(badgeType: effectiveBadge),
           ),
       ],
     );
