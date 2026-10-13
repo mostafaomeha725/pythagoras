@@ -12,6 +12,8 @@ jobs:
     name: Build & Upload to TestFlight
     runs-on: macos-latest
     timeout-minutes: 60
+    env:
+      FLUTTER_SWIFT_PACKAGE_MANAGER: "false"
 
     steps:
       - name: Checkout repository
@@ -58,6 +60,10 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Disable Swift Package Manager in Flutter
+        run: |
+          flutter config --no-enable-swift-package-manager
+
       - name: Clean build environment & caches
         run: |
           set -euo pipefail
@@ -65,11 +71,28 @@ jobs:
           flutter clean
           rm -rf build/
           rm -rf ios/Pods/
+          # NOTE: ios/Podfile.lock is NOT deleted — it is intentionally tracked in Git
+          # to pin CocoaPods dependency versions and enable reproducible builds.
+          # ios/.gitignore excludes **/Pods/ but NOT Podfile.lock.
+          # After the first successful CI run, commit the generated Podfile.lock.
+          rm -rf ios/Flutter/ephemeral/Packages
           rm -rf ~/Library/Developer/Xcode/DerivedData
           pod cache clean --all || true
 
       - name: Install Flutter dependencies
         run: flutter pub get
+
+      - name: Install CocoaPods dependencies
+        run: |
+          set -euo pipefail
+          cd ios
+          # --repo-update ensures specs are fresh; safe to keep for correctness.
+          # Once Podfile.lock is committed to Git, `pod install` (without --repo-update)
+          # will use pinned versions from the lockfile instead of resolving again.
+          pod install --repo-update
+          diff Podfile.lock Pods/Manifest.lock
+          echo "Verified: CocoaPods sandbox and Podfile.lock are in sync."
+          cd ..
 
       - name: Verify pubspec.lock has no Stripe
         run: |
@@ -79,7 +102,6 @@ jobs:
             exit 1
           fi
           echo "Verified: pubspec.lock contains zero Stripe references."
-
 
       - name: Check iOS project
         run: |
