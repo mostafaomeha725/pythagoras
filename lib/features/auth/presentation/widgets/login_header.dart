@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pythagoras/core/routes/route_paths.dart';
 import 'package:pythagoras/core/constants/app_assets.dart';
 import 'package:pythagoras/core/theme/light_colors.dart';
 import 'package:pythagoras/core/theme/styles.dart';
@@ -23,9 +24,7 @@ class LoginHeader extends StatelessWidget {
           child: BounceIt(
             child: InkWell(
               onTap: () {
-                if (context.canPop()) {
-                  context.pop();
-                }
+                context.go(Routes.mainNavigationScreen);
               },
               borderRadius: BorderRadius.circular(50.r),
               child: Container(
