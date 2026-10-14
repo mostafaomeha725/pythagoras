@@ -90,7 +90,7 @@ class DefaultApp extends StatelessWidget {
             BlocProvider(create: (context) => sl<ProfileCubit>()),
           ],
           child: MaterialApp.router(
-            title: 'أحمد جمال فيثاغورث',
+            title: 'أحمد جمال\nفيثاغورث',
             debugShowCheckedModeBanner: false,
             builder: EasyLoading.init(
               builder: (context, child) {
