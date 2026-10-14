@@ -12,6 +12,46 @@ class CourseCardDetails extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isIOS = Theme.of(context).platform == TargetPlatform.iOS;
+
+    if (isIOS) {
+      return Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: AppText(
+                course.title,
+                style: font16w700.copyWith(
+                  color: const Color(0xFF1E1E2D),
+                  height: 1.3,
+                ),
+                maxLines: 2,
+              ),
+            ),
+            SizedBox(width: 12.w),
+            // Arrow button
+            Container(
+              width: 32.w,
+              height: 32.w,
+              decoration: const BoxDecoration(
+                color: Color(0xFFFCEEFA),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Icon(
+                  Icons.arrow_forward,
+                  color: AppLightColors.primary,
+                  size: 16.sp,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: EdgeInsets.all(16.w),
       child: Column(
@@ -31,16 +71,12 @@ class CourseCardDetails extends StatelessWidget {
                 children: [
                   AppText(
                     course.price.toStringAsFixed(2),
-                    style: font16w700.copyWith(
-                      color: AppLightColors.primary,
-                    ),
+                    style: font16w700.copyWith(color: AppLightColors.primary),
                   ),
                   SizedBox(width: 4.w),
                   AppText(
                     course.currencyLabel ?? "دينار كويتي",
-                    style: font14w600.copyWith(
-                      color: AppLightColors.primary,
-                    ),
+                    style: font14w600.copyWith(color: AppLightColors.primary),
                   ),
                 ],
               ),

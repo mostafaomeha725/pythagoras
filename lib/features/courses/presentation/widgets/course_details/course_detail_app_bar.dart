@@ -8,7 +8,14 @@ class CourseDetailAppBar extends StatelessWidget
     implements PreferredSizeWidget {
   final String title;
   final VoidCallback? onBack;
-  const CourseDetailAppBar({super.key, this.title = 'تفاصيل الدورة', this.onBack});
+  final Widget? action;
+
+  const CourseDetailAppBar({
+    super.key,
+    this.title = 'تفاصيل الدورة',
+    this.onBack,
+    this.action,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -55,8 +62,8 @@ class CourseDetailAppBar extends StatelessWidget
                     ),
                   ),
 
-                  // Placeholder to balance back button
-                  SizedBox(width: 40.w),
+                  // Placeholder to balance back button or custom action
+                  action ?? SizedBox(width: 40.w),
                 ],
               ),
             ),

@@ -7,6 +7,7 @@ class CourseDetailShimmer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isIOS = Theme.of(context).platform == TargetPlatform.iOS;
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(horizontal: 20.w),
       child: Shimmer.fromColors(
@@ -16,7 +17,7 @@ class CourseDetailShimmer extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(height: 20.h),
-            
+
             // Video / Thumbnail Placeholder
             Container(
               height: 200.h,
@@ -26,7 +27,7 @@ class CourseDetailShimmer extends StatelessWidget {
               ),
             ),
             SizedBox(height: 20.h),
-            
+
             // Title Placeholder
             Container(
               height: 24.h,
@@ -46,7 +47,7 @@ class CourseDetailShimmer extends StatelessWidget {
               ),
             ),
             SizedBox(height: 16.h),
-            
+
             // Meta chips
             Row(
               children: [
@@ -70,18 +71,20 @@ class CourseDetailShimmer extends StatelessWidget {
               ],
             ),
             SizedBox(height: 16.h),
-            
+
             // Price Placeholder
-            Container(
-              height: 20.h,
-              width: 150.w,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(6.r),
+            if (!isIOS) ...[
+              Container(
+                height: 20.h,
+                width: 150.w,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(6.r),
+                ),
               ),
-            ),
-            SizedBox(height: 20.h),
-            
+              SizedBox(height: 20.h),
+            ],
+
             // Description Placeholder
             ...List.generate(
               4,
@@ -98,7 +101,7 @@ class CourseDetailShimmer extends StatelessWidget {
               ),
             ),
             SizedBox(height: 28.h),
-            
+
             // Curriculum label Placeholder
             Container(
               height: 48.h,
@@ -109,7 +112,7 @@ class CourseDetailShimmer extends StatelessWidget {
               ),
             ),
             SizedBox(height: 16.h),
-            
+
             // Chapters Placeholder
             ...List.generate(
               3,
@@ -124,7 +127,7 @@ class CourseDetailShimmer extends StatelessWidget {
                 ),
               ),
             ),
-            
+
             SizedBox(height: 120.h),
           ],
         ),

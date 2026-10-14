@@ -21,10 +21,12 @@ import 'package:pythagoras/features/profile/domain/usecases/upload_profile_pictu
 import 'package:pythagoras/features/profile/domain/usecases/update_personal_profile_use_case.dart';
 import 'package:pythagoras/features/profile/domain/usecases/get_my_courses_use_case.dart';
 import 'package:pythagoras/features/profile/domain/usecases/submit_contact_us_use_case.dart';
+import 'package:pythagoras/features/profile/domain/usecases/delete_account_use_case.dart';
 import 'package:pythagoras/features/profile/presentation/cubit/profile/profile_cubit.dart';
 import 'package:pythagoras/features/profile/presentation/cubit/edit_profile/edit_profile_cubit.dart';
 import 'package:pythagoras/features/profile/presentation/cubit/my_courses/my_courses_cubit.dart';
 import 'package:pythagoras/features/profile/presentation/cubit/contact_us/contact_us_cubit.dart';
+import 'package:pythagoras/features/profile/presentation/cubit/delete_account/delete_account_cubit.dart';
 import 'package:pythagoras/features/courses/domain/repositories/courses_repository.dart';
 import 'package:pythagoras/features/courses/data/repositories/courses_repository_impl.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/get_classes_use_case.dart';
@@ -112,10 +114,12 @@ class ServiceLocator {
     sl.registerLazySingleton(() => UpdatePersonalProfileUseCase(sl()));
     sl.registerLazySingleton(() => GetMyCoursesUseCase(sl()));
     sl.registerLazySingleton(() => SubmitContactUsUseCase(sl()));
+    sl.registerLazySingleton(() => DeleteAccountUseCase(sl()));
     sl.registerFactory(() => ProfileCubit(sl()));
     sl.registerFactory(() => EditProfileCubit(sl(), sl()));
     sl.registerFactory(() => MyCoursesCubit(sl()));
     sl.registerFactory(() => ContactUsCubit(submitContactUsUseCase: sl()));
+    sl.registerFactory(() => DeleteAccountCubit(sl()));
   }
 
   /// =============================

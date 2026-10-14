@@ -22,4 +22,5 @@ class Routes {
   static const webViewScreen = '/web-viewer';
   static const quizScreen = '/quiz';
   static const courseReviewsScreen = '/course-reviews';
+  static const privacyPolicyScreen = '/privacy-policy';
 }

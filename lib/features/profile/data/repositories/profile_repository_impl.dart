@@ -14,6 +14,7 @@ import 'package:pythagoras/features/profile/domain/entities/my_course_enrollment
 import 'package:pythagoras/features/profile/domain/repositories/profile_repository.dart';
 import 'package:pythagoras/core/enums/app_enums.dart';
 import 'package:pythagoras/core/cache/hive_storage.dart';
+import 'package:pythagoras/core/constants/strings.dart';
 
 class ProfileRepositoryImpl implements ProfileRepository {
   final NetworkService networkService;
@@ -265,6 +266,33 @@ class ProfileRepositoryImpl implements ProfileRepository {
     } catch (e) {
       debugPrint('🔴 ProfileRepositoryImpl.submitContactUs error: $e');
       return Left(Failure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteAccount() async {
+    try {
+      final response = await networkService.deleteData(
+        endPoint: EndPoints.account,
+      );
+
+      return await response.fold(
+        (errorMsg) async {
+          if (errorMsg == AppStrings.noInternetConnection) {
+            return const Left(Failure(AppStrings.noInternetConnection));
+          }
+          await _clearLocalSessionData();
+          return const Right(null);
+        },
+        (data) async {
+          await _clearLocalSessionData();
+          return const Right(null);
+        },
+      );
+    } catch (e) {
+      debugPrint('🔴 ProfileRepositoryImpl.deleteAccount error: $e');
+      await _clearLocalSessionData();
+      return const Right(null);
     }
   }
 }

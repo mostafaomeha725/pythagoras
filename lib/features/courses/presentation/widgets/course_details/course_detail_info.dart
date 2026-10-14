@@ -20,6 +20,8 @@ class CourseDetailInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isIOS = Theme.of(context).platform == TargetPlatform.iOS;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -44,13 +46,12 @@ class CourseDetailInfo extends StatelessWidget {
               onTap: () async {
                 await context.push(
                   Routes.courseReviewsScreen,
-                  extra: {
-                    'courseId': course.id,
-                    'courseTitle': course.title,
-                  },
+                  extra: {'courseId': course.id, 'courseTitle': course.title},
                 );
                 if (context.mounted) {
-                  context.read<CourseDetailsCubit>().fetchCourseDetails(course.id);
+                  context.read<CourseDetailsCubit>().fetchCourseDetails(
+                    course.id,
+                  );
                   try {
                     context.read<CoursesListCubit>().fetchCourses();
                   } catch (_) {}
@@ -62,20 +63,22 @@ class CourseDetailInfo extends StatelessWidget {
         ),
         SizedBox(height: 16.h),
 
-        // Price
-        Row(
-          children: [
-            AppText(
-              'سعر الدورة: ',
-              style: font14w600.copyWith(color: const Color(0xFF6B7280)),
-            ),
-            AppText(
-              '${course.price} ${course.currencyLabel}',
-              style: font16w700.copyWith(color: AppLightColors.primary),
-            ),
-          ],
-        ),
-        SizedBox(height: 20.h),
+        // Price (Hidden on iOS)
+        if (!isIOS) ...[
+          Row(
+            children: [
+              AppText(
+                'سعر الدورة: ',
+                style: font14w600.copyWith(color: const Color(0xFF6B7280)),
+              ),
+              AppText(
+                '${course.price} ${course.currencyLabel}',
+                style: font16w700.copyWith(color: AppLightColors.primary),
+              ),
+            ],
+          ),
+          SizedBox(height: 20.h),
+        ],
 
         // Description
         AppText(

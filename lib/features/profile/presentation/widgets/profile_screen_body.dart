@@ -11,6 +11,7 @@ import 'package:pythagoras/features/profile/domain/entities/user_profile.dart';
 import 'package:pythagoras/features/profile/presentation/widgets/profile_header_card.dart';
 import 'package:pythagoras/features/profile/presentation/widgets/profile_option_card.dart';
 import 'package:pythagoras/features/profile/presentation/widgets/logout_dialog.dart';
+import 'package:pythagoras/features/profile/presentation/widgets/delete_account_dialog.dart';
 import 'package:pythagoras/features/profile/presentation/widgets/profile_shimmer.dart';
 import 'package:pythagoras/core/di/services_locator.dart';
 import 'package:pythagoras/core/cache/preferences_storage.dart';
@@ -83,6 +84,12 @@ class ProfileScreenBody extends StatelessWidget {
               icon: Icons.support_agent_outlined,
               onTap: () => context.push(Routes.contactUsScreen),
             ),
+            ProfileOption(
+              title: 'سياسة الخصوصية',
+              subtitle: 'شروط الخصوصية وأمان البيانات',
+              icon: Icons.privacy_tip_outlined,
+              onTap: () => context.push(Routes.privacyPolicyScreen),
+            ),
           ];
         } else {
           options = [
@@ -110,6 +117,24 @@ class ProfileScreenBody extends StatelessWidget {
               subtitle: 'الدعم والمساعدة',
               icon: Icons.support_agent_outlined,
               onTap: () => context.push(Routes.contactUsScreen),
+            ),
+            ProfileOption(
+              title: 'سياسة الخصوصية',
+              subtitle: 'شروط الخصوصية وأمان البيانات',
+              icon: Icons.privacy_tip_outlined,
+              onTap: () => context.push(Routes.privacyPolicyScreen),
+            ),
+            ProfileOption(
+              title: 'حذف الحساب',
+              subtitle: 'حذف حسابك وبياناتك نهائياً',
+              icon: Icons.delete_outline_rounded,
+              isDestructive: true,
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => const DeleteAccountDialog(),
+                );
+              },
             ),
             ProfileOption(
               title: 'تسجيل الخروج',

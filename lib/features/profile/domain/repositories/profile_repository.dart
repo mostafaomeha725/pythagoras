@@ -11,4 +11,5 @@ abstract class ProfileRepository {
   Future<Either<Failure, UserProfile>> updatePersonalProfile({required String name, String? password});
   Future<Either<Failure, List<MyCourseEnrollment>>> getMyCourses({bool fromCache = false});
   Future<Either<Failure, String>> submitContactUs({required String name, required String email, required String message});
+  Future<Either<Failure, void>> deleteAccount();
 }

@@ -13,6 +13,7 @@ import 'package:pythagoras/features/profile/domain/entities/user_profile.dart';
 import 'package:pythagoras/features/profile/presentation/screens/my_courses_screen.dart';
 import 'package:pythagoras/features/profile/presentation/screens/edit_profile_screen.dart';
 import 'package:pythagoras/features/profile/presentation/screens/contact_us_screen.dart';
+import 'package:pythagoras/features/profile/presentation/screens/privacy_policy_screen.dart';
 import 'package:pythagoras/features/home/screens/home_screen.dart';
 import 'package:pythagoras/features/courses/presentation/screens/pdf_viewer_screen.dart';
 import 'package:pythagoras/features/courses/presentation/screens/webview_screen.dart';
@@ -177,6 +178,10 @@ GoRouter createRouter() {
             courseTitle: courseTitle,
           );
         },
+      ),
+      GoRoute(
+        path: Routes.privacyPolicyScreen,
+        builder: (context, state) => const PrivacyPolicyScreen(),
       ),
     ],
   );

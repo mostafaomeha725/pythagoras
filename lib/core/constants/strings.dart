@@ -16,8 +16,10 @@ class AppStrings {
   static const String googlePlayUrl = '';
   static const String appStoreUrl = '';
   static const String fontFamily = 'Tajawal';
-  static const String enPrivacyPolicy = '';
-  static const String arPrivacyPolicy = '';
+  static const String privacyPolicyWebUrl =
+      'https://neudrosi-pythagoras.com/terms#privacy';
+  static const String enPrivacyPolicy = privacyPolicyWebUrl;
+  static const String arPrivacyPolicy = privacyPolicyWebUrl;
 
   static const String noInternetConnection =
       'لا يوجد اتصال بالإنترنت، يرجى التحقق من اتصالك والمحاولة مرة أخرى';
