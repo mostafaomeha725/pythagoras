@@ -54,7 +54,10 @@ class MyCourseCardHeader extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 12.w,
+                      vertical: 4.h,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFDF4FA),
                       borderRadius: BorderRadius.circular(20.r),

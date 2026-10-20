@@ -65,9 +65,7 @@ class PrivacyPolicyWebCard extends StatelessWidget {
                     SizedBox(height: 2.h),
                     AppText(
                       'Terms & Privacy | Pythagoras',
-                      style: font12w500.copyWith(
-                        color: AppLightColors.primary,
-                      ),
+                      style: font12w500.copyWith(color: AppLightColors.primary),
                       textDirection: TextDirection.ltr,
                     ),
                   ],

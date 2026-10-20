@@ -41,7 +41,9 @@ class CourseReviewsProgressBar extends StatelessWidget {
               value: progress,
               minHeight: 6.h,
               backgroundColor: const Color(0xFFF3F4F6),
-              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFBBF24)),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                Color(0xFFFBBF24),
+              ),
             ),
           ),
         ),

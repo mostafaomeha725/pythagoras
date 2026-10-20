@@ -29,10 +29,7 @@ class CourseReviewItemCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(
-          color: const Color(0xFFF3F4F6),
-          width: 1.5,
-        ),
+        border: Border.all(color: const Color(0xFFF3F4F6), width: 1.5),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
@@ -63,14 +60,18 @@ class CourseReviewItemCard extends StatelessWidget {
                   children: [
                     Text(
                       name,
-                      style: font14w700.copyWith(color: const Color(0xFF1E1E2D)),
+                      style: font14w700.copyWith(
+                        color: const Color(0xFF1E1E2D),
+                      ),
                     ),
                     SizedBox(height: 4.h),
                     Row(
                       children: [
                         Text(
                           rating.toStringAsFixed(1),
-                          style: font10w700.copyWith(color: const Color(0xFF6B7280)),
+                          style: font10w700.copyWith(
+                            color: const Color(0xFF6B7280),
+                          ),
                         ),
                         SizedBox(width: 4.w),
                         Row(
@@ -79,8 +80,8 @@ class CourseReviewItemCard extends StatelessWidget {
                             return Padding(
                               padding: EdgeInsets.symmetric(horizontal: 1.w),
                               child: Icon(
-                                index < rating.floor() 
-                                    ? Icons.star_rounded 
+                                index < rating.floor()
+                                    ? Icons.star_rounded
                                     : Icons.star_outline_rounded,
                                 color: const Color(0xFFFBBF24),
                                 size: 12.sp,

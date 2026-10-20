@@ -37,6 +37,11 @@ class CourseVideoPlayerManager extends ChangeNotifier {
   String? currentVideoUrl;
   Timer? _networkTimer;
 
+  // Fullscreen orientation state tracking (Tablet support)
+  bool wasTablet = false;
+  Orientation? preFullscreenOrientation;
+  bool isExitingFullScreen = false;
+
   Future<void> _handleError(String fallbackMsg, String url) async {
     if (_isDisposed || currentVideoUrl != url) return;
 
@@ -316,6 +321,7 @@ class CourseVideoPlayerManager extends ChangeNotifier {
   }
 
   void exitFullScreen() {
+    isExitingFullScreen = false;
     _toggleFullScreen(false);
     notifyListeners();
   }
@@ -326,6 +332,7 @@ class CourseVideoPlayerManager extends ChangeNotifier {
   }
 
   void _disposePlayers({bool keepScreenProtection = false}) {
+    isExitingFullScreen = false;
     playerKey = GlobalKey(); // Force widget tree to drop the old player state
 
     adapter?.disposeAdapter();

@@ -33,12 +33,16 @@ class CourseAddReviewStars extends StatelessWidget {
                   color: isSelected ? const Color(0xFFFFFBEB) : Colors.white,
                   borderRadius: BorderRadius.circular(12.r),
                   border: Border.all(
-                    color: isSelected ? const Color(0xFFFDE68A) : const Color(0xFFF3F4F6),
+                    color: isSelected
+                        ? const Color(0xFFFDE68A)
+                        : const Color(0xFFF3F4F6),
                   ),
                 ),
                 child: Icon(
                   isSelected ? Icons.star_rounded : Icons.star_border_rounded,
-                  color: isSelected ? const Color(0xFFF59E0B) : const Color(0xFFD1D5DB),
+                  color: isSelected
+                      ? const Color(0xFFF59E0B)
+                      : const Color(0xFFD1D5DB),
                   size: 24.sp,
                 ),
               ),
@@ -50,7 +54,11 @@ class CourseAddReviewStars extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error_outline_rounded, color: const Color(0xFFDC2626), size: 14.sp),
+              Icon(
+                Icons.error_outline_rounded,
+                color: const Color(0xFFDC2626),
+                size: 14.sp,
+              ),
               SizedBox(width: 4.w),
               AppText(
                 'لم تختر تقييماً بعد',

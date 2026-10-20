@@ -9,6 +9,7 @@ class CourseLessonsList extends StatelessWidget {
   final bool showStatuses;
   final String? selectedLessonId;
   final Function(CourseLesson)? onLessonTap;
+  final bool tabletLandscape;
 
   const CourseLessonsList({
     super.key,
@@ -16,6 +17,7 @@ class CourseLessonsList extends StatelessWidget {
     this.showStatuses = false,
     this.selectedLessonId,
     this.onLessonTap,
+    this.tabletLandscape = false,
   });
 
   @override
@@ -31,13 +33,14 @@ class CourseLessonsList extends StatelessWidget {
               showStatuses: showStatuses,
               isSelected: lesson.id == selectedLessonId,
               onTap: onLessonTap != null ? () => onLessonTap!(lesson) : null,
+              tabletLandscape: tabletLandscape,
             ),
             if (!isLast)
               Divider(
                 height: 1,
                 color: AppLightColors.primary.withValues(alpha: 0.1),
-                indent: 16.w,
-                endIndent: 16.w,
+                indent: tabletLandscape ? 16 : 16.w,
+                endIndent: tabletLandscape ? 16 : 16.w,
               ),
           ],
         );

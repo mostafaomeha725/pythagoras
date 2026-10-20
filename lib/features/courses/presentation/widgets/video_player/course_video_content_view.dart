@@ -85,13 +85,16 @@ class CourseVideoContentView extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Container(color: Colors.black),
+        Positioned.fill(child: player),
         if (manager.isInitializing)
-          Positioned(left: 0, top: 0, width: 1, height: 1, child: player)
-        else
-          Positioned.fill(child: player),
-        if (manager.isInitializing)
-          const Center(child: CircularProgressIndicator(color: Colors.white)),
+          Positioned.fill(
+            child: Container(
+              color: Colors.black,
+              child: const Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              ),
+            ),
+          ),
       ],
     );
   }

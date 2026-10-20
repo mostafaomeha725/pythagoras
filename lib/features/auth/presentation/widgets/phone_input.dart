@@ -5,12 +5,17 @@ import 'package:pythagoras/core/widgets/app_form_field.dart';
 
 class PhoneInput extends StatelessWidget {
   final TextEditingController controller;
+  final bool tabletLandscape;
 
-  const PhoneInput({super.key, required this.controller});
+  const PhoneInput({
+    super.key,
+    required this.controller,
+    this.tabletLandscape = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
+    final input = Directionality(
       textDirection: TextDirection.ltr,
       child: AppFormField(
         controller: controller,
@@ -18,36 +23,52 @@ class PhoneInput extends StatelessWidget {
         keyboardType: TextInputType.phone,
         fillColor: const Color(0xFFF9FAFB),
         borderColor: const Color(0xFFE5E7EB),
-        radius: 12.r,
+        radius: tabletLandscape ? 12 : 12.r,
+        contentPadding: tabletLandscape
+            ? const EdgeInsets.symmetric(horizontal: 16)
+            : null,
         maxLines: 1,
+        textStyle: tabletLandscape
+            ? font14w600.copyWith(color: const Color(0xFF1E1E2D), fontSize: 17)
+            : null,
+        hintStyle: tabletLandscape
+            ? font14w600.copyWith(color: Colors.grey, fontSize: 17)
+            : null,
         prefixIcon: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 12.w),
+          padding: tabletLandscape
+              ? const EdgeInsets.symmetric(horizontal: 16)
+              : EdgeInsets.symmetric(horizontal: 12.w),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 "🇰🇼",
-                style: TextStyle(fontSize: 20.sp),
+                style: TextStyle(fontSize: tabletLandscape ? 24 : 20.sp),
               ),
-              SizedBox(width: 8.w),
+              SizedBox(width: tabletLandscape ? 10 : 8.w),
               Text(
                 "+965",
                 textDirection: TextDirection.ltr,
-                style: font14w600.copyWith(
-                  color: const Color(0xFF1E1E2D),
-                ),
+                style: tabletLandscape
+                    ? font14w600.copyWith(
+                        color: const Color(0xFF1E1E2D),
+                        fontSize: 17,
+                      )
+                    : font14w600.copyWith(color: const Color(0xFF1E1E2D)),
               ),
-              SizedBox(width: 8.w),
+              SizedBox(width: tabletLandscape ? 10 : 8.w),
               Container(
-                width: 1.w,
-                height: 24.h,
+                width: tabletLandscape ? 1 : 1.w,
+                height: tabletLandscape ? 28 : 24.h,
                 color: const Color(0xFFE5E7EB),
               ),
-              SizedBox(width: 4.w),
+              SizedBox(width: tabletLandscape ? 4 : 4.w),
             ],
           ),
         ),
       ),
     );
+
+    return tabletLandscape ? SizedBox(height: 60, child: input) : input;
   }
 }

@@ -25,7 +25,8 @@ class CourseRecordedChaptersList extends StatelessWidget {
     for (final chapter in course.chapters) {
       totalVideos += chapter.videos.length;
     }
-    final String courseStatsLabel = '${course.chapters.length} فصل • $totalVideos دروس';
+    final String courseStatsLabel =
+        '${course.chapters.length} فصل • $totalVideos دروس';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -55,9 +56,13 @@ class CourseRecordedChaptersList extends StatelessWidget {
         SizedBox(height: 16.h),
         ...course.chapters.asMap().entries.map((entry) {
           final chapter = entry.value;
-          int totalChapterSeconds = chapter.videos.fold(0, (sum, video) => sum + video.durationMinutes);
+          int totalChapterSeconds = chapter.videos.fold(
+            0,
+            (sum, video) => sum + video.durationMinutes,
+          );
           int totalChapterMinutes = totalChapterSeconds ~/ 60;
-          String subtitle = '${chapter.videos.length} دروس • $totalChapterMinutes دقيقة';
+          String subtitle =
+              '${chapter.videos.length} دروس • $totalChapterMinutes دقيقة';
 
           return CourseChapterTile(
             chapter: chapter,

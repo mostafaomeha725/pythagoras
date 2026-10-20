@@ -10,6 +10,8 @@ import 'package:pythagoras/features/profile/presentation/widgets/contact_info_ca
 import 'package:pythagoras/features/profile/presentation/widgets/contact_text_field.dart';
 import 'package:pythagoras/features/profile/presentation/cubit/contact_us/contact_us_cubit.dart';
 import 'package:pythagoras/features/profile/presentation/cubit/contact_us/contact_us_state.dart';
+import 'package:pythagoras/core/utils/responsive_helper.dart';
+import 'package:pythagoras/features/profile/presentation/widgets/contact_us_tablet_landscape.dart';
 
 class ContactUsScreenBody extends StatefulWidget {
   const ContactUsScreenBody({super.key});
@@ -34,13 +36,13 @@ class _ContactUsScreenBodyState extends State<ContactUsScreenBody> {
 
   void _submitForm() {
     if (_formKey.currentState?.validate() ?? false) {
-      if (_nameController.text.trim().isEmpty || 
-          _emailController.text.trim().isEmpty || 
+      if (_nameController.text.trim().isEmpty ||
+          _emailController.text.trim().isEmpty ||
           _messageController.text.trim().isEmpty) {
         EasyLoading.showError('يرجى ملء جميع الحقول');
         return;
       }
-      
+
       context.read<ContactUsCubit>().submit(
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
@@ -64,94 +66,118 @@ class _ContactUsScreenBodyState extends State<ContactUsScreenBody> {
           EasyLoading.showError(state.message);
         }
       },
-      child: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 24.h),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Description Card
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12.r),
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
-                ),
-                child: AppText(
-                  'هل لديك سؤال، أو تحتاج إلى مساعدة، أو تريد فقط أن تقول مرحباً؟ فريق الدعم لدينا هنا لمساعدتك.',
-                  style: font14w500.copyWith(color: const Color(0xFF6B7280)),
-                  alignment: AlignmentDirectional.center,
-                  textAlign: TextAlign.center,
-                  maxLines: 3,
-                ),
-              ),
-              SizedBox(height: 16.h),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isTablet =
+              ResponsiveHelper.isTablet(context) ||
+              (constraints.maxWidth >= 900 &&
+                  constraints.maxWidth > constraints.maxHeight);
 
-              // Phone Card
-              const ContactInfoCard(
-                text: '65608054',
-                icon: Icons.phone_in_talk_outlined,
-              ),
-              SizedBox(height: 12.h),
+          if (isTablet) {
+            return ContactUsTabletLandscape(
+              formKey: _formKey,
+              nameController: _nameController,
+              emailController: _emailController,
+              messageController: _messageController,
+              onSubmit: _submitForm,
+            );
+          }
 
-              // Email Card
-              const ContactInfoCard(
-                text: 'info@neudrosi-pythagoras.com',
-                icon: Icons.email_outlined,
-              ),
-              SizedBox(height: 24.h),
-
-              // Name Field
-              ContactTextField(
-                label: 'الاسم',
-                hint: 'اكتب اسمك',
-                icon: Icons.person_outline,
-                controller: _nameController,
-              ),
-              SizedBox(height: 16.h),
-
-              // Email Field
-              ContactTextField(
-                label: 'البريد الإلكتروني',
-                hint: 'example@email.com',
-                icon: Icons.email_outlined,
-                controller: _emailController,
-              ),
-              SizedBox(height: 16.h),
-
-              // Message Field
-              ContactTextField(
-                label: 'الرسالة',
-                hint: 'اكتب رسالتك',
-                icon: Icons.edit_outlined,
-                maxLines: 4,
-                controller: _messageController,
-              ),
-              SizedBox(height: 32.h),
-
-              // Submit Button
-              BounceIt(
-                onPressed: _submitForm,
-                child: Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.symmetric(vertical: 16.h),
-                  decoration: BoxDecoration(
-                    color: AppLightColors.primary,
-                    borderRadius: BorderRadius.circular(12.r),
+          return SingleChildScrollView(
+            padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 24.h),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Description Card
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 16.w,
+                      vertical: 20.h,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12.r),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                    ),
+                    child: AppText(
+                      'هل لديك سؤال، أو تحتاج إلى مساعدة، أو تريد فقط أن تقول مرحباً؟ فريق الدعم لدينا هنا لمساعدتك.',
+                      style: font14w500.copyWith(
+                        color: const Color(0xFF6B7280),
+                      ),
+                      alignment: AlignmentDirectional.center,
+                      textAlign: TextAlign.center,
+                      maxLines: 3,
+                    ),
                   ),
-                  alignment: Alignment.center,
-                  child: AppText(
-                    'إرسال',
-                    style: font16w700.copyWith(color: Colors.white),
-                    alignment: AlignmentDirectional.center,
+                  SizedBox(height: 16.h),
+
+                  // Phone Card
+                  const ContactInfoCard(
+                    text: '65608054',
+                    icon: Icons.phone_in_talk_outlined,
                   ),
-                ),
+                  SizedBox(height: 12.h),
+
+                  // Email Card
+                  const ContactInfoCard(
+                    text: 'info@neudrosi-pythagoras.com',
+                    icon: Icons.email_outlined,
+                  ),
+                  SizedBox(height: 24.h),
+
+                  // Name Field
+                  ContactTextField(
+                    label: 'الاسم',
+                    hint: 'اكتب اسمك',
+                    icon: Icons.person_outline,
+                    controller: _nameController,
+                  ),
+                  SizedBox(height: 16.h),
+
+                  // Email Field
+                  ContactTextField(
+                    label: 'البريد الإلكتروني',
+                    hint: 'example@email.com',
+                    icon: Icons.email_outlined,
+                    controller: _emailController,
+                  ),
+                  SizedBox(height: 16.h),
+
+                  // Message Field
+                  ContactTextField(
+                    label: 'الرسالة',
+                    hint: 'اكتب رسالتك',
+                    icon: Icons.edit_outlined,
+                    maxLines: 4,
+                    controller: _messageController,
+                  ),
+                  SizedBox(height: 32.h),
+
+                  // Submit Button
+                  BounceIt(
+                    onPressed: _submitForm,
+                    child: Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.symmetric(vertical: 16.h),
+                      decoration: BoxDecoration(
+                        color: AppLightColors.primary,
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                      alignment: Alignment.center,
+                      child: AppText(
+                        'إرسال',
+                        style: font16w700.copyWith(color: Colors.white),
+                        alignment: AlignmentDirectional.center,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }

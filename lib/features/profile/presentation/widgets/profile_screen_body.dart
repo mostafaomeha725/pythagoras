@@ -16,6 +16,8 @@ import 'package:pythagoras/features/profile/presentation/widgets/profile_shimmer
 import 'package:pythagoras/core/di/services_locator.dart';
 import 'package:pythagoras/core/cache/preferences_storage.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/courses_list/courses_list_cubit.dart';
+import 'package:pythagoras/core/utils/responsive_helper.dart';
+import 'package:pythagoras/features/profile/presentation/widgets/profile_tablet_landscape.dart';
 
 class ProfileScreenBody extends StatelessWidget {
   const ProfileScreenBody({super.key});
@@ -73,17 +75,20 @@ class ProfileScreenBody extends StatelessWidget {
                   extra: true,
                 );
                 if (result == true && context.mounted) {
-                  context.read<ProfileCubit>().getAccountInfo();
-                  context.read<CoursesListCubit>().fetchCourses();
+                  final token = sl<PreferencesStorage>().getUserToken();
+                  if (token != null && token.isNotEmpty) {
+                    context.read<ProfileCubit>().getAccountInfo();
+                    context.read<CoursesListCubit>().fetchCourses();
+                  }
                 }
               },
             ),
-            ProfileOption(
-              title: 'تواصل معنا',
-              subtitle: 'الدعم والمساعدة',
-              icon: Icons.support_agent_outlined,
-              onTap: () => context.push(Routes.contactUsScreen),
-            ),
+            // ProfileOption(
+            //   title: 'تواصل معنا',
+            //   subtitle: 'الدعم والمساعدة',
+            //   icon: Icons.support_agent_outlined,
+            //   onTap: () => context.push(Routes.contactUsScreen),
+            // ),
             ProfileOption(
               title: 'سياسة الخصوصية',
               subtitle: 'شروط الخصوصية وأمان البيانات',
@@ -112,12 +117,12 @@ class ProfileScreenBody extends StatelessWidget {
               icon: Icons.menu_book_outlined,
               onTap: () => context.push(Routes.myCoursesScreen),
             ),
-            ProfileOption(
-              title: 'تواصل معنا',
-              subtitle: 'الدعم والمساعدة',
-              icon: Icons.support_agent_outlined,
-              onTap: () => context.push(Routes.contactUsScreen),
-            ),
+            // ProfileOption(
+            //   title: 'تواصل معنا',
+            //   subtitle: 'الدعم والمساعدة',
+            //   icon: Icons.support_agent_outlined,
+            //   onTap: () => context.push(Routes.contactUsScreen),
+            // ),
             ProfileOption(
               title: 'سياسة الخصوصية',
               subtitle: 'شروط الخصوصية وأمان البيانات',
@@ -150,28 +155,56 @@ class ProfileScreenBody extends StatelessWidget {
           ];
         }
 
-        return RefreshIndicator(
-          onRefresh: () async {
-            if (!isGuest) {
-              await context.read<ProfileCubit>().getAccountInfo();
-            }
-          },
-          color: const Color(0xFF832561),
-          child: ListView(
-            padding: EdgeInsets.all(24.w),
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics(),
-            ),
-            children: [
-              ProfileHeaderCard(
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final isTablet =
+                ResponsiveHelper.isTablet(context) ||
+                (constraints.maxWidth >= 900 &&
+                    constraints.maxWidth > constraints.maxHeight);
+
+            if (isTablet) {
+              final isPortrait = ResponsiveHelper.isPortrait(
+                context,
+                constraints,
+              );
+              return ProfileTabletLandscape(
                 name: name,
                 grade: grade,
                 profilePictureUrl: profilePictureUrl,
+                options: options,
+                bottomPadding: isPortrait ? 110 : 24,
+                onRefresh: () async {
+                  if (!isGuest) {
+                    await context.read<ProfileCubit>().getAccountInfo();
+                  }
+                },
+              );
+            }
+
+            return RefreshIndicator(
+              onRefresh: () async {
+                if (!isGuest) {
+                  await context.read<ProfileCubit>().getAccountInfo();
+                }
+              },
+              color: const Color(0xFF832561),
+              child: ListView(
+                padding: EdgeInsets.all(24.w),
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
+                children: [
+                  ProfileHeaderCard(
+                    name: name,
+                    grade: grade,
+                    profilePictureUrl: profilePictureUrl,
+                  ),
+                  SizedBox(height: 32.h),
+                  ...options.map((option) => ProfileOptionCard(option: option)),
+                ],
               ),
-              SizedBox(height: 32.h),
-              ...options.map((option) => ProfileOptionCard(option: option)),
-            ],
-          ),
+            );
+          },
         );
       },
     );

@@ -11,6 +11,9 @@ import 'package:pythagoras/features/courses/presentation/screens/courses_screen.
 import 'package:pythagoras/features/profile/presentation/screens/profile_screen.dart';
 import 'package:pythagoras/core/di/services_locator.dart';
 import 'package:pythagoras/core/cache/preferences_storage.dart';
+import 'package:pythagoras/features/home/widgets/tablet_navigation_sidebar.dart';
+
+import 'package:pythagoras/core/utils/responsive_helper.dart';
 
 class HomeScreenContent extends StatefulWidget {
   final NavigationState navState;
@@ -42,7 +45,7 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
 
     await coursesCubit.fetchCourses();
     await classesCubit.fetchClasses();
-    
+
     final prefs = sl<PreferencesStorage>();
     final token = prefs.getUserToken();
     if (token != null && token.isNotEmpty) {
@@ -52,31 +55,75 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
-      body: IndexedStack(
-        index: widget.navState.selectedIndex,
-        children: [
-          HomeScreenBody(
-            onNavigateToCourses: () {
-              widget.navState.onItemTapped(1, () {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isTabletLandscape = ResponsiveHelper.isTabletLandscape(
+          context,
+          constraints,
+        );
+
+        if (isTabletLandscape) {
+          return Scaffold(
+            backgroundColor: const Color(0xFFFAFAFA),
+            body: Row(
+              children: [
+                TabletNavigationSidebar(
+                  navItems: widget.navItems,
+                  selectedIndex: widget.navState.selectedIndex,
+                  onItemTapped: (index) {
+                    widget.navState.onItemTapped(index, () {
+                      setState(() {});
+                    });
+                  },
+                ),
+                Expanded(
+                  child: IndexedStack(
+                    index: widget.navState.selectedIndex,
+                    children: [
+                      HomeScreenBody(
+                        onNavigateToCourses: () {
+                          widget.navState.onItemTapped(1, () {
+                            setState(() {});
+                          });
+                        },
+                      ),
+                      const CoursesScreen(),
+                      const ProfileScreen(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Scaffold(
+          extendBody: true,
+          body: IndexedStack(
+            index: widget.navState.selectedIndex,
+            children: [
+              HomeScreenBody(
+                onNavigateToCourses: () {
+                  widget.navState.onItemTapped(1, () {
+                    setState(() {});
+                  });
+                },
+              ),
+              const CoursesScreen(),
+              const ProfileScreen(),
+            ],
+          ),
+          bottomNavigationBar: CustomBottomNavBar(
+            navItems: widget.navItems,
+            navState: widget.navState,
+            onItemTapped: (index) {
+              widget.navState.onItemTapped(index, () {
                 setState(() {});
               });
             },
           ),
-          const CoursesScreen(),
-          const ProfileScreen(),
-        ],
-      ),
-      bottomNavigationBar: CustomBottomNavBar(
-        navItems: widget.navItems,
-        navState: widget.navState,
-        onItemTapped: (index) {
-          widget.navState.onItemTapped(index, () {
-            setState(() {});
-          });
-        },
-      ),
+        );
+      },
     );
   }
 }

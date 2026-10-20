@@ -42,11 +42,7 @@ class ProfileShimmer extends StatelessWidget {
                         color: Colors.white,
                       ),
                       SizedBox(height: 8.h),
-                      Container(
-                        width: 80.w,
-                        height: 12.h,
-                        color: Colors.white,
-                      ),
+                      Container(width: 80.w, height: 12.h, color: Colors.white),
                     ],
                   ),
                 ),
@@ -55,7 +51,7 @@ class ProfileShimmer extends StatelessWidget {
           ),
         ),
         SizedBox(height: 32.h),
-        
+
         // Profile Options Shimmer
         ...List.generate(4, (index) {
           return Padding(

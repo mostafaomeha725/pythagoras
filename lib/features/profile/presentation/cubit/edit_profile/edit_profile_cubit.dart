@@ -25,9 +25,7 @@ class EditProfileCubit extends Cubit<EditProfileState> {
 
     updateResult.fold(
       (failure) => emit(EditProfileFailure(failure.message)),
-      (userProfile) => emit(EditProfileSuccess(
-        userProfile: userProfile,
-      )),
+      (userProfile) => emit(EditProfileSuccess(userProfile: userProfile)),
     );
   }
 }

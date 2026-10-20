@@ -10,8 +10,13 @@ import 'phone_input.dart';
 
 class LoginForm extends StatefulWidget {
   final void Function(String phone, String password) onSubmit;
+  final bool tabletLandscape;
 
-  const LoginForm({super.key, required this.onSubmit});
+  const LoginForm({
+    super.key,
+    required this.onSubmit,
+    this.tabletLandscape = false,
+  });
 
   @override
   State<LoginForm> createState() => _LoginFormState();
@@ -30,40 +35,52 @@ class _LoginFormState extends State<LoginForm> {
 
   @override
   Widget build(BuildContext context) {
+    final labelStyle = widget.tabletLandscape
+        ? font17w700.copyWith(color: const Color(0xFF1E1E2D), fontSize: 17)
+        : font14w700.copyWith(color: const Color(0xFF1E1E2D));
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Phone Label
         AppText(
           "رقم الهاتف",
-          style: font14w700.copyWith(color: const Color(0xFF1E1E2D)),
+          style: labelStyle,
           alignment: AlignmentDirectional.centerStart,
         ),
         SizedBox(height: 8.h),
 
         // Phone Input
-        PhoneInput(controller: _phoneController),
+        PhoneInput(
+          controller: _phoneController,
+          tabletLandscape: widget.tabletLandscape,
+        ),
 
-        SizedBox(height: 20.h),
+        SizedBox(height: widget.tabletLandscape ? 16 : 20.h),
 
         // Password Label
         AppText(
           "كلمة المرور",
-          style: font14w700.copyWith(color: const Color(0xFF1E1E2D)),
+          style: labelStyle,
           alignment: AlignmentDirectional.centerStart,
           maxLines: 1,
         ),
         SizedBox(height: 8.h),
 
         // Password Input
-        PasswordInput(controller: _passwordController),
+        PasswordInput(
+          controller: _passwordController,
+          tabletLandscape: widget.tabletLandscape,
+        ),
 
-        SizedBox(height: 40.h),
+        SizedBox(height: widget.tabletLandscape ? 28 : 40.h),
 
         // Login Button
         Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16.r),
+            borderRadius: BorderRadius.circular(
+              widget.tabletLandscape ? 16 : 16.r,
+            ),
             boxShadow: [
               BoxShadow(
                 color: AppLightColors.primary.withValues(alpha: 0.25),
@@ -80,10 +97,10 @@ class _LoginFormState extends State<LoginForm> {
                 _passwordController.text,
               );
             },
-            radius: 16.r,
-            height: 56.h,
+            radius: widget.tabletLandscape ? 16 : 16.r,
+            height: widget.tabletLandscape ? 62 : 56.h,
             textColor: Colors.white,
-            textSize: 16.sp,
+            textSize: widget.tabletLandscape ? 20 : 16.sp,
             textWeight: FontWeight.bold,
           ),
         ),

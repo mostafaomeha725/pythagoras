@@ -5,6 +5,7 @@ import 'package:pythagoras/features/courses/domain/entities/course_detail.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/course_exams/course_exams_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_app_bar.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/quizzes/course_exams_screen_body.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/quizzes/course_exams_tablet_landscape.dart';
 
 class CourseExamsScreen extends StatelessWidget {
   final CourseDetail course;
@@ -16,9 +17,26 @@ class CourseExamsScreen extends StatelessWidget {
     return BlocProvider(
       create: (_) =>
           sl<CourseExamsCubit>()..fetchExamsAndAssignments(course.id),
-      child: Scaffold(
-        appBar: const CourseDetailAppBar(title: 'الامتحانات والواجبات'),
-        body: SafeArea(child: CourseExamsScreenBody(course: course)),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isTabletLandscape =
+              constraints.maxWidth >= 900 &&
+              constraints.maxHeight >= 600 &&
+              constraints.maxWidth > constraints.maxHeight;
+
+          if (isTabletLandscape) {
+            return Scaffold(
+              backgroundColor: const Color(0xFFF8F9FA),
+              body: CourseExamsTabletLandscape(course: course),
+            );
+          }
+
+          // Original layout for Mobile Portrait & Tablet Portrait completely untouched
+          return Scaffold(
+            appBar: const CourseDetailAppBar(title: 'الامتحانات والواجبات'),
+            body: SafeArea(child: CourseExamsScreenBody(course: course)),
+          );
+        },
       ),
     );
   }

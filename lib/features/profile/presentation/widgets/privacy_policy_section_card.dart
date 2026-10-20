@@ -47,19 +47,13 @@ class PrivacyPolicySectionCard extends StatelessWidget {
                   color: const Color(0xFFFDF4FA),
                   borderRadius: BorderRadius.circular(10.r),
                 ),
-                child: Icon(
-                  icon,
-                  color: AppLightColors.primary,
-                  size: 20.sp,
-                ),
+                child: Icon(icon, color: AppLightColors.primary, size: 20.sp),
               ),
               SizedBox(width: 12.w),
               Expanded(
                 child: AppText(
                   title,
-                  style: font16w700.copyWith(
-                    color: const Color(0xFF1E1E2D),
-                  ),
+                  style: font16w700.copyWith(color: const Color(0xFF1E1E2D)),
                   maxLines: 2,
                 ),
               ),

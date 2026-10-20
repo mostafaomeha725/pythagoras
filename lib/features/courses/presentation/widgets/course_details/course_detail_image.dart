@@ -7,13 +7,18 @@ import 'package:pythagoras/features/courses/presentation/widgets/course_card/cou
 
 class CourseDetailImage extends StatelessWidget {
   final CourseDetail course;
+  final bool tabletLandscape;
 
-  const CourseDetailImage({super.key, required this.course});
+  const CourseDetailImage({
+    super.key,
+    required this.course,
+    this.tabletLandscape = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(16.r),
+      borderRadius: BorderRadius.circular(tabletLandscape ? 16 : 16.r),
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -27,9 +32,12 @@ class CourseDetailImage extends StatelessWidget {
           ),
           if (course.badgeType != CourseBadgeType.none)
             Positioned(
-              top: 12.h,
-              right: 12.w,
-              child: CourseCardBadge(badgeType: course.badgeType),
+              top: tabletLandscape ? 12 : 12.h,
+              right: tabletLandscape ? 12 : 12.w,
+              child: CourseCardBadge(
+                badgeType: course.badgeType,
+                tabletLandscape: tabletLandscape,
+              ),
             ),
         ],
       ),

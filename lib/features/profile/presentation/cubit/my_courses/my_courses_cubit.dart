@@ -12,7 +12,7 @@ class MyCoursesCubit extends Cubit<MyCoursesState> {
   Future<void> fetchMyCourses() async {
     // 1. Try Cache
     final cacheResult = await getMyCoursesUseCase(fromCache: true);
-    
+
     if (isClosed) return;
 
     bool hasCache = false;
@@ -33,7 +33,7 @@ class MyCoursesCubit extends Cubit<MyCoursesState> {
 
     // 2. Fetch Remote
     final result = await getMyCoursesUseCase(fromCache: false);
-    
+
     if (isClosed) return;
     _isFetchingRemote = false;
 

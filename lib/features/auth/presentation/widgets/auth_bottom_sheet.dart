@@ -6,11 +6,25 @@ import 'package:pythagoras/core/theme/light_colors.dart';
 import 'package:pythagoras/core/theme/styles.dart';
 import 'package:pythagoras/core/widgets/bouncing_widgets.dart';
 import 'package:pythagoras/core/widgets/custom_text.dart';
+import 'package:pythagoras/features/auth/presentation/widgets/auth_tablet_bottom_sheet.dart';
 
 class AuthBottomSheet extends StatelessWidget {
   const AuthBottomSheet({super.key});
 
   static Future<bool?> show(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final isTabletLandscape =
+        size.width >= 900 && size.height >= 600 && size.width > size.height;
+
+    if (isTabletLandscape) {
+      return showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => const AuthTabletBottomSheet(),
+      );
+    }
+
     return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -24,6 +38,14 @@ class AuthBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final isTabletLandscape =
+        size.width >= 900 && size.height >= 600 && size.width > size.height;
+
+    if (isTabletLandscape) {
+      return const AuthTabletBottomSheet();
+    }
+
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 20.h),
@@ -105,7 +127,10 @@ class AuthBottomSheet extends StatelessWidget {
                   child: BounceIt(
                     onPressed: () async {
                       // wait for login to finish, then pop the bottom sheet with the result
-                      final result = await context.push(Routes.loginScreen, extra: true);
+                      final result = await context.push(
+                        Routes.loginScreen,
+                        extra: true,
+                      );
                       if (context.mounted) {
                         context.pop(result == true);
                       }
@@ -117,7 +142,9 @@ class AuthBottomSheet extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12.r),
                         boxShadow: [
                           BoxShadow(
-                            color: AppLightColors.primary.withValues(alpha: 0.2),
+                            color: AppLightColors.primary.withValues(
+                              alpha: 0.2,
+                            ),
                             blurRadius: 8,
                             offset: const Offset(0, 4),
                           ),

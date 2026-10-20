@@ -23,6 +23,7 @@ class CourseChapterBody extends StatelessWidget {
   final CourseDetail? course;
   final String? selectedLessonId;
   final Function(CourseLesson)? onLessonTap;
+  final bool tabletLandscape;
 
   const CourseChapterBody({
     super.key,
@@ -33,6 +34,7 @@ class CourseChapterBody extends StatelessWidget {
     this.course,
     this.selectedLessonId,
     this.onLessonTap,
+    this.tabletLandscape = false,
   });
 
   @override
@@ -46,13 +48,15 @@ class CourseChapterBody extends StatelessWidget {
             children: [
               if (showActionButtons) ...[
                 Padding(
-                  padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 16.h),
+                  padding: tabletLandscape
+                      ? const EdgeInsets.fromLTRB(16, 10, 16, 14)
+                      : EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 16.h),
                   child: AppButton(
                     text: 'عرض الدرس',
                     onPressed: () {
                       if (course != null) {
                         context.push(
-                          Routes.courseSectionsScreen, 
+                          Routes.courseSectionsScreen,
                           extra: {
                             'course': course,
                             'selectedChapterId': chapter.id,
@@ -60,17 +64,18 @@ class CourseChapterBody extends StatelessWidget {
                         );
                       }
                     },
-                    radius: 12.r,
-                    height: 48.h,
-                    textSize: 15.sp,
+                    radius: tabletLandscape ? 12 : 12.r,
+                    height: tabletLandscape ? 48 : 48.h,
+                    textSize: tabletLandscape ? 15 : 15.sp,
+                    contentPadding: tabletLandscape ? EdgeInsets.zero : null,
                   ),
                 ),
                 if (chapter.videos.isNotEmpty)
                   Divider(
                     height: 1,
                     color: AppLightColors.primary.withValues(alpha: 0.12),
-                    indent: 16.w,
-                    endIndent: 16.w,
+                    indent: tabletLandscape ? 16 : 16.w,
+                    endIndent: tabletLandscape ? 16 : 16.w,
                   ),
               ],
               if (chapter.videos.isNotEmpty)
@@ -79,6 +84,7 @@ class CourseChapterBody extends StatelessWidget {
                   showStatuses: showLessonStatuses,
                   selectedLessonId: selectedLessonId,
                   onLessonTap: onLessonTap,
+                  tabletLandscape: tabletLandscape,
                 ),
             ],
           )
@@ -88,6 +94,7 @@ class CourseChapterBody extends StatelessWidget {
             currencyLabel: chapter.currencyLabel,
             isEnrolled: isEnrolled || chapter.isEnrolled,
             requestStatus: chapter.requestStatus,
+            tabletLandscape: tabletLandscape,
             onPressed: () async {
               final didLogin = await AuthGuard.checkAuthAndExecute(context, () {
                 context.read<RequestEnrollmentCubit>().requestChapter(
@@ -101,7 +108,10 @@ class CourseChapterBody extends StatelessWidget {
                 // Refresh the parent course details so the UI updates accurately.
                 final courseDetailCubit = context.read<CourseDetailsCubit>();
                 if (courseDetailCubit.state is CourseDetailsLoaded) {
-                  final courseId = (courseDetailCubit.state as CourseDetailsLoaded).courseDetail.id;
+                  final courseId =
+                      (courseDetailCubit.state as CourseDetailsLoaded)
+                          .courseDetail
+                          .id;
                   courseDetailCubit.fetchCourseDetails(courseId);
                 }
               }

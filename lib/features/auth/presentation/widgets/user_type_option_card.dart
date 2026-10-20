@@ -23,11 +23,13 @@ class UserTypeOptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor =
-        isSelected ? AppLightColors.primary : const Color(0xFFE5E7EB);
+    final borderColor = isSelected
+        ? AppLightColors.primary
+        : const Color(0xFFE5E7EB);
     final backgroundColor = isSelected ? const Color(0xFFFDF7FB) : Colors.white;
-    final iconBgColor =
-        isSelected ? AppLightColors.primary : const Color(0xFFF3F4F6);
+    final iconBgColor = isSelected
+        ? AppLightColors.primary
+        : const Color(0xFFF3F4F6);
     final iconColor = isSelected ? Colors.white : const Color(0xFF6B7280);
 
     return BounceIt(
@@ -38,10 +40,7 @@ class UserTypeOptionCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: backgroundColor,
             borderRadius: BorderRadius.circular(16.r),
-            border: Border.all(
-              color: borderColor,
-              width: 1.5,
-            ),
+            border: Border.all(color: borderColor, width: 1.5),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.04),
@@ -61,11 +60,7 @@ class UserTypeOptionCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12.r),
                 ),
                 child: Center(
-                  child: Icon(
-                    icon,
-                    color: iconColor,
-                    size: 28.sp,
-                  ),
+                  child: Icon(icon, color: iconColor, size: 28.sp),
                 ),
               ),
 
@@ -118,11 +113,7 @@ class UserTypeOptionCard extends StatelessWidget {
                   ),
                 ),
                 child: isSelected
-                    ? Icon(
-                        Icons.check,
-                        color: Colors.white,
-                        size: 16.sp,
-                      )
+                    ? Icon(Icons.check, color: Colors.white, size: 16.sp)
                     : null,
               ),
             ],

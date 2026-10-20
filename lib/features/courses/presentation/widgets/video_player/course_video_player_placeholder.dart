@@ -52,7 +52,11 @@ class _CourseVideoPlayerPlaceholderState
   @override
   void dispose() {
     if (_manager.isFullScreen) {
-      SystemUiManager.exitFullscreen();
+      SystemUiManager.exitFullscreen(
+        isTablet: _manager.wasTablet,
+        targetOrientation: _manager.preFullscreenOrientation,
+        unlockAfter: _manager.wasTablet,
+      );
     }
     _manager.removeListener(_onManagerStateChanged);
     _manager.dispose();

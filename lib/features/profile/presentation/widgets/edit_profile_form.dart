@@ -23,7 +23,9 @@ class EditProfileForm extends StatelessWidget {
         // Name (Editable)
         ProfileTextField(
           label: 'الاسم',
-          initialValue: nameController == null ? (userProfile?.name ?? 'الاسم') : null,
+          initialValue: nameController == null
+              ? (userProfile?.name ?? 'الاسم')
+              : null,
           controller: nameController,
           readOnly: false,
         ),

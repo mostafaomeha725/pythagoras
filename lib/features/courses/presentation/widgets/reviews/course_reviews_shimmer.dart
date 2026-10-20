@@ -15,59 +15,57 @@ class CourseReviewsShimmer extends StatelessWidget {
       baseColor: baseColor,
       highlightColor: highlightColor,
       child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-
-
-            // Overall Rating Shimmer
-            Container(
-              width: double.infinity,
-              height: 200.h,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16.r),
-              ),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Overall Rating Shimmer
+          Container(
+            width: double.infinity,
+            height: 200.h,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16.r),
             ),
-            SizedBox(height: 32.h),
+          ),
+          SizedBox(height: 32.h),
 
-            // Filter Header Shimmer
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  width: 100.w,
-                  height: 20.h,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(4.r),
-                  ),
-                ),
-                Container(
-                  width: 80.w,
-                  height: 32.h,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16.r),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 24.h),
-
-            // Review Items Shimmer
-            for (int i = 0; i < 3; i++) ...[
+          // Filter Header Shimmer
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
               Container(
-                width: double.infinity,
-                height: 140.h,
-                margin: EdgeInsets.only(bottom: 16.h),
+                width: 100.w,
+                height: 20.h,
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(12.r),
+                  borderRadius: BorderRadius.circular(4.r),
+                ),
+              ),
+              Container(
+                width: 80.w,
+                height: 32.h,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16.r),
                 ),
               ),
             ],
+          ),
+          SizedBox(height: 24.h),
+
+          // Review Items Shimmer
+          for (int i = 0; i < 3; i++) ...[
+            Container(
+              width: double.infinity,
+              height: 140.h,
+              margin: EdgeInsets.only(bottom: 16.h),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+            ),
           ],
-        ),
+        ],
+      ),
     );
   }
 }

@@ -10,6 +10,7 @@ class CourseLessonRow extends StatelessWidget {
   final bool showStatuses;
   final bool isSelected;
   final VoidCallback? onTap;
+  final bool tabletLandscape;
 
   const CourseLessonRow({
     super.key,
@@ -17,6 +18,7 @@ class CourseLessonRow extends StatelessWidget {
     required this.showStatuses,
     this.isSelected = false,
     this.onTap,
+    this.tabletLandscape = false,
   });
 
   @override
@@ -28,7 +30,9 @@ class CourseLessonRow extends StatelessWidget {
       onTap: onTap,
       child: Container(
         color: isPlaying ? const Color(0xFFF6EEF5) : Colors.transparent,
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+        padding: tabletLandscape
+            ? const EdgeInsets.symmetric(horizontal: 16, vertical: 12)
+            : EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
         child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -40,14 +44,16 @@ class CourseLessonRow extends StatelessWidget {
                 CourseLessonIcon(
                   isCompleted: isCompleted,
                   isPlaying: isPlaying,
+                  tabletLandscape: tabletLandscape,
                 ),
-                SizedBox(width: 10.w),
+                SizedBox(width: tabletLandscape ? 12 : 10.w),
                 // Lesson title & subtitle
                 Expanded(
                   child: CourseLessonInfo(
                     title: lesson.title,
                     isPlaying: isPlaying,
                     isCompleted: isCompleted,
+                    tabletLandscape: tabletLandscape,
                   ),
                 ),
               ],
@@ -58,6 +64,7 @@ class CourseLessonRow extends StatelessWidget {
             durationMinutes: lesson.durationMinutes,
             showStatuses: showStatuses,
             isPlaying: isPlaying,
+            tabletLandscape: tabletLandscape,
           ),
         ],
       ),

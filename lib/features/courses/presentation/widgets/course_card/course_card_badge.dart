@@ -7,8 +7,13 @@ import 'package:pythagoras/features/courses/domain/entities/course_badge_type.da
 /// Reusable status badge pill for course cards and course detail headers.
 class CourseCardBadge extends StatelessWidget {
   final CourseBadgeType badgeType;
+  final bool tabletLandscape;
 
-  const CourseCardBadge({super.key, required this.badgeType});
+  const CourseCardBadge({
+    super.key,
+    required this.badgeType,
+    this.tabletLandscape = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -19,14 +24,16 @@ class CourseCardBadge extends StatelessWidget {
     final _BadgeConfig config = _resolveConfig(badgeType);
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+      padding: tabletLandscape
+          ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
+          : EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
       decoration: BoxDecoration(
         color: config.backgroundColor,
-        borderRadius: BorderRadius.circular(8.r),
+        borderRadius: BorderRadius.circular(tabletLandscape ? 8 : 8.r),
         boxShadow: [
           BoxShadow(
             color: config.backgroundColor.withValues(alpha: 0.3),
-            blurRadius: 8.r,
+            blurRadius: tabletLandscape ? 8 : 8.r,
             offset: const Offset(0, 4),
           ),
         ],
@@ -34,11 +41,20 @@ class CourseCardBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(config.icon, color: config.foregroundColor, size: 14.sp),
-          SizedBox(width: 4.w),
+          Icon(
+            config.icon,
+            color: config.foregroundColor,
+            size: tabletLandscape ? 16 : 14.sp,
+          ),
+          SizedBox(width: tabletLandscape ? 6 : 4.w),
           AppText(
             config.label,
-            style: font12w700.copyWith(color: config.foregroundColor),
+            style: tabletLandscape
+                ? font12w700.copyWith(
+                    color: config.foregroundColor,
+                    fontSize: 13,
+                  )
+                : font12w700.copyWith(color: config.foregroundColor),
           ),
         ],
       ),

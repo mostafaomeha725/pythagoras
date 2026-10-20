@@ -29,8 +29,9 @@ class HomeHeader extends StatelessWidget {
             final token = prefs.getUserToken();
             final isGuest = token == null || token.isEmpty;
 
-            String fullName =
-                isGuest ? 'يا زائر' : (prefs.getUserName() ?? 'طالب');
+            String fullName = isGuest
+                ? 'يا زائر'
+                : (prefs.getUserName() ?? 'طالب');
             String branchName = isGuest
                 ? 'تصفح كورساتنا الآن'
                 : (prefs.getBranchName() ?? 'طالبنا المميز');
@@ -65,8 +66,11 @@ class HomeHeader extends StatelessWidget {
               }
 
               displaySubtitle =
-                  ClassNameHelper.getClassName(classId, classes: dynamicClasses) ??
-                      branchName;
+                  ClassNameHelper.getClassName(
+                    classId,
+                    classes: dynamicClasses,
+                  ) ??
+                  branchName;
             }
 
             return Padding(
@@ -82,12 +86,14 @@ class HomeHeader extends StatelessWidget {
                         AppText(
                           "أهلاً $fullName",
                           style: font20w700.copyWith(
-                              color: const Color(0xFF1E1E2D)),
+                            color: const Color(0xFF1E1E2D),
+                          ),
                         ),
                         AppText(
                           displaySubtitle,
-                          style:
-                              font14w600.copyWith(color: AppLightColors.primary),
+                          style: font14w600.copyWith(
+                            color: AppLightColors.primary,
+                          ),
                         ),
                       ],
                     ),
@@ -104,10 +110,14 @@ class HomeHeader extends StatelessWidget {
                           shape: BoxShape.circle,
                           color: Colors.white,
                           border: Border.all(
-                              color: AppLightColors.primary, width: 1.5.w),
+                            color: AppLightColors.primary,
+                            width: 1.5.w,
+                          ),
                           boxShadow: [
                             BoxShadow(
-                              color: AppLightColors.primary.withValues(alpha: 0.1),
+                              color: AppLightColors.primary.withValues(
+                                alpha: 0.1,
+                              ),
                               blurRadius: 6,
                               offset: const Offset(0, 2),
                             ),

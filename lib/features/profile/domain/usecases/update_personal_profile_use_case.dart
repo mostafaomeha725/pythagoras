@@ -8,7 +8,10 @@ class UpdatePersonalProfileUseCase {
 
   UpdatePersonalProfileUseCase(this.repository);
 
-  Future<Either<Failure, UserProfile>> call({required String name, String? password}) {
+  Future<Either<Failure, UserProfile>> call({
+    required String name,
+    String? password,
+  }) {
     return repository.updatePersonalProfile(name: name, password: password);
   }
 }

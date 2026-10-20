@@ -63,9 +63,7 @@ class PrivacyPolicyContactCard extends StatelessWidget {
                     SizedBox(height: 4.h),
                     AppText(
                       'info@neudrosi-pythagoras.com',
-                      style: font13w500.copyWith(
-                        color: AppLightColors.primary,
-                      ),
+                      style: font13w500.copyWith(color: AppLightColors.primary),
                     ),
                   ],
                 ),
@@ -96,9 +94,7 @@ class PrivacyPolicyContactCard extends StatelessWidget {
                   Expanded(
                     child: AppText(
                       'neudrosi-pythagoras.com/terms#privacy',
-                      style: font12w500.copyWith(
-                        color: AppLightColors.primary,
-                      ),
+                      style: font12w500.copyWith(color: AppLightColors.primary),
                       textDirection: TextDirection.ltr,
                       maxLines: 1,
                     ),

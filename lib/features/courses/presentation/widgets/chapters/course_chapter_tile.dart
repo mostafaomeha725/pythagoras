@@ -20,6 +20,7 @@ class CourseChapterTile extends StatefulWidget {
   final CourseDetail? course;
   final String? selectedLessonId;
   final Function(CourseLesson)? onLessonTap;
+  final bool tabletLandscape;
 
   const CourseChapterTile({
     super.key,
@@ -36,6 +37,7 @@ class CourseChapterTile extends StatefulWidget {
     this.course,
     this.selectedLessonId,
     this.onLessonTap,
+    this.tabletLandscape = false,
   });
 
   @override
@@ -55,7 +57,9 @@ class _CourseChapterTileState extends State<CourseChapterTile> {
 
   void _checkInitialExpandedState() {
     if (widget.selectedLessonId != null) {
-      final hasSelected = widget.chapter.videos.any((v) => v.id == widget.selectedLessonId);
+      final hasSelected = widget.chapter.videos.any(
+        (v) => v.id == widget.selectedLessonId,
+      );
       if (hasSelected) {
         _isExpanded = true;
       }
@@ -73,12 +77,12 @@ class _CourseChapterTileState extends State<CourseChapterTile> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: EdgeInsets.only(bottom: 10.h),
+      margin: EdgeInsets.only(bottom: widget.tabletLandscape ? 12 : 10.h),
       decoration: BoxDecoration(
         color: widget.backgroundColor ?? _bgColor,
         border: widget.border,
         boxShadow: widget.boxShadow,
-        borderRadius: BorderRadius.circular(16.r),
+        borderRadius: BorderRadius.circular(widget.tabletLandscape ? 16 : 16.r),
       ),
       child: Column(
         children: [
@@ -86,16 +90,25 @@ class _CourseChapterTileState extends State<CourseChapterTile> {
           Container(
             decoration: BoxDecoration(
               color: widget.headerBackgroundColor,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(16.r), bottom: Radius.circular(_isExpanded ? 0 : 16.r)),
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(widget.tabletLandscape ? 16 : 16.r),
+                bottom: Radius.circular(
+                  _isExpanded ? 0 : (widget.tabletLandscape ? 16 : 16.r),
+                ),
+              ),
             ),
             child: CourseChapterHeader(
               index: widget.index,
               title: widget.chapter.title,
               subtitle: widget.subtitle,
               isExpanded: _isExpanded,
-              isCompleted: widget.chapter.videos.isNotEmpty &&
-                  widget.chapter.videos.every((v) => v.status == CourseLessonStatus.completed),
+              isCompleted:
+                  widget.chapter.videos.isNotEmpty &&
+                  widget.chapter.videos.every(
+                    (v) => v.status == CourseLessonStatus.completed,
+                  ),
               onTap: () => setState(() => _isExpanded = !_isExpanded),
+              tabletLandscape: widget.tabletLandscape,
             ),
           ),
 
@@ -109,10 +122,10 @@ class _CourseChapterTileState extends State<CourseChapterTile> {
               course: widget.course,
               selectedLessonId: widget.selectedLessonId,
               onLessonTap: widget.onLessonTap,
+              tabletLandscape: widget.tabletLandscape,
             ),
         ],
       ),
     );
   }
 }
-

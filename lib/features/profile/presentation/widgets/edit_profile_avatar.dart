@@ -16,10 +16,7 @@ class EditProfileAvatar extends StatelessWidget {
         padding: EdgeInsets.all(4.w),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          border: Border.all(
-            color: AppLightColors.primary,
-            width: 2.5,
-          ),
+          border: Border.all(color: AppLightColors.primary, width: 2.5),
           boxShadow: [
             BoxShadow(
               color: AppLightColors.primary.withValues(alpha: 0.12),
@@ -36,10 +33,7 @@ class EditProfileAvatar extends StatelessWidget {
           child: ClipOval(
             child: Padding(
               padding: EdgeInsets.all(6.w),
-              child: Image.asset(
-                'assets/logoapp.jpeg',
-                fit: BoxFit.contain,
-              ),
+              child: Image.asset('assets/logoapp.jpeg', fit: BoxFit.contain),
             ),
           ),
         ),

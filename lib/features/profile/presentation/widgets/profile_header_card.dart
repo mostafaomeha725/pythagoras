@@ -9,8 +9,8 @@ class ProfileHeaderCard extends StatelessWidget {
   final String? profilePictureUrl;
 
   const ProfileHeaderCard({
-    super.key, 
-    required this.name, 
+    super.key,
+    required this.name,
     required this.grade,
     this.profilePictureUrl,
   });

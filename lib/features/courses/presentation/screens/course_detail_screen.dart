@@ -15,6 +15,9 @@ import 'package:pythagoras/core/utils/url_launcher_util.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/courses_list/courses_list_cubit.dart';
 import 'package:pythagoras/core/widgets/no_internet_widget.dart';
 
+import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_tablet_landscape.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_tablet_shimmer.dart';
+
 class CourseDetailScreen extends StatefulWidget {
   final int courseId;
   final String courseTitle;
@@ -31,7 +34,8 @@ class CourseDetailScreen extends StatefulWidget {
   State<CourseDetailScreen> createState() => _CourseDetailScreenState();
 }
 
-class _CourseDetailScreenState extends State<CourseDetailScreen> with WidgetsBindingObserver {
+class _CourseDetailScreenState extends State<CourseDetailScreen>
+    with WidgetsBindingObserver {
   late final CourseDetailsCubit _courseDetailsCubit;
   late final RequestEnrollmentCubit _requestEnrollmentCubit;
   bool _isWaitingForWhatsApp = false;
@@ -39,7 +43,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> with WidgetsBin
   @override
   void initState() {
     super.initState();
-    _courseDetailsCubit = sl<CourseDetailsCubit>()..fetchCourseDetails(widget.courseId);
+    _courseDetailsCubit = sl<CourseDetailsCubit>()
+      ..fetchCourseDetails(widget.courseId);
     _requestEnrollmentCubit = sl<RequestEnrollmentCubit>();
     WidgetsBinding.instance.addObserver(this);
   }
@@ -85,49 +90,77 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> with WidgetsBin
             if (launched) {
               _isWaitingForWhatsApp = true;
             } else {
-              EasyLoading.showError('تعذر فتح الواتساب، يرجى التأكد من تثبيت التطبيق');
+              EasyLoading.showError(
+                'تعذر فتح الواتساب، يرجى التأكد من تثبيت التطبيق',
+              );
             }
           } else if (state is RequestEnrollmentError) {
             EasyLoading.showError(state.message);
           }
         },
 
-        child: Scaffold(
-          backgroundColor: Colors.white,
-          appBar: const CourseDetailAppBar(),
-        body: BlocBuilder<CourseDetailsCubit, CourseDetailsState>(
-            builder: (context, state) {
-              if (state is CourseDetailsLoading) {
-                return const CourseDetailShimmer();
-              } else if (state is CourseDetailsError) {
-                return NoInternetWidget(
-                  message: state.message,
-                  onRetry: () => _courseDetailsCubit.fetchCourseDetails(widget.courseId),
-                );
-              } else if (state is CourseDetailsLoaded) {
-                // Use the CourseDetail directly from the API which contains the fresh request_status
-                final updatedCourse = state.courseDetail;
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isTabletLandscape =
+                constraints.maxWidth >= 900 &&
+                constraints.maxHeight >= 600 &&
+                constraints.maxWidth > constraints.maxHeight;
 
-                return Stack(
-                  children: [
-                    SafeArea(
-                      top: false,
-                      child: CourseDetailScreenBody(course: updatedCourse),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      child: CourseDetailBottomButton(
-                        course: updatedCourse,
+            return Scaffold(
+              backgroundColor: isTabletLandscape
+                  ? const Color(0xFFF8F9FA)
+                  : Colors.white,
+              appBar: isTabletLandscape ? null : const CourseDetailAppBar(),
+              body: BlocBuilder<CourseDetailsCubit, CourseDetailsState>(
+                builder: (context, state) {
+                  if (state is CourseDetailsLoading) {
+                    if (isTabletLandscape) {
+                      return CourseDetailTabletShimmer(
+                        constraints: constraints,
+                      );
+                    }
+                    return const CourseDetailShimmer();
+                  } else if (state is CourseDetailsError) {
+                    return NoInternetWidget(
+                      message: state.message,
+                      onRetry: () => _courseDetailsCubit.fetchCourseDetails(
+                        widget.courseId,
                       ),
-                    ),
-                  ],
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
+                    );
+                  } else if (state is CourseDetailsLoaded) {
+                    final updatedCourse = state.courseDetail;
+
+                    // ── Tablet Landscape: dedicated two-column layout ──
+                    if (isTabletLandscape) {
+                      return CourseDetailTabletLandscape(
+                        course: updatedCourse,
+                        constraints: constraints,
+                      );
+                    }
+
+                    // ── Mobile Portrait & Tablet Portrait: original layout untouched ──
+                    return Stack(
+                      children: [
+                        SafeArea(
+                          top: false,
+                          child: CourseDetailScreenBody(course: updatedCourse),
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: CourseDetailBottomButton(
+                            course: updatedCourse,
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+            );
+          },
         ),
       ),
     );

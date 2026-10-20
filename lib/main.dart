@@ -44,10 +44,10 @@ Future<void> main() async {
     }
   };
 
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  // await SystemChrome.setPreferredOrientations([
+  //   DeviceOrientation.portraitUp,
+  //   DeviceOrientation.portraitDown,
+  // ]);
 
   await Hive.initFlutter();
   await Hive.openBox(HiveBoxes.cacheBox);

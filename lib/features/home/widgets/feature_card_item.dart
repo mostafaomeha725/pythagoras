@@ -36,10 +36,7 @@ class FeatureCardItem extends StatelessWidget {
               borderRadius: BorderRadius.circular(12.r),
             ),
             child: Center(
-              child: Text(
-                icon,
-                style: TextStyle(fontSize: 24.sp),
-              ),
+              child: Text(icon, style: TextStyle(fontSize: 24.sp)),
             ),
           ),
           SizedBox(width: 16.w),

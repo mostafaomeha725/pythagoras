@@ -7,11 +7,8 @@ import 'package:pythagoras/core/widgets/custom_text.dart';
 
 class HomeHeroCard extends StatelessWidget {
   final VoidCallback onStartLearning;
-  
-  const HomeHeroCard({
-    super.key,
-    required this.onStartLearning,
-  });
+
+  const HomeHeroCard({super.key, required this.onStartLearning});
 
   @override
   Widget build(BuildContext context) {

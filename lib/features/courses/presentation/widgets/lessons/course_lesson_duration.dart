@@ -8,12 +8,14 @@ class CourseLessonDuration extends StatelessWidget {
   final int durationMinutes;
   final bool showStatuses;
   final bool isPlaying;
+  final bool tabletLandscape;
 
   const CourseLessonDuration({
     super.key,
     required this.durationMinutes,
     required this.showStatuses,
     required this.isPlaying,
+    this.tabletLandscape = false,
   });
 
   String _formatDuration(int totalSeconds) {
@@ -34,13 +36,15 @@ class CourseLessonDuration extends StatelessWidget {
           Icon(
             Icons.access_time_rounded,
             color: isPlaying ? AppLightColors.primary : const Color(0xFF9CA3AF),
-            size: 12.sp,
+            size: tabletLandscape ? 14 : 12.sp,
           ),
-          SizedBox(width: 4.w),
+          SizedBox(width: tabletLandscape ? 4 : 4.w),
           AppText(
             _formatDuration(durationMinutes),
             style: font10w700.copyWith(
-              color: isPlaying ? AppLightColors.primary : const Color(0xFF9CA3AF),
+              fontSize: tabletLandscape ? 12 : null,
+              color:
+                  isPlaying ? AppLightColors.primary : const Color(0xFF9CA3AF),
             ),
           ),
         ],
@@ -48,7 +52,10 @@ class CourseLessonDuration extends StatelessWidget {
     } else {
       return AppText(
         _formatDuration(durationMinutes),
-        style: font12w500.copyWith(color: const Color(0xFF9CA3AF)),
+        style: font12w500.copyWith(
+          fontSize: tabletLandscape ? 13 : null,
+          color: const Color(0xFF9CA3AF),
+        ),
       );
     }
   }

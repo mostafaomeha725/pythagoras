@@ -5,7 +5,8 @@ import 'package:pythagoras/features/profile/presentation/cubit/contact_us/contac
 class ContactUsCubit extends Cubit<ContactUsState> {
   final SubmitContactUsUseCase submitContactUsUseCase;
 
-  ContactUsCubit({required this.submitContactUsUseCase}) : super(ContactUsInitial());
+  ContactUsCubit({required this.submitContactUsUseCase})
+    : super(ContactUsInitial());
 
   Future<void> submit({
     required String name,

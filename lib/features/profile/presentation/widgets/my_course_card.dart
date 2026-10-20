@@ -48,4 +48,3 @@ class MyCourseCard extends StatelessWidget {
     );
   }
 }
-

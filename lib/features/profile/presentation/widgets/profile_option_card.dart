@@ -12,9 +12,15 @@ class ProfileOptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color primaryColor = option.isDestructive ? const Color(0xFFEF4444) : const Color(0xFF1E1E2D);
-    final Color iconColor = option.isDestructive ? const Color(0xFFEF4444) : const Color(0xFF832561);
-    final Color bgColor = option.isDestructive ? const Color(0xFFFEF2F2) : const Color(0xFFFDF4FA);
+    final Color primaryColor = option.isDestructive
+        ? const Color(0xFFEF4444)
+        : const Color(0xFF1E1E2D);
+    final Color iconColor = option.isDestructive
+        ? const Color(0xFFEF4444)
+        : const Color(0xFF832561);
+    final Color bgColor = option.isDestructive
+        ? const Color(0xFFFEF2F2)
+        : const Color(0xFFFDF4FA);
 
     return BounceIt(
       onPressed: option.onTap ?? () {},
@@ -30,40 +36,42 @@ class ProfileOptionCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             // Icon and Texts (Right side in RTL)
-            Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(10.w),
-                  decoration: BoxDecoration(
-                    color: bgColor,
-                    borderRadius: BorderRadius.circular(12.r),
-                  ),
-                  child: Icon(
-                    option.icon,
-                    color: iconColor,
-                    size: 24.sp,
-                  ),
-                ),
-                SizedBox(width: 16.w),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AppText(
-                      option.title,
-                      style: font16w700.copyWith(color: primaryColor),
+            Expanded(
+              child: Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(10.w),
+                    decoration: BoxDecoration(
+                      color: bgColor,
+                      borderRadius: BorderRadius.circular(12.r),
                     ),
-                    if (option.subtitle != null) ...[
-                      SizedBox(height: 4.h),
-                      AppText(
-                        option.subtitle!,
-                        style: font12w500.copyWith(color: const Color(0xFF6B7280)),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
+                    child: Icon(option.icon, color: iconColor, size: 24.sp),
+                  ),
+                  SizedBox(width: 16.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppText(
+                          option.title,
+                          style: font16w700.copyWith(color: primaryColor),
+                        ),
+                        if (option.subtitle != null) ...[
+                          SizedBox(height: 4.h),
+                          AppText(
+                            option.subtitle!,
+                            style: font12w500.copyWith(
+                              color: const Color(0xFF6B7280),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-            
+
             // Left Arrow (Chevron)
             Icon(
               Icons.arrow_forward_ios_rounded,

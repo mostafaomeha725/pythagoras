@@ -53,24 +53,27 @@ class CourseResourcesScreenBody extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   // Right Side
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      AppText(
-                        'موارد المقرر',
-                        style: font24w700.copyWith(
-                          color: const Color(0xFF1E1E2D),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppText(
+                          'موارد المقرر',
+                          style: font24w700.copyWith(
+                            color: const Color(0xFF1E1E2D),
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 4.h),
-                      AppText(
-                        'كل ما تحتاجه للمذاكرة',
-                        style: font12w500.copyWith(
-                          color: const Color(0xFF6B7280),
+                        SizedBox(height: 4.h),
+                        AppText(
+                          'كل ما تحتاجه للمذاكرة',
+                          style: font12w500.copyWith(
+                            color: const Color(0xFF6B7280),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                  SizedBox(width: 8.w),
                   // Left Side Pill
                   Container(
                     padding: EdgeInsets.symmetric(
@@ -109,10 +112,13 @@ class CourseResourcesScreenBody extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  AppText(
-                    'الملفات التعليمية',
-                    style: font20w700.copyWith(color: const Color(0xFF1E1E2D)),
+                  Expanded(
+                    child: AppText(
+                      'الملفات التعليمية',
+                      style: font20w700.copyWith(color: const Color(0xFF1E1E2D)),
+                    ),
                   ),
+                  SizedBox(width: 8.w),
                   Container(
                     padding: EdgeInsets.symmetric(
                       horizontal: 12.w,

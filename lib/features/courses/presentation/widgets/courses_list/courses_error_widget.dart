@@ -13,9 +13,6 @@ class CoursesErrorWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return NoInternetWidget(
-      message: message,
-      onRetry: onRetry,
-    );
+    return NoInternetWidget(message: message, onRetry: onRetry);
   }
 }

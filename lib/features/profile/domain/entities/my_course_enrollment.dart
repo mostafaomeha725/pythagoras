@@ -39,9 +39,5 @@ class EnrolledInstructor {
   final String name;
   final String? image;
 
-  EnrolledInstructor({
-    required this.id,
-    required this.name,
-    this.image,
-  });
+  EnrolledInstructor({required this.id, required this.name, this.image});
 }

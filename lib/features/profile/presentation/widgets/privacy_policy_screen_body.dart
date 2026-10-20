@@ -6,29 +6,45 @@ import 'package:pythagoras/features/profile/presentation/widgets/privacy_policy_
 import 'package:pythagoras/features/profile/presentation/widgets/privacy_policy_sections_data.dart';
 import 'package:pythagoras/features/profile/presentation/widgets/privacy_policy_web_card.dart';
 
+import 'package:pythagoras/core/utils/responsive_helper.dart';
+import 'package:pythagoras/features/profile/presentation/widgets/privacy_policy_tablet_landscape.dart';
+
 class PrivacyPolicyScreenBody extends StatelessWidget {
   const PrivacyPolicyScreenBody({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
-      physics: const BouncingScrollPhysics(),
-      children: [
-        const PrivacyPolicyHeaderBanner(),
-        SizedBox(height: 16.h),
-        const PrivacyPolicyWebCard(),
-        SizedBox(height: 4.h),
-        ...PrivacyPolicySectionsData.sections.map(
-          (section) => PrivacyPolicySectionCard(
-            title: section.title,
-            icon: section.icon,
-            points: section.points,
-            note: section.note,
-          ),
-        ),
-        const PrivacyPolicyContactCard(),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isTablet =
+            ResponsiveHelper.isTablet(context) ||
+            (constraints.maxWidth >= 900 &&
+                constraints.maxWidth > constraints.maxHeight);
+
+        if (isTablet) {
+          return const PrivacyPolicyTabletLandscape();
+        }
+
+        return ListView(
+          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
+          physics: const BouncingScrollPhysics(),
+          children: [
+            const PrivacyPolicyHeaderBanner(),
+            SizedBox(height: 16.h),
+            const PrivacyPolicyWebCard(),
+            SizedBox(height: 4.h),
+            ...PrivacyPolicySectionsData.sections.map(
+              (section) => PrivacyPolicySectionCard(
+                title: section.title,
+                icon: section.icon,
+                points: section.points,
+                note: section.note,
+              ),
+            ),
+            const PrivacyPolicyContactCard(),
+          ],
+        );
+      },
     );
   }
 }

@@ -55,16 +55,16 @@ class _ProfileTextFieldState extends State<ProfileTextField> {
           onChanged: widget.onChanged,
           obscureText: _obscureText,
           readOnly: widget.readOnly,
-          style: font14w500.copyWith(
-            color: const Color(0xFF1E1E2D),
-          ),
+          style: font14w500.copyWith(color: const Color(0xFF1E1E2D)),
           decoration: InputDecoration(
             hintText: widget.hint,
             hintStyle: font14w500.copyWith(color: const Color(0xFF9CA3AF)),
             suffixIcon: widget.isPassword
                 ? IconButton(
                     icon: Icon(
-                      _obscureText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                      _obscureText
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
                       color: const Color(0xFF6B7280),
                       size: 20,
                     ),

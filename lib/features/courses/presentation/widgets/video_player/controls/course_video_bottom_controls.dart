@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pythagoras/core/theme/styles.dart';
+import 'package:pythagoras/core/utils/responsive_helper.dart';
 import 'package:pythagoras/core/widgets/custom_text.dart';
 import '../adapters/course_video_adapter.dart';
 
@@ -60,11 +61,18 @@ class CourseVideoBottomControls extends StatelessWidget {
             ),
           );
 
+          final isTablet = ResponsiveHelper.isTablet(context);
+
           final timeText =
               adapter.supportsPosition && adapter.supportsDuration
                   ? AppText(
                       '${_formatDuration(adapter.position)} / ${_formatDuration(adapter.duration)}',
-                      style: font12w400.copyWith(color: Colors.white),
+                      style: isTablet
+                          ? font12w400.copyWith(
+                              color: Colors.white,
+                              fontSize: 13,
+                            )
+                          : font12w400.copyWith(color: Colors.white),
                       overflow: TextOverflow.ellipsis,
                     )
                   : const SizedBox.shrink();

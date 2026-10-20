@@ -60,11 +60,7 @@ class ContactTextField extends StatelessWidget {
                   left: 16.w,
                 ),
               ),
-              Positioned(
-                top: 12.h,
-                right: 0,
-                child: styledIcon,
-              ),
+              Positioned(top: 12.h, right: 0, child: styledIcon),
             ],
           )
         else

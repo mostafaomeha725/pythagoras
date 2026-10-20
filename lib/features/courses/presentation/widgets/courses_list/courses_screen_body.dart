@@ -12,6 +12,9 @@ import 'package:pythagoras/features/courses/presentation/widgets/courses_list/co
 import 'package:pythagoras/features/courses/presentation/widgets/filters/courses_filter_bar.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_card/course_shimmer_list.dart';
 
+import 'package:pythagoras/core/utils/responsive_helper.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/courses_list/courses_tablet_landscape.dart';
+
 class CoursesScreenBody extends StatefulWidget {
   const CoursesScreenBody({super.key});
 
@@ -22,75 +25,91 @@ class CoursesScreenBody extends StatefulWidget {
 class _CoursesScreenBodyState extends State<CoursesScreenBody> {
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: 20.w),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(height: 16.h),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isTablet =
+            ResponsiveHelper.isTablet(context) ||
+            (constraints.maxWidth >= 900 &&
+                constraints.maxWidth > constraints.maxHeight);
 
-            // Header
-            const CoursePageHeader(title: 'الدورات'),
+        if (isTablet) {
+          final isPortrait = ResponsiveHelper.isPortrait(context, constraints);
+          return CoursesTabletLandscape(bottomPadding: isPortrait ? 110 : 24);
+        }
 
-            SizedBox(height: 24.h),
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(horizontal: 20.w),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(height: 16.h),
 
-            // Filters
-            const CoursesFilterBar(),
+                // Header
+                const CoursePageHeader(title: 'الدورات'),
 
-            SizedBox(height: 24.h),
+                SizedBox(height: 24.h),
 
-            // Courses List
-            BlocBuilder<CoursesListCubit, CoursesListState>(
-              builder: (context, state) {
-                if (state is CoursesListLoading) {
-                  return const CourseShimmerList(count: 6);
-                } else if (state is CoursesListError) {
-                  return CoursesErrorWidget(
-                    message: state.message,
-                    onRetry: () =>
-                        context.read<CoursesListCubit>().fetchCourses(),
-                  );
-                } else if (state is CoursesListLoaded) {
-                  if (state.courses.isEmpty) {
-                    return const EmptyStateWidget(
-                      message: 'لا توجد دورات متاحة حالياً',
-                      subMessage: 'جرب تغيير الفلتر أو حاول في وقت لاحق',
-                      icon: Icons.school_outlined,
-                    );
-                  }
+                // Filters
+                const CoursesFilterBar(),
 
-                  return ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: state.courses.length,
-                    separatorBuilder: (context, index) =>
-                        SizedBox(height: 16.h),
-                    itemBuilder: (context, index) {
-                      final course = state.courses[index];
-                      return CourseCard(
-                        course: course,
-                        onTap: () => context.push(
-                          Routes.courseDetailScreen,
-                          extra: {
-                            'id': course.id, 
-                            'title': course.title, 
-                            'isEnrolled': course.isEnrolled,
-                          },
-                        ),
+                SizedBox(height: 24.h),
+
+                // Courses List
+                BlocBuilder<CoursesListCubit, CoursesListState>(
+                  builder: (context, state) {
+                    if (state is CoursesListLoading) {
+                      return const CourseShimmerList(count: 6);
+                    } else if (state is CoursesListError) {
+                      return CoursesErrorWidget(
+                        message: state.message,
+                        onRetry: () =>
+                            context.read<CoursesListCubit>().fetchCourses(),
                       );
-                    },
-                  );
-                }
+                    } else if (state is CoursesListLoaded) {
+                      if (state.courses.isEmpty) {
+                        return const EmptyStateWidget(
+                          message: 'لا توجد دورات متاحة حالياً',
+                          subMessage: 'جرب تغيير الفلتر أو حاول في وقت لاحق',
+                          icon: Icons.school_outlined,
+                        );
+                      }
 
-                return const SizedBox.shrink();
-              },
+                      return ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: state.courses.length,
+                        separatorBuilder: (context, index) =>
+                            SizedBox(height: 16.h),
+                        itemBuilder: (context, index) {
+                          final course = state.courses[index];
+                          return CourseCard(
+                            course: course,
+                            onTap: () => context.push(
+                              Routes.courseDetailScreen,
+                              extra: {
+                                'id': course.id,
+                                'title': course.title,
+                                'isEnrolled': course.isEnrolled,
+                              },
+                            ),
+                          );
+                        },
+                      );
+                    }
+
+                    return const SizedBox.shrink();
+                  },
+                ),
+
+                SizedBox(
+                  height: 120.h,
+                ), // Extra padding for Bottom Navigation Bar
+              ],
             ),
-
-            SizedBox(height: 120.h), // Extra padding for Bottom Navigation Bar
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

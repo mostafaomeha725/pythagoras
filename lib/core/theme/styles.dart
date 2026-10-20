@@ -58,6 +58,8 @@ TextStyle get font16w600 =>
 
 TextStyle get font16w700 =>
     GoogleFonts.rubik(fontWeight: FontWeight.w700, fontSize: 16.sp);
+TextStyle get font17w700 =>
+    GoogleFonts.rubik(fontWeight: FontWeight.w700, fontSize: 17.sp);
 
 TextStyle get font18w300 =>
     GoogleFonts.rubik(fontWeight: FontWeight.w300, fontSize: 18.sp);

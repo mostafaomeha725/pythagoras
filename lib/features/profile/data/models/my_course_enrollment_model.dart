@@ -11,12 +11,12 @@ class MyCourseEnrollmentModel extends MyCourseEnrollment {
 
   factory MyCourseEnrollmentModel.fromJson(Map<String, dynamic> json) {
     return MyCourseEnrollmentModel(
-      enrollmentId: json['enrollment_id'] is int 
-          ? json['enrollment_id'] 
+      enrollmentId: json['enrollment_id'] is int
+          ? json['enrollment_id']
           : int.tryParse(json['enrollment_id']?.toString() ?? '') ?? 0,
       status: json['status'] ?? '',
-      progress: json['progress'] is int 
-          ? json['progress'] 
+      progress: json['progress'] is int
+          ? json['progress']
           : (double.tryParse(json['progress']?.toString() ?? '')?.toInt() ?? 0),
       startedAt: json['started_at'],
       course: EnrolledCourseModel.fromJson(json['course'] ?? {}),

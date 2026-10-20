@@ -13,6 +13,9 @@ import 'package:pythagoras/features/courses/presentation/widgets/reviews/course_
 import 'package:pythagoras/features/courses/presentation/widgets/reviews/course_add_review_form_card.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/reviews/course_reviews_shimmer.dart';
 import 'package:pythagoras/core/widgets/no_internet_widget.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/reviews/course_reviews_tablet_landscape.dart';
+
+import 'package:pythagoras/core/utils/responsive_helper.dart';
 
 class CourseReviewsScreenBody extends StatefulWidget {
   final int courseId;
@@ -38,82 +41,104 @@ class _CourseReviewsScreenBodyState extends State<CourseReviewsScreenBody> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 24.h),
-      child: Column(
-        children: [
-          CourseReviewHeaderInfo(title: widget.courseTitle),
-          SizedBox(height: 24.h),
-          CourseAddReviewFormCard(courseId: widget.courseId),
-          SizedBox(height: 32.h),
-          BlocBuilder<CourseReviewsCubit, CourseReviewsState>(
-            builder: (context, state) {
-              if (state is CourseReviewsLoading) {
-                return const CourseReviewsShimmer();
-              } else if (state is CourseReviewsError) {
-                return NoInternetWidget(
-                  message: state.message,
-                  onRetry: () => context
-                      .read<CourseReviewsCubit>()
-                      .fetchCourseReviews(widget.courseId),
-                );
-              } else if (state is CourseReviewsLoaded) {
-                final data = state.reviewsData;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isTablet =
+            ResponsiveHelper.isTablet(context) ||
+            (constraints.maxWidth >= 900 &&
+                constraints.maxWidth > constraints.maxHeight);
 
-                // Sort logic
-                List<CourseReview> displayedReviews = List.from(data.reviews);
-                if (_sortType == 'latest') {
-                  displayedReviews.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-                } else {
-                  displayedReviews.sort((a, b) => b.rating.compareTo(a.rating));
-                }
+        if (isTablet) {
+          return CourseReviewsTabletLandscape(
+            courseId: widget.courseId,
+            courseTitle: widget.courseTitle,
+          );
+        }
 
-                return Column(
-                  children: [
-                    CourseOverallRatingCard(data: data),
-                    SizedBox(height: 32.h),
-                CourseReviewsFilterHeader(
-                  totalReviews: data.totalReviews,
-                  currentSort: _sortType,
-                  onSortChanged: (type) {
-                    setState(() {
-                      _sortType = type;
-                    });
-                  },
-                ),
-                SizedBox(height: 24.h),
+        return SingleChildScrollView(
+          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 24.h),
+          child: Column(
+            children: [
+              CourseReviewHeaderInfo(title: widget.courseTitle),
+              SizedBox(height: 24.h),
+              CourseAddReviewFormCard(courseId: widget.courseId),
+              SizedBox(height: 32.h),
+              BlocBuilder<CourseReviewsCubit, CourseReviewsState>(
+                builder: (context, state) {
+                  if (state is CourseReviewsLoading) {
+                    return const CourseReviewsShimmer();
+                  } else if (state is CourseReviewsError) {
+                    return NoInternetWidget(
+                      message: state.message,
+                      onRetry: () => context
+                          .read<CourseReviewsCubit>()
+                          .fetchCourseReviews(widget.courseId),
+                    );
+                  } else if (state is CourseReviewsLoaded) {
+                    final data = state.reviewsData;
 
-                // Actual data
-                if (displayedReviews.isEmpty)
-                  Padding(
-                    padding: EdgeInsets.all(32.h),
-                    child: Text(
-                      'لا توجد تقييمات بعد.',
-                      style: font14w500.copyWith(color: Colors.grey),
-                    ),
-                  )
-                else
-                  ...displayedReviews.map(
-                    (review) => CourseReviewItemCard(
-                      name: review.userName,
-                      date: _formatDate(review.createdAt),
-                      rating: review.rating,
-                      reviewText: review.comment,
-                      helpfulCount:
-                          0, // Mock helpful count since it's not in the API
-                      imageUrl: review.userAvatarUrl ?? '',
-                    ),
-                  ),
+                    // Sort logic
+                    List<CourseReview> displayedReviews = List.from(
+                      data.reviews,
+                    );
+                    if (_sortType == 'latest') {
+                      displayedReviews.sort(
+                        (a, b) => b.createdAt.compareTo(a.createdAt),
+                      );
+                    } else {
+                      displayedReviews.sort(
+                        (a, b) => b.rating.compareTo(a.rating),
+                      );
+                    }
 
-                SizedBox(height: 40.h),
-              ],
-            );
-              }
-              return const SizedBox.shrink();
-            },
+                    return Column(
+                      children: [
+                        CourseOverallRatingCard(data: data),
+                        SizedBox(height: 32.h),
+                        CourseReviewsFilterHeader(
+                          totalReviews: data.totalReviews,
+                          currentSort: _sortType,
+                          onSortChanged: (type) {
+                            setState(() {
+                              _sortType = type;
+                            });
+                          },
+                        ),
+                        SizedBox(height: 24.h),
+
+                        // Actual data
+                        if (displayedReviews.isEmpty)
+                          Padding(
+                            padding: EdgeInsets.all(32.h),
+                            child: Text(
+                              'لا توجد تقييمات بعد.',
+                              style: font14w500.copyWith(color: Colors.grey),
+                            ),
+                          )
+                        else
+                          ...displayedReviews.map(
+                            (review) => CourseReviewItemCard(
+                              name: review.userName,
+                              date: _formatDate(review.createdAt),
+                              rating: review.rating,
+                              reviewText: review.comment,
+                              helpfulCount:
+                                  0, // Mock helpful count since it's not in the API
+                              imageUrl: review.userAvatarUrl ?? '',
+                            ),
+                          ),
+
+                        SizedBox(height: 40.h),
+                      ],
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

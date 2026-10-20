@@ -88,10 +88,13 @@ class PrivacyPolicyHeaderBanner extends StatelessWidget {
                       size: 14.sp,
                     ),
                     SizedBox(width: 6.w),
-                    AppText(
-                      'آخر تحديث: ١٤ أكتوبر ٢٠٢٦',
-                      style: font12w500.copyWith(
-                        color: Colors.white.withValues(alpha: 0.95),
+                    Flexible(
+                      child: AppText(
+                        'آخر تحديث: ١٤ أكتوبر ٢٠٢٦',
+                        style: font12w500.copyWith(
+                          color: Colors.white.withValues(alpha: 0.95),
+                        ),
+                        maxLines: 1,
                       ),
                     ),
                   ],
@@ -101,8 +104,10 @@ class PrivacyPolicyHeaderBanner extends StatelessWidget {
                 onPressed: () =>
                     UrlLauncherHelper.openUrl(AppStrings.privacyPolicyWebUrl),
                 child: Container(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 12.w,
+                    vertical: 6.h,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8.r),

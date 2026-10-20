@@ -8,11 +8,7 @@ class ContactInfoCard extends StatelessWidget {
   final String text;
   final IconData icon;
 
-  const ContactInfoCard({
-    super.key,
-    required this.text,
-    required this.icon,
-  });
+  const ContactInfoCard({super.key, required this.text, required this.icon});
 
   @override
   Widget build(BuildContext context) {

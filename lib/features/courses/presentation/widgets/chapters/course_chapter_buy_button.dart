@@ -8,6 +8,7 @@ class CourseChapterBuyButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool isEnrolled;
   final String requestStatus;
+  final bool tabletLandscape;
 
   const CourseChapterBuyButton({
     super.key,
@@ -16,6 +17,7 @@ class CourseChapterBuyButton extends StatelessWidget {
     this.onPressed,
     required this.isEnrolled,
     this.requestStatus = 'not_requested',
+    this.tabletLandscape = false,
   });
 
   @override
@@ -27,16 +29,21 @@ class CourseChapterBuyButton extends StatelessWidget {
         ? 'طلب الحصة'
         : 'طلب الحصة ($parsedPrice $currencyLabel)';
 
+    final buttonText = isEnrolled
+        ? 'عرض الحصة'
+        : (requestStatus == 'pending' ? 'قيد الانتظار' : requestText);
+
     return Padding(
-      padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 16.h),
+      padding: tabletLandscape
+          ? const EdgeInsets.fromLTRB(16, 10, 16, 14)
+          : EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 16.h),
       child: AppButton(
-        text: isEnrolled
-            ? 'عرض الحصة'
-            : (requestStatus == 'pending' ? 'قيد الانتظار' : requestText),
+        text: buttonText,
         onPressed: requestStatus == 'pending' ? () {} : (onPressed ?? () {}),
-        radius: 12.r,
-        textSize: 15.sp,
-        height: 48.h,
+        radius: tabletLandscape ? 12 : 12.r,
+        textSize: tabletLandscape ? 15 : 15.sp,
+        height: tabletLandscape ? 48 : 48.h,
+        contentPadding: tabletLandscape ? EdgeInsets.zero : null,
       ),
     );
   }

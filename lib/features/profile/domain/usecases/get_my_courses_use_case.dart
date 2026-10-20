@@ -8,7 +8,9 @@ class GetMyCoursesUseCase {
 
   GetMyCoursesUseCase(this.repository);
 
-  Future<Either<Failure, List<MyCourseEnrollment>>> call({bool fromCache = false}) {
+  Future<Either<Failure, List<MyCourseEnrollment>>> call({
+    bool fromCache = false,
+  }) {
     return repository.getMyCourses(fromCache: fromCache);
   }
 }

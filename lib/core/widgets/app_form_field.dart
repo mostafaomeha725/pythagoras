@@ -37,6 +37,8 @@ class AppFormField extends StatefulWidget {
     this.readOnly = false,
     this.autofillHints,
     this.contentPadding,
+    this.textStyle,
+    this.hintStyle,
   });
 
   final TextEditingController controller;
@@ -64,6 +66,8 @@ class AppFormField extends StatefulWidget {
   final bool readOnly;
   final Iterable<String>? autofillHints;
   final EdgeInsetsGeometry? contentPadding;
+  final TextStyle? textStyle;
+  final TextStyle? hintStyle;
   final Color? fillColor;
   final Color? borderColor;
 
@@ -80,11 +84,13 @@ class _AppFormFieldState extends State<AppFormField> {
       obscureText: widget.obsecureText,
       controller: widget.controller,
       keyboardType: widget.keyboardType,
-      style: font14w500.copyWith(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? AppDarkColors.offwhite
-            : const Color(0xFF1E1E2D), // Dark text for light mode
-      ),
+      style:
+          widget.textStyle ??
+          font14w500.copyWith(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppDarkColors.offwhite
+                : const Color(0xFF1E1E2D), // Dark text for light mode
+          ),
       onChanged: (value) {
         setState(() {});
         widget.onChanged?.call(value);
@@ -104,11 +110,13 @@ class _AppFormFieldState extends State<AppFormField> {
       decoration: InputDecoration(
         border: InputBorder.none,
         hintText: widget.hintText,
-        hintStyle: font14w500.copyWith(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? AppDarkColors.offwhite
-              : Colors.grey,
-        ),
+        hintStyle:
+            widget.hintStyle ??
+            font14w500.copyWith(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? AppDarkColors.offwhite
+                  : Colors.grey,
+            ),
         filled: true,
         fillColor: widget.fillColor ?? Colors.white,
         contentPadding: widget.contentPadding ?? EdgeInsets.all(15.h),

@@ -1,7 +1,7 @@
 class AppStrings {
-  static const String baseUrl = 'https://neudrosi-pythagoras.com/backend/';
-  // static const String baseUrl =
-  //     'https://optima-software-solutions.com/pythagoras/';
+  // static const String baseUrl = 'https://neudrosi-pythagoras.com/backend/';
+  static const String baseUrl =
+      'https://optima-software-solutions.com/pythagoras/';
 
   static const String notificationHubUrl =
       'https://primefit.runasp.net/hubs/notifications';

@@ -8,12 +8,14 @@ class CourseLessonInfo extends StatelessWidget {
   final String title;
   final bool isPlaying;
   final bool isCompleted;
+  final bool tabletLandscape;
 
   const CourseLessonInfo({
     super.key,
     required this.title,
     required this.isPlaying,
     required this.isCompleted,
+    this.tabletLandscape = false,
   });
 
   @override
@@ -24,21 +26,28 @@ class CourseLessonInfo extends StatelessWidget {
         AppText(
           title,
           style: (isPlaying ? font14w700 : font14w600).copyWith(
+            fontSize: tabletLandscape ? 15 : null,
             color: isPlaying ? AppLightColors.primary : const Color(0xFF1E1E2D),
           ),
           maxLines: 2,
         ),
         if (isPlaying) ...[
-          SizedBox(height: 4.h),
+          SizedBox(height: tabletLandscape ? 4 : 4.h),
           AppText(
             'يُعرض الان',
-            style: font10w700.copyWith(color: AppLightColors.primary),
+            style: font10w700.copyWith(
+              fontSize: tabletLandscape ? 11 : null,
+              color: AppLightColors.primary,
+            ),
           ),
         ] else if (isCompleted) ...[
-          SizedBox(height: 4.h),
+          SizedBox(height: tabletLandscape ? 4 : 4.h),
           AppText(
             'مكتمل',
-            style: font10w700.copyWith(color: const Color(0xFF10B981)),
+            style: font10w700.copyWith(
+              fontSize: tabletLandscape ? 11 : null,
+              color: const Color(0xFF10B981),
+            ),
           ),
         ],
       ],

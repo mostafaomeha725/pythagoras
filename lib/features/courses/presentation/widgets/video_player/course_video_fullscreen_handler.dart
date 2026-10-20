@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:pythagoras/core/utils/responsive_helper.dart';
 import 'package:pythagoras/core/utils/system_ui_manager.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/video_player/course_video_error_overlay.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/video_player/course_video_player_manager.dart';
@@ -13,19 +14,39 @@ class CourseVideoFullscreenHandler {
     required BuildContext context,
     required CourseVideoPlayerManager manager,
   }) {
-    final bool wasPlaying = manager.adapter?.isPlaying ?? false;
+    if (manager.isExitingFullScreen) return;
+    manager.isExitingFullScreen = true;
 
-    // 1. Rotate device back to Portrait WHILE STILL in the unrestricted Fullscreen Route.
-    // This prevents the Portrait Route's Column from overflowing during the orientation change.
-    SystemUiManager.exitFullscreen().then((_) {
-      // 2. Wait for the engine to complete the layout in Portrait mode.
+    final bool wasPlaying = manager.adapter?.isPlaying ?? false;
+    final bool isTablet = manager.wasTablet;
+    final Orientation? targetOrientation = manager.preFullscreenOrientation;
+
+    // 1. Set orientation and system UI mode while still in the unrestricted Fullscreen Route.
+    // On tablet landscape, this preserves landscape and does NOT force portrait.
+    // On tablet portrait, this returns to portrait.
+    // On mobile, this preserves existing mobile behavior.
+    SystemUiManager.exitFullscreen(
+      isTablet: isTablet,
+      targetOrientation: targetOrientation,
+    ).then((_) {
+      // 2. Wait for the engine to complete layout.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!context.mounted) return;
-        // 3. Now that the screen is safely Portrait, relinquish the GlobalKey and pop.
+        if (!context.mounted) {
+          manager.isExitingFullScreen = false;
+          return;
+        }
+        // 3. Relinquish the GlobalKey and pop the fullscreen route.
         if (manager.isFullScreen) {
           manager.exitFullScreen();
         }
         Navigator.of(context, rootNavigator: true).pop();
+
+        if (isTablet) {
+          // Unlock orientations on tablet so the user can freely rotate via sensor
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            SystemUiManager.unlockOrientations();
+          });
+        }
 
         bool isIOS = !kIsWeb && Platform.isIOS;
         if (isIOS && wasPlaying) {
@@ -48,6 +69,11 @@ class CourseVideoFullscreenHandler {
       if (wasPlaying) {
         manager.adapter?.pause();
       }
+
+      // Record device type and pre-fullscreen orientation before pushing route
+      manager.wasTablet = ResponsiveHelper.isTablet(context);
+      manager.preFullscreenOrientation = MediaQuery.orientationOf(context);
+      manager.isExitingFullScreen = false;
 
       // 1. Sync state change + route push FIRST.
       // This safely extracts the GlobalKey from the restrictive Portrait Route

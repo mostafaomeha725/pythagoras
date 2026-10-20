@@ -10,47 +10,85 @@ import 'package:pythagoras/core/widgets/bouncing_widgets.dart';
 import 'package:pythagoras/core/widgets/custom_text.dart';
 
 class LoginHeader extends StatelessWidget {
-  const LoginHeader({super.key});
+  final bool showBackButton;
+  final double? logoHeight;
+  final TextStyle? titleStyle;
+  final TextStyle? subtitleStyle;
+
+  const LoginHeader({
+    super.key,
+    this.showBackButton = true,
+    this.logoHeight,
+    this.titleStyle,
+    this.subtitleStyle,
+  });
+
+  static Widget backButton(
+    BuildContext context, {
+    double size = 36,
+    double iconSize = 16,
+    double? borderRadius,
+    VoidCallback? onTap,
+  }) {
+    return BounceIt(
+      child: InkWell(
+        onTap:
+            onTap ??
+            () {
+              if (context.canPop()) {
+                context.pop(false);
+              } else {
+                context.go(Routes.mainNavigationScreen);
+              }
+            },
+        borderRadius: BorderRadius.circular(borderRadius ?? size / 2),
+        child: Container(
+          width: size,
+          height: size,
+          decoration: const BoxDecoration(
+            color: Color(0xFFFCEEFA),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Icon(
+              Icons.arrow_back_ios_new,
+              color: AppLightColors.primary,
+              size: iconSize,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(height: 16.h),
-
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: BounceIt(
-            child: InkWell(
-              onTap: () {
-                context.go(Routes.mainNavigationScreen);
-              },
-              borderRadius: BorderRadius.circular(50.r),
-              child: Container(
-                width: 36.w,
-                height: 36.w,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFCEEFA),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Icon(
-                    Icons.arrow_back_ios_new,
-                    color: AppLightColors.primary,
-                    size: 16.sp,
-                  ),
-                ),
-              ),
+        if (showBackButton) ...[
+          SizedBox(height: 16.h),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: backButton(
+              context,
+              size: 36.w,
+              iconSize: 16.sp,
+              borderRadius: 50.r,
             ),
           ),
-        ),
-        SizedBox(height: 8.h),
+          SizedBox(height: 8.h),
+        ],
 
         // Logo
         Align(
           alignment: Alignment.center,
-          child: AppAsset(assetName: Assets.logoapp, height: 140.h),
+          child: AppAsset(
+            assetName: Assets.logoapp,
+            height: logoHeight ?? 140.h,
+          ),
         ),
 
         SizedBox(height: 22.h),
@@ -58,7 +96,8 @@ class LoginHeader extends StatelessWidget {
         // Heading
         AppText(
           "مرحباً بك مجدداً",
-          style: font24w800.copyWith(color: const Color(0xFF1E1E2D)),
+          style:
+              titleStyle ?? font24w800.copyWith(color: const Color(0xFF1E1E2D)),
           alignment: AlignmentDirectional.center,
         ),
 
@@ -67,7 +106,9 @@ class LoginHeader extends StatelessWidget {
         // Subtitle
         AppText(
           "الرجاء إدخال بياناتك لتسجيل الدخول إلى حسابك",
-          style: font14w500.copyWith(color: const Color(0xFF6B7280)),
+          style:
+              subtitleStyle ??
+              font14w500.copyWith(color: const Color(0xFF6B7280)),
           alignment: AlignmentDirectional.center,
         ),
       ],

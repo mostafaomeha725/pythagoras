@@ -12,6 +12,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pythagoras/features/profile/presentation/widgets/discard_changes_dialog.dart';
 import 'package:pythagoras/features/profile/presentation/widgets/save_profile_button.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_app_bar.dart';
+import 'package:pythagoras/features/profile/presentation/widgets/edit_profile_tablet_landscape.dart';
 
 class EditProfileScreenBody extends StatefulWidget {
   final UserProfile? userProfile;
@@ -85,60 +86,84 @@ class _EditProfileScreenBodyState extends State<EditProfileScreenBody> {
         if (didPop) return;
         _onBackPress();
       },
-      child: Scaffold(
-        appBar: CourseDetailAppBar(
-          title: 'تعديل الملف الشخصي',
-          onBack: _onBackPress,
-        ),
-        body: SafeArea(
-          child: BlocConsumer<EditProfileCubit, EditProfileState>(
-            listener: (context, state) {
-              if (state is EditProfileLoading) {
-                showLoading();
-              } else {
-                hideLoading();
-                if (state is EditProfileFailure) {
-                  showError(state.message);
-                } else if (state is EditProfileSuccess) {
-                  showSuccess('تم حفظ التغييرات بنجاح');
-                  context.pop(true);
-                }
-              }
-            },
-            builder: (context, state) {
-              return SingleChildScrollView(
-                padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 32.h),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Avatar
-                    EditProfileAvatar(
-                      profilePictureUrl: widget.userProfile?.profilePictureUrl,
-                    ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isTabletLandscape =
+              constraints.maxWidth >= 900 &&
+              constraints.maxHeight >= 600 &&
+              constraints.maxWidth > constraints.maxHeight;
 
-                    SizedBox(height: 32.h),
-
-                    // Form Fields
-                    EditProfileForm(
+          return Scaffold(
+            appBar: isTabletLandscape
+                ? null
+                : CourseDetailAppBar(
+                    title: 'تعديل الملف الشخصي',
+                    onBack: _onBackPress,
+                  ),
+            body: SafeArea(
+              child: BlocConsumer<EditProfileCubit, EditProfileState>(
+                listener: (context, state) {
+                  if (state is EditProfileLoading) {
+                    showLoading();
+                  } else {
+                    hideLoading();
+                    if (state is EditProfileFailure) {
+                      showError(state.message);
+                    } else if (state is EditProfileSuccess) {
+                      showSuccess('تم حفظ التغييرات بنجاح');
+                      context.pop(true);
+                    }
+                  }
+                },
+                builder: (context, state) {
+                  if (isTabletLandscape) {
+                    return EditProfileTabletLandscape(
                       userProfile: widget.userProfile,
                       nameController: nameController,
                       passwordController: passwordController,
-                    ),
+                      onBack: _onBackPress,
+                    );
+                  }
 
-                    SizedBox(height: 40.h),
-
-                    // Save Button
-                    SaveProfileButton(
-                      userProfile: widget.userProfile,
-                      nameController: nameController,
-                      passwordController: passwordController,
+                  return SingleChildScrollView(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 24.w,
+                      vertical: 32.h,
                     ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Avatar
+                        EditProfileAvatar(
+                          profilePictureUrl:
+                              widget.userProfile?.profilePictureUrl,
+                        ),
+
+                        SizedBox(height: 32.h),
+
+                        // Form Fields
+                        EditProfileForm(
+                          userProfile: widget.userProfile,
+                          nameController: nameController,
+                          passwordController: passwordController,
+                        ),
+
+                        SizedBox(height: 40.h),
+
+                        // Save Button
+                        SaveProfileButton(
+                          userProfile: widget.userProfile,
+                          nameController: nameController,
+                          passwordController: passwordController,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        },
       ),
     );
   }
