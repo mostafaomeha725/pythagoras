@@ -69,17 +69,16 @@ class LoginHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (showBackButton) ...[
-          SizedBox(height: 16.h),
           Align(
-            alignment: AlignmentDirectional.centerStart,
+            alignment: AlignmentDirectional.topStart,
             child: backButton(
               context,
-              size: 36.w,
-              iconSize: 16.sp,
+              size: 38.w,
+              iconSize: 18.sp,
               borderRadius: 50.r,
             ),
           ),
-          SizedBox(height: 8.h),
+          SizedBox(height: 12.h),
         ],
 
         // Logo

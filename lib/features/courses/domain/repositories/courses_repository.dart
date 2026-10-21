@@ -35,6 +35,10 @@ abstract class CoursesRepository {
   });
   Future<Either<Failure, String>> requestCourse(int courseId);
   Future<Either<Failure, String>> requestChapter(int chapterId);
+
+  /// iOS-only: direct enrollment without a WhatsApp redirect.
+  Future<Either<Failure, String>> requestCourseDirect(int courseId);
+  Future<Either<Failure, String>> requestChapterDirect(int chapterId);
   Future<Either<Failure, List<CourseLesson>>> getChapterVideos(
     int chapterId, {
     bool fromCache = false,

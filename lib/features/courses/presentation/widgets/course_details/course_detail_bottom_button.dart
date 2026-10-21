@@ -12,6 +12,7 @@ import 'package:pythagoras/features/courses/presentation/cubit/course_details/co
 import 'package:pythagoras/features/courses/presentation/cubit/request_enrollment/request_enrollment_cubit.dart';
 import 'package:pythagoras/core/widgets/custom_button.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_detail.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_cubit.dart';
 
 class CourseDetailBottomButton extends StatelessWidget {
   final CourseDetail course;
@@ -41,15 +42,23 @@ class CourseDetailBottomButton extends StatelessWidget {
                 // Refresh global and local data without auto-purchasing
                 context.read<ProfileCubit>().getAccountInfo();
                 context.read<CoursesListCubit>().fetchCourses();
-                context.read<CourseDetailsCubit>().fetchCourseDetails(course.id);
+                context.read<CourseDetailsCubit>().fetchCourseDetails(
+                  course.id,
+                );
               }
               return;
             }
 
-            context.read<RequestEnrollmentCubit>().requestCourse(
-              course.id,
-              courseTitle: course.title,
-            );
+            // ── iOS: direct enrollment (no WhatsApp redirect) ──
+            if (Theme.of(context).platform == TargetPlatform.iOS) {
+              context.read<DirectRequestCubit>().requestCourse(course.id);
+            } else {
+              // ── Android: WhatsApp redirect flow ──
+              context.read<RequestEnrollmentCubit>().requestCourse(
+                course.id,
+                courseTitle: course.title,
+              );
+            }
           },
           radius: 14.r,
           height: 52.h,

@@ -281,6 +281,52 @@ class CoursesRepositoryImpl implements CoursesRepository {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // iOS-only: direct enrollment (no WhatsApp redirect)
+  // ---------------------------------------------------------------------------
+
+  @override
+  Future<Either<Failure, String>> requestCourseDirect(int courseId) async {
+    try {
+      final response = await networkService.postData(
+        endPoint: EndPoints.requestCourseDirect,
+        data: {'courseId': courseId},
+      );
+
+      return response.fold((failure) => Left(failure), (data) {
+        final message = data?['message']?.toString();
+        if (message != null && message.isNotEmpty) {
+          return Right(message);
+        } else {
+          return Left(Failure('فشل في طلب الدورة'));
+        }
+      });
+    } catch (e) {
+      return Left(Failure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, String>> requestChapterDirect(int chapterId) async {
+    try {
+      final response = await networkService.postData(
+        endPoint: EndPoints.requestChapterDirect,
+        data: {'chapterId': chapterId},
+      );
+
+      return response.fold((failure) => Left(failure), (data) {
+        final message = data?['message']?.toString();
+        if (message != null && message.isNotEmpty) {
+          return Right(message);
+        } else {
+          return Left(Failure('فشل في طلب الحصة'));
+        }
+      });
+    } catch (e) {
+      return Left(Failure(e.toString()));
+    }
+  }
+
   @override
   Future<Either<Failure, List<CourseLesson>>> getChapterVideos(
     int chapterId, {

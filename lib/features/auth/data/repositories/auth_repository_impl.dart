@@ -7,6 +7,7 @@ import 'package:pythagoras/core/network/endpoints.dart';
 import 'package:pythagoras/core/network/network_service.dart';
 import 'package:pythagoras/core/cache/hive_boxes.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:pythagoras/features/auth/domain/entities/register_response.dart';
 import 'package:pythagoras/features/auth/domain/repositories/auth_repository.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
@@ -77,6 +78,129 @@ class AuthRepositoryImpl implements AuthRepository {
         return const Right(null);
       } catch (e) {
         debugPrint('🔴 AuthRepositoryImpl.login error: $e');
+        return Left(Failure(e.toString()));
+      }
+    });
+  }
+
+  @override
+  Future<Either<Failure, RegisterResponse>> register({
+    required String name,
+    required String phone,
+    required String password,
+    required int classId,
+    String type = 'student',
+  }) async {
+    final response = await networkService.postData(
+      endPoint: EndPoints.register,
+      data: {
+        "name": name,
+        "phone": phone,
+        "password": password,
+        "class_id": classId,
+        "type": type,
+      },
+    );
+
+    return await response.fold<
+      Future<Either<Failure, RegisterResponse>>
+    >((failure) async => Left(failure), (data) async {
+      try {
+        if (data is! Map<String, dynamic>) {
+          return const Left(Failure('استجابة غير متوقعة من السيرفر'));
+        }
+
+        final success = data['success'];
+        if (success == false) {
+          final msg = data['message']?.toString() ?? 'فشل إنشاء الحساب';
+          return Left(Failure(msg));
+        }
+
+        final message = data['message']?.toString() ?? 'تم إنشاء الحساب بنجاح';
+        final dataMap = data['data'] is Map<String, dynamic>
+            ? data['data'] as Map<String, dynamic>
+            : (data['user'] is Map<String, dynamic> ? data : null);
+
+        // Extract token from all possible locations
+        String? token;
+        if (dataMap != null) {
+          token =
+              (dataMap['token'] ??
+                      dataMap['access_token'] ??
+                      dataMap['authorisation']?['token'])
+                  as String?;
+        }
+        token ??=
+            (data['token'] ??
+                    data['access_token'] ??
+                    data['authorisation']?['token'])
+                as String?;
+
+        Map<String, dynamic>? user;
+        if (dataMap != null && dataMap['user'] is Map<String, dynamic>) {
+          user = dataMap['user'] as Map<String, dynamic>;
+        } else if (data['user'] is Map<String, dynamic>) {
+          user = data['user'] as Map<String, dynamic>;
+        } else if (dataMap != null) {
+          user = dataMap;
+        }
+
+        if (token != null && token.isNotEmpty) {
+          await _clearLocalSessionData();
+          await preferencesStorage.saveUserToken(token);
+          networkService.addToken(token);
+        } else {
+          // Auto-login to establish session and get token if register didn't provide one
+          debugPrint('🔄 Auto-logging in after register...');
+          final loginResult = await login(phone, password);
+          loginResult.fold(
+            (failure) => debugPrint('⚠️ Auto-login failed: ${failure.message}'),
+            (_) {
+              token = preferencesStorage.getUserToken();
+              debugPrint('✅ Auto-login succeeded, token: $token');
+            },
+          );
+        }
+
+        // Always save user identification and profile in PreferencesStorage
+        final userId = user?['id'] ?? preferencesStorage.getUserId() ?? 0;
+        final finalUserId = userId is int
+            ? userId
+            : int.tryParse(userId.toString()) ?? 0;
+        if (finalUserId != 0) {
+          await preferencesStorage.saveUserId(finalUserId);
+        }
+
+        final userName = (user?['name'] as String?)?.isNotEmpty == true
+            ? user!['name'] as String
+            : name;
+        await preferencesStorage.saveUserName(userName);
+
+        final profileMap = <String, dynamic>{
+          if (user != null) ...user,
+          'id': finalUserId,
+          'name': userName,
+          'phone': phone,
+          'class_id': user?['class_id'] ?? classId,
+          'role': 'student',
+          'type': type,
+        };
+        await preferencesStorage.saveUserProfile(jsonEncode(profileMap));
+
+        debugPrint(
+          '✅ Registered student session ready: $userName (id: $finalUserId, class: $classId)',
+        );
+
+        return Right(
+          RegisterResponse(
+            success: true,
+            message: message,
+            token: token ?? preferencesStorage.getUserToken(),
+            user: profileMap,
+          ),
+        );
+      } catch (e) {
+        debugPrint('🔴 AuthRepositoryImpl.register error: $e');
         return Left(Failure(e.toString()));
       }
     });

@@ -11,6 +11,7 @@ import 'package:pythagoras/features/courses/domain/entities/course_detail.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/course_details/course_details_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/courses_list/courses_list_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/request_enrollment/request_enrollment_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_cubit.dart';
 import 'package:pythagoras/features/profile/presentation/cubit/profile/profile_cubit.dart';
 
 /// Fixed action button ("طلب الدورة" / "عرض الدورة") for Tablet Landscape.
@@ -18,10 +19,7 @@ import 'package:pythagoras/features/profile/presentation/cubit/profile/profile_c
 class CourseDetailTabletActionButton extends StatelessWidget {
   final CourseDetail course;
 
-  const CourseDetailTabletActionButton({
-    super.key,
-    required this.course,
-  });
+  const CourseDetailTabletActionButton({super.key, required this.course});
 
   @override
   Widget build(BuildContext context) {
@@ -53,15 +51,23 @@ class CourseDetailTabletActionButton extends StatelessWidget {
               if (didLogin == true && context.mounted) {
                 context.read<ProfileCubit>().getAccountInfo();
                 context.read<CoursesListCubit>().fetchCourses();
-                context.read<CourseDetailsCubit>().fetchCourseDetails(course.id);
+                context.read<CourseDetailsCubit>().fetchCourseDetails(
+                  course.id,
+                );
               }
               return;
             }
 
-            context.read<RequestEnrollmentCubit>().requestCourse(
-                  course.id,
-                  courseTitle: course.title,
-                );
+            // ── iOS: direct enrollment (no WhatsApp redirect) ──
+            if (Theme.of(context).platform == TargetPlatform.iOS) {
+              context.read<DirectRequestCubit>().requestCourse(course.id);
+            } else {
+              // ── Android: WhatsApp redirect flow ──
+              context.read<RequestEnrollmentCubit>().requestCourse(
+                course.id,
+                courseTitle: course.title,
+              );
+            }
           },
           radius: 14,
           height: 52,

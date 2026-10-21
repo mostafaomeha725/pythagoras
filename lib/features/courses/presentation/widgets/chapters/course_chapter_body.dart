@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pythagoras/core/routes/route_paths.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/request_enrollment/request_enrollment_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/course_details/course_details_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/course_details/course_details_state.dart';
 import 'package:pythagoras/core/utils/auth_guard.dart';
@@ -97,10 +98,16 @@ class CourseChapterBody extends StatelessWidget {
             tabletLandscape: tabletLandscape,
             onPressed: () async {
               final didLogin = await AuthGuard.checkAuthAndExecute(context, () {
-                context.read<RequestEnrollmentCubit>().requestChapter(
-                  chapter.id,
-                  chapterTitle: chapter.title,
-                );
+                // ── iOS: direct enrollment (no WhatsApp redirect) ──
+                if (Theme.of(context).platform == TargetPlatform.iOS) {
+                  context.read<DirectRequestCubit>().requestChapter(chapter.id);
+                } else {
+                  // ── Android: WhatsApp redirect flow ──
+                  context.read<RequestEnrollmentCubit>().requestChapter(
+                    chapter.id,
+                    chapterTitle: chapter.title,
+                  );
+                }
               });
 
               if (didLogin == true && context.mounted) {

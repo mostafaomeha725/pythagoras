@@ -14,6 +14,8 @@ import 'package:pythagoras/features/auth/presentation/cubit/login_cubit.dart';
 import 'package:pythagoras/features/auth/presentation/cubit/logout_cubit.dart';
 import 'package:pythagoras/features/auth/domain/usecases/get_whatsapp_register_url_use_case.dart';
 import 'package:pythagoras/features/auth/presentation/cubit/whatsapp_register_cubit.dart';
+import 'package:pythagoras/features/auth/domain/usecases/register_use_case.dart';
+import 'package:pythagoras/features/auth/presentation/cubit/ios_register_cubit.dart';
 import 'package:pythagoras/features/profile/domain/repositories/profile_repository.dart';
 import 'package:pythagoras/features/profile/data/repositories/profile_repository_impl.dart';
 import 'package:pythagoras/features/profile/domain/usecases/get_account_info_use_case.dart';
@@ -38,6 +40,9 @@ import 'package:pythagoras/features/courses/domain/use_cases/get_course_details_
 import 'package:pythagoras/features/courses/domain/use_cases/get_course_curriculum_use_case.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/request_course_use_case.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/request_chapter_use_case.dart';
+import 'package:pythagoras/features/courses/domain/use_cases/request_course_direct_use_case.dart';
+import 'package:pythagoras/features/courses/domain/use_cases/request_chapter_direct_use_case.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_cubit.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/get_course_assignments_use_case.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/get_assignment_details_use_case.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/submit_assignment_use_case.dart';
@@ -90,11 +95,15 @@ class ServiceLocator {
     );
     sl.registerLazySingleton(() => LoginUseCase(sl()));
     sl.registerLazySingleton(() => LogoutUseCase(sl()));
+    sl.registerLazySingleton(() => RegisterUseCase(sl()));
     sl.registerLazySingleton(() => GetWhatsappRegisterUrlUseCase(sl()));
     sl.registerFactory(() => LoginCubit(sl()));
     sl.registerFactory(() => LogoutCubit(sl()));
     sl.registerFactory(
       () => WhatsappRegisterCubit(getWhatsappRegisterUrlUseCase: sl()),
+    );
+    sl.registerFactory(
+      () => IosRegisterCubit(registerUseCase: sl(), getClassesUseCase: sl()),
     );
   }
 
@@ -135,6 +144,8 @@ class ServiceLocator {
     sl.registerLazySingleton(() => GetCourseCurriculumUseCase(sl()));
     sl.registerLazySingleton(() => RequestCourseUseCase(sl()));
     sl.registerLazySingleton(() => RequestChapterUseCase(sl()));
+    sl.registerLazySingleton(() => RequestCourseDirectUseCase(sl()));
+    sl.registerLazySingleton(() => RequestChapterDirectUseCase(sl()));
     sl.registerLazySingleton(() => GetCourseAssignmentsUseCase(sl()));
     sl.registerLazySingleton(() => GetAssignmentDetailsUseCase(sl()));
     sl.registerLazySingleton(() => SubmitAssignmentUseCase(sl()));
@@ -154,6 +165,12 @@ class ServiceLocator {
     sl.registerFactory(() => CompleteVideoCubit(repository: sl()));
     sl.registerFactory(() => CompleteLessonCubit(repository: sl()));
     sl.registerFactory(() => RequestEnrollmentCubit(sl(), sl()));
+    sl.registerFactory(
+      () => DirectRequestCubit(
+        requestCourseDirectUseCase: sl(),
+        requestChapterDirectUseCase: sl(),
+      ),
+    );
     sl.registerFactory(
       () => CourseExamsCubit(
         getCourseAssignmentsUseCase: sl(),
@@ -182,7 +199,9 @@ class ServiceLocator {
     sl.registerLazySingleton(() => DownloadResourceUseCase(sl()));
     sl.registerFactory(() => CourseReviewsCubit(sl()));
     sl.registerFactory(() => AddCourseReviewCubit(sl()));
-    sl.registerFactory(() => DownloadResourceCubit(downloadResourceUseCase: sl()));
+    sl.registerFactory(
+      () => DownloadResourceCubit(downloadResourceUseCase: sl()),
+    );
   }
 
   /// =============================

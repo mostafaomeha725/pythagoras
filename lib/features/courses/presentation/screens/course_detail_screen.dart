@@ -10,6 +10,8 @@ import 'package:pythagoras/features/courses/presentation/widgets/course_details/
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/request_enrollment/request_enrollment_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/request_enrollment/request_enrollment_state.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_state.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_shimmer.dart';
 import 'package:pythagoras/core/utils/url_launcher_util.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/courses_list/courses_list_cubit.dart';
@@ -38,6 +40,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     with WidgetsBindingObserver {
   late final CourseDetailsCubit _courseDetailsCubit;
   late final RequestEnrollmentCubit _requestEnrollmentCubit;
+  late final DirectRequestCubit _directRequestCubit;
   bool _isWaitingForWhatsApp = false;
 
   @override
@@ -46,6 +49,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     _courseDetailsCubit = sl<CourseDetailsCubit>()
       ..fetchCourseDetails(widget.courseId);
     _requestEnrollmentCubit = sl<RequestEnrollmentCubit>();
+    _directRequestCubit = sl<DirectRequestCubit>();
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -54,6 +58,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     WidgetsBinding.instance.removeObserver(this);
     _courseDetailsCubit.close();
     _requestEnrollmentCubit.close();
+    _directRequestCubit.close();
     super.dispose();
   }
 
@@ -74,30 +79,56 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
       providers: [
         BlocProvider.value(value: _courseDetailsCubit),
         BlocProvider.value(value: _requestEnrollmentCubit),
+        BlocProvider.value(value: _directRequestCubit),
       ],
-      child: BlocListener<RequestEnrollmentCubit, RequestEnrollmentState>(
-        listener: (context, state) async {
-          if (state is RequestEnrollmentLoading) {
-            EasyLoading.show(status: 'جاري التحميل...');
-          } else if (state is RequestEnrollmentSuccess) {
-            EasyLoading.dismiss();
-            final launched = await UrlLauncherUtil.openWhatsAppUrl(
-              state.whatsappUrl,
-              chapterTitle: state.chapterTitle,
-              courseTitle: state.courseTitle,
-              isChapter: state.isChapter,
-            );
-            if (launched) {
-              _isWaitingForWhatsApp = true;
-            } else {
-              EasyLoading.showError(
-                'تعذر فتح الواتساب، يرجى التأكد من تثبيت التطبيق',
-              );
-            }
-          } else if (state is RequestEnrollmentError) {
-            EasyLoading.showError(state.message);
-          }
-        },
+      child: MultiBlocListener(
+        listeners: [
+          // ── Android: WhatsApp redirect flow (unchanged) ──────────────────
+          BlocListener<RequestEnrollmentCubit, RequestEnrollmentState>(
+            listener: (context, state) async {
+              if (state is RequestEnrollmentLoading) {
+                EasyLoading.show(status: 'جاري التحميل...');
+              } else if (state is RequestEnrollmentSuccess) {
+                EasyLoading.dismiss();
+                final launched = await UrlLauncherUtil.openWhatsAppUrl(
+                  state.whatsappUrl,
+                  chapterTitle: state.chapterTitle,
+                  courseTitle: state.courseTitle,
+                  isChapter: state.isChapter,
+                );
+                if (launched) {
+                  _isWaitingForWhatsApp = true;
+                } else {
+                  EasyLoading.showError(
+                    'تعذر فتح الواتساب، يرجى التأكد من تثبيت التطبيق',
+                  );
+                }
+              } else if (state is RequestEnrollmentError) {
+                EasyLoading.showError(state.message);
+              }
+            },
+          ),
+          // ── iOS: direct enrollment flow ──────────────────────────────────
+          BlocListener<DirectRequestCubit, DirectRequestState>(
+            listener: (context, state) {
+              if (state is DirectRequestLoading) {
+                EasyLoading.show(status: 'جاري التحميل...');
+              } else if (state is DirectRequestSuccess) {
+                EasyLoading.showSuccess(state.message);
+                // Refresh course details and courses list immediately after
+                // a successful iOS direct request — mirrors the same two
+                // calls Android makes when the app returns from WhatsApp
+                // (see didChangeAppLifecycleState).
+                _courseDetailsCubit.fetchCourseDetails(widget.courseId);
+                if (mounted) {
+                  context.read<CoursesListCubit>().fetchCourses();
+                }
+              } else if (state is DirectRequestError) {
+                EasyLoading.showError(state.message);
+              }
+            },
+          ),
+        ],
 
         child: LayoutBuilder(
           builder: (context, constraints) {

@@ -22,28 +22,31 @@ class LoginRegisterLink extends StatelessWidget {
         ? font14w700.copyWith(color: AppLightColors.primary, fontSize: 16)
         : font14w700.copyWith(color: AppLightColors.primary);
 
-    return Wrap(
-      alignment: WrapAlignment.center,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        AppText(
-          "ليس لديك حساب؟ ",
-          style: textStyle,
-          alignment: AlignmentDirectional.center,
-        ),
-        BounceIt(
-          child: GestureDetector(
-            onTap: () {
-              context.push(Routes.registerScreen);
-            },
-            child: AppText(
-              "إنشاء حساب",
-              style: linkStyle,
-              alignment: AlignmentDirectional.center,
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AppText(
+            "ليس لديك حساب؟ ",
+            style: textStyle,
+            alignment: AlignmentDirectional.center,
+          ),
+          BounceIt(
+            child: GestureDetector(
+              onTap: () {
+                context.push(Routes.registerScreen);
+              },
+              child: AppText(
+                "إنشاء حساب",
+                style: linkStyle,
+                alignment: AlignmentDirectional.center,
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
