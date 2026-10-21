@@ -23,6 +23,8 @@ class CourseDetailTabletActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isPending = course.requestStatus?.trim().toLowerCase() == 'pending';
+
     return SafeArea(
       top: false,
       child: Container(
@@ -37,38 +39,44 @@ class CourseDetailTabletActionButton extends StatelessWidget {
           ],
         ),
         child: AppButton(
-          text: course.isEnrolled ? 'عرض الدورة' : 'طلب الدورة',
-          onPressed: () async {
-            if (course.isEnrolled) {
-              context.push(Routes.courseSectionsScreen, extra: course);
-              return;
-            }
+          text: course.isEnrolled
+              ? 'عرض الدورة'
+              : isPending
+              ? 'قيد الانتظار'
+              : 'طلب الدورة',
+          onPressed: isPending
+              ? null
+              : () async {
+                  if (course.isEnrolled) {
+                    context.push(Routes.courseSectionsScreen, extra: course);
+                    return;
+                  }
 
-            final prefs = sl<PreferencesStorage>();
-            final token = prefs.getUserToken();
-            if (token == null || token.isEmpty) {
-              final didLogin = await AuthBottomSheet.show(context);
-              if (didLogin == true && context.mounted) {
-                context.read<ProfileCubit>().getAccountInfo();
-                context.read<CoursesListCubit>().fetchCourses();
-                context.read<CourseDetailsCubit>().fetchCourseDetails(
-                  course.id,
-                );
-              }
-              return;
-            }
+                  final prefs = sl<PreferencesStorage>();
+                  final token = prefs.getUserToken();
+                  if (token == null || token.isEmpty) {
+                    final didLogin = await AuthBottomSheet.show(context);
+                    if (didLogin == true && context.mounted) {
+                      context.read<ProfileCubit>().getAccountInfo();
+                      context.read<CoursesListCubit>().fetchCourses();
+                      context.read<CourseDetailsCubit>().fetchCourseDetails(
+                        course.id,
+                      );
+                    }
+                    return;
+                  }
 
-            // ── iOS: direct enrollment (no WhatsApp redirect) ──
-            if (Theme.of(context).platform == TargetPlatform.iOS) {
-              context.read<DirectRequestCubit>().requestCourse(course.id);
-            } else {
-              // ── Android: WhatsApp redirect flow ──
-              context.read<RequestEnrollmentCubit>().requestCourse(
-                course.id,
-                courseTitle: course.title,
-              );
-            }
-          },
+                  // ── iOS: direct enrollment (no WhatsApp redirect) ──
+                  if (Theme.of(context).platform == TargetPlatform.iOS) {
+                    context.read<DirectRequestCubit>().requestCourse(course.id);
+                  } else {
+                    // ── Android: WhatsApp redirect flow ──
+                    context.read<RequestEnrollmentCubit>().requestCourse(
+                      course.id,
+                      courseTitle: course.title,
+                    );
+                  }
+                },
           radius: 14,
           height: 52,
           textSize: 16,

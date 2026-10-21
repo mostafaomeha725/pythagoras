@@ -21,45 +21,54 @@ class CourseDetailBottomButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isPending = course.requestStatus?.trim().toLowerCase() == 'pending';
+
     return Padding(
       padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 24.h),
       child: SafeArea(
         top: false,
         child: AppButton(
-          text: course.isEnrolled ? 'عرض الدورة' : 'طلب الدورة',
-          onPressed: () async {
-            if (course.isEnrolled) {
-              context.push(Routes.courseSectionsScreen, extra: course);
-              return;
-            }
+          text: course.isEnrolled
+              ? 'عرض الدورة'
+              : isPending
+              ? 'قيد الانتظار'
+              : 'طلب الدورة',
 
-            final prefs = sl<PreferencesStorage>();
-            final token = prefs.getUserToken();
-            if (token == null || token.isEmpty) {
-              // Guest trying to purchase, show login sheet
-              final didLogin = await AuthBottomSheet.show(context);
-              if (didLogin == true && context.mounted) {
-                // Refresh global and local data without auto-purchasing
-                context.read<ProfileCubit>().getAccountInfo();
-                context.read<CoursesListCubit>().fetchCourses();
-                context.read<CourseDetailsCubit>().fetchCourseDetails(
-                  course.id,
-                );
-              }
-              return;
-            }
+          onPressed: isPending
+              ? null
+              : () async {
+                  if (course.isEnrolled) {
+                    context.push(Routes.courseSectionsScreen, extra: course);
+                    return;
+                  }
 
-            // ── iOS: direct enrollment (no WhatsApp redirect) ──
-            if (Theme.of(context).platform == TargetPlatform.iOS) {
-              context.read<DirectRequestCubit>().requestCourse(course.id);
-            } else {
-              // ── Android: WhatsApp redirect flow ──
-              context.read<RequestEnrollmentCubit>().requestCourse(
-                course.id,
-                courseTitle: course.title,
-              );
-            }
-          },
+                  final prefs = sl<PreferencesStorage>();
+                  final token = prefs.getUserToken();
+                  if (token == null || token.isEmpty) {
+                    // Guest trying to purchase, show login sheet
+                    final didLogin = await AuthBottomSheet.show(context);
+                    if (didLogin == true && context.mounted) {
+                      // Refresh global and local data without auto-purchasing
+                      context.read<ProfileCubit>().getAccountInfo();
+                      context.read<CoursesListCubit>().fetchCourses();
+                      context.read<CourseDetailsCubit>().fetchCourseDetails(
+                        course.id,
+                      );
+                    }
+                    return;
+                  }
+
+                  // ── iOS: direct enrollment (no WhatsApp redirect) ──
+                  if (Theme.of(context).platform == TargetPlatform.iOS) {
+                    context.read<DirectRequestCubit>().requestCourse(course.id);
+                  } else {
+                    // ── Android: WhatsApp redirect flow ──
+                    context.read<RequestEnrollmentCubit>().requestCourse(
+                      course.id,
+                      courseTitle: course.title,
+                    );
+                  }
+                },
           radius: 14.r,
           height: 52.h,
           textSize: 16.sp,
