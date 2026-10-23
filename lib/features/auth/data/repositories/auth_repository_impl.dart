@@ -26,6 +26,7 @@ class AuthRepositoryImpl implements AuthRepository {
       data: {
         "phone": phone,
         "password": password, // never printed in release
+        "type": "student",
       },
     );
 

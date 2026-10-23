@@ -91,7 +91,9 @@ class ServiceLocator {
     sl.registerLazySingleton(() => RemoteConfigService());
     sl.registerLazySingleton(() => AppleIapService());
     sl.registerFactory(() => RemoteConfigCubit(remoteConfigService: sl()));
-    sl.registerFactory(() => AppleIapCubit(service: sl(), preferences: sl()));
+    sl.registerFactory(
+      () => AppleIapCubit(service: sl<AppleIapService>(), preferences: sl()),
+    );
   }
 
   /// =============================

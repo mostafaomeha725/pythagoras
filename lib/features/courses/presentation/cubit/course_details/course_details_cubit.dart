@@ -5,39 +5,51 @@ import 'package:pythagoras/features/courses/presentation/cubit/course_details/co
 class CourseDetailsCubit extends Cubit<CourseDetailsState> {
   final GetCourseCurriculumUseCase getCourseCurriculumUseCase;
 
-  CourseDetailsCubit(this.getCourseCurriculumUseCase) : super(CourseDetailsInitial());
+  CourseDetailsCubit(this.getCourseCurriculumUseCase)
+    : super(CourseDetailsInitial());
 
   Future<void> fetchCourseDetails(int courseId) async {
-    // 1. Try Cache (SWR Pattern)
-    final cacheResult = await getCourseCurriculumUseCase(courseId, fromCache: true);
+    if (isClosed) return;
+    emit(CourseDetailsLoading());
 
-    bool hasCache = false;
-    cacheResult.fold(
-      (failure) {
-        if (state is! CourseDetailsLoaded) {
-          emit(CourseDetailsLoading());
-        }
-      },
-      (courseDetail) {
+    try {
+      // 1. Try Cache (SWR Pattern)
+      final cacheResult = await getCourseCurriculumUseCase(
+        courseId,
+        fromCache: true,
+      );
+
+      bool hasCache = false;
+      cacheResult.fold((failure) {}, (courseDetail) {
+        if (isClosed) return;
         hasCache = true;
         emit(CourseDetailsLoaded(courseDetail: courseDetail));
-      },
-    );
+      });
 
-    // 2. Fetch Remote (Background revalidate)
-    // Using curriculum API to get both details and videos
-    final result = await getCourseCurriculumUseCase(courseId, fromCache: false);
+      // 2. Fetch Remote (Background revalidate)
+      // Using curriculum API to get both details and videos
+      final result = await getCourseCurriculumUseCase(
+        courseId,
+        fromCache: false,
+      );
 
-    result.fold(
-      (failure) {
-        // Only show error if we don't have cache to display
-        if (!hasCache && state is! CourseDetailsLoaded) {
-          if (!isClosed) emit(CourseDetailsError(failure.message));
-        }
-      },
-      (courseDetail) {
-        if (!isClosed) emit(CourseDetailsLoaded(courseDetail: courseDetail));
-      },
-    );
+      result.fold(
+        (failure) {
+          // Only show error if we don't have cache to display
+          if (!hasCache && !isClosed) {
+            emit(CourseDetailsError(failure.message));
+          }
+        },
+        (courseDetail) {
+          if (!isClosed) {
+            emit(CourseDetailsLoaded(courseDetail: courseDetail));
+          }
+        },
+      );
+    } catch (error) {
+      if (!isClosed && state is! CourseDetailsLoaded) {
+        emit(CourseDetailsError(error.toString()));
+      }
+    }
   }
 }
