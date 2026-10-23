@@ -2,6 +2,8 @@ import 'package:pythagoras/core/cache/preferences_storage.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:pythagoras/core/cache/hive_boxes.dart';
 import 'package:pythagoras/core/cache/hive_storage.dart';
+import 'package:pythagoras/core/services/remote_config_service.dart';
+import 'package:pythagoras/features/courses/data/services/apple_iap_service.dart';
 import 'package:pythagoras/core/network/network_service.dart';
 import 'package:dio/dio.dart';
 import 'package:get_it/get_it.dart';
@@ -70,6 +72,8 @@ import 'package:pythagoras/features/courses/presentation/cubit/download_resource
 import 'package:pythagoras/features/courses/presentation/cubit/chapter_videos/chapter_videos_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/complete_video/complete_video_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/complete_lesson/complete_lesson_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/remote_config/remote_config_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/apple_iap/apple_iap_cubit.dart';
 
 final sl = GetIt.instance;
 
@@ -84,6 +88,10 @@ class ServiceLocator {
   Future<void> _initCore() async {
     await _initStorage();
     _initDio();
+    sl.registerLazySingleton(() => RemoteConfigService());
+    sl.registerLazySingleton(() => AppleIapService());
+    sl.registerFactory(() => RemoteConfigCubit(remoteConfigService: sl()));
+    sl.registerFactory(() => AppleIapCubit(service: sl(), preferences: sl()));
   }
 
   /// =============================

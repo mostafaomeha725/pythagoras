@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pythagoras/core/di/services_locator.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/course_details/course_details_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/course_details/course_details_state.dart';
@@ -12,6 +13,11 @@ import 'package:pythagoras/features/courses/presentation/cubit/request_enrollmen
 import 'package:pythagoras/features/courses/presentation/cubit/request_enrollment/request_enrollment_state.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_state.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/apple_iap/apple_iap_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/apple_iap/apple_iap_state.dart';
+import 'package:pythagoras/features/courses/data/services/apple_iap_product_catalog.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/remote_config/remote_config_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/remote_config/remote_config_state.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_shimmer.dart';
 import 'package:pythagoras/core/utils/url_launcher_util.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/courses_list/courses_list_cubit.dart';
@@ -19,6 +25,7 @@ import 'package:pythagoras/core/widgets/no_internet_widget.dart';
 
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_tablet_landscape.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_tablet_shimmer.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/apple_iap_purchase_section.dart';
 
 class CourseDetailScreen extends StatefulWidget {
   final int courseId;
@@ -41,7 +48,10 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
   late final CourseDetailsCubit _courseDetailsCubit;
   late final RequestEnrollmentCubit _requestEnrollmentCubit;
   late final DirectRequestCubit _directRequestCubit;
+  late final RemoteConfigCubit _remoteConfigCubit;
+  late final AppleIapCubit _appleIapCubit;
   bool _isWaitingForWhatsApp = false;
+  String? _pendingApplePurchaseKey;
 
   @override
   void initState() {
@@ -50,6 +60,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
       ..fetchCourseDetails(widget.courseId);
     _requestEnrollmentCubit = sl<RequestEnrollmentCubit>();
     _directRequestCubit = sl<DirectRequestCubit>();
+    _remoteConfigCubit = sl<RemoteConfigCubit>()..load();
+    _appleIapCubit = sl<AppleIapCubit>();
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -59,6 +71,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     _courseDetailsCubit.close();
     _requestEnrollmentCubit.close();
     _directRequestCubit.close();
+    _remoteConfigCubit.close();
+    _appleIapCubit.close();
     super.dispose();
   }
 
@@ -80,6 +94,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
         BlocProvider.value(value: _courseDetailsCubit),
         BlocProvider.value(value: _requestEnrollmentCubit),
         BlocProvider.value(value: _directRequestCubit),
+        BlocProvider.value(value: _remoteConfigCubit),
+        BlocProvider.value(value: _appleIapCubit),
       ],
       child: MultiBlocListener(
         listeners: [
@@ -110,11 +126,16 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
           ),
           // ── iOS: direct enrollment flow ──────────────────────────────────
           BlocListener<DirectRequestCubit, DirectRequestState>(
-            listener: (context, state) {
+            listener: (context, state) async {
               if (state is DirectRequestLoading) {
                 EasyLoading.show(status: 'جاري التحميل...');
               } else if (state is DirectRequestSuccess) {
                 EasyLoading.showSuccess(state.message);
+                final purchaseKey = _pendingApplePurchaseKey;
+                if (purchaseKey != null) {
+                  _pendingApplePurchaseKey = null;
+                  await _appleIapCubit.completeConfirmedPurchase(purchaseKey);
+                }
                 // Refresh course details and courses list immediately after
                 // a successful iOS direct request — mirrors the same two
                 // calls Android makes when the app returns from WhatsApp
@@ -128,68 +149,112 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
               }
             },
           ),
+          BlocListener<AppleIapCubit, AppleIapState>(
+            listener: (context, state) {
+              if (state.status != AppleIapStatus.purchaseConfirmed ||
+                  state.transactionKey == null ||
+                  _pendingApplePurchaseKey != null) {
+                return;
+              }
+
+              final target = AppleIapProductCatalog.targetFor(
+                state.activeProductId ?? '',
+              );
+              if (target?.type != AppleIapProductType.course ||
+                  target?.contentId != widget.courseId) {
+                return;
+              }
+
+              _pendingApplePurchaseKey = state.transactionKey;
+              _directRequestCubit.requestCourse(widget.courseId);
+            },
+          ),
+          BlocListener<RemoteConfigCubit, RemoteConfigState>(
+            listenWhen: (previous, current) =>
+                previous.iosIapEnabled != current.iosIapEnabled,
+            listener: (context, state) {
+              if (state.iosIapEnabled) {
+                _appleIapCubit.loadProducts();
+              }
+            },
+          ),
         ],
 
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isTabletLandscape =
-                constraints.maxWidth >= 900 &&
-                constraints.maxHeight >= 600 &&
-                constraints.maxWidth > constraints.maxHeight;
+        child: BlocBuilder<RemoteConfigCubit, RemoteConfigState>(
+          builder: (context, remoteConfigState) {
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final isTabletLandscape =
+                    constraints.maxWidth >= 900 &&
+                    constraints.maxHeight >= 600 &&
+                    constraints.maxWidth > constraints.maxHeight;
 
-            return Scaffold(
-              backgroundColor: isTabletLandscape
-                  ? const Color(0xFFF8F9FA)
-                  : Colors.white,
-              appBar: isTabletLandscape ? null : const CourseDetailAppBar(),
-              body: BlocBuilder<CourseDetailsCubit, CourseDetailsState>(
-                builder: (context, state) {
-                  if (state is CourseDetailsLoading) {
-                    if (isTabletLandscape) {
-                      return CourseDetailTabletShimmer(
-                        constraints: constraints,
-                      );
-                    }
-                    return const CourseDetailShimmer();
-                  } else if (state is CourseDetailsError) {
-                    return NoInternetWidget(
-                      message: state.message,
-                      onRetry: () => _courseDetailsCubit.fetchCourseDetails(
-                        widget.courseId,
-                      ),
-                    );
-                  } else if (state is CourseDetailsLoaded) {
-                    final updatedCourse = state.courseDetail;
-
-                    // ── Tablet Landscape: dedicated two-column layout ──
-                    if (isTabletLandscape) {
-                      return CourseDetailTabletLandscape(
-                        course: updatedCourse,
-                        constraints: constraints,
-                      );
-                    }
-
-                    // ── Mobile Portrait & Tablet Portrait: original layout untouched ──
-                    return Stack(
-                      children: [
-                        SafeArea(
-                          top: false,
-                          child: CourseDetailScreenBody(course: updatedCourse),
-                        ),
-                        Positioned(
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          child: CourseDetailBottomButton(
-                            course: updatedCourse,
+                return Scaffold(
+                  backgroundColor: isTabletLandscape
+                      ? const Color(0xFFF8F9FA)
+                      : Colors.white,
+                  appBar: isTabletLandscape ? null : const CourseDetailAppBar(),
+                  body: BlocBuilder<CourseDetailsCubit, CourseDetailsState>(
+                    builder: (context, state) {
+                      if (state is CourseDetailsLoading) {
+                        if (isTabletLandscape) {
+                          return CourseDetailTabletShimmer(
+                            constraints: constraints,
+                          );
+                        }
+                        return const CourseDetailShimmer();
+                      } else if (state is CourseDetailsError) {
+                        return NoInternetWidget(
+                          message: state.message,
+                          onRetry: () => _courseDetailsCubit.fetchCourseDetails(
+                            widget.courseId,
                           ),
-                        ),
-                      ],
-                    );
-                  }
-                  return const SizedBox.shrink();
-                },
-              ),
+                        );
+                      } else if (state is CourseDetailsLoaded) {
+                        final updatedCourse = state.courseDetail;
+
+                        // ── Tablet Landscape: dedicated two-column layout ──
+                        if (isTabletLandscape) {
+                          return CourseDetailTabletLandscape(
+                            course: updatedCourse,
+                            constraints: constraints,
+                          );
+                        }
+
+                        // ── Mobile Portrait & Tablet Portrait: original layout untouched ──
+                        return Stack(
+                          children: [
+                            SafeArea(
+                              top: false,
+                              child: CourseDetailScreenBody(
+                                course: updatedCourse,
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 76.h,
+                              left: 0,
+                              right: 0,
+                              child: AppleIapPurchaseSection(
+                                type: AppleIapProductType.course,
+                                contentId: updatedCourse.id,
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              child: CourseDetailBottomButton(
+                                course: updatedCourse,
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                );
+              },
             );
           },
         ),

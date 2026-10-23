@@ -14,6 +14,8 @@ import 'package:pythagoras/features/courses/domain/entities/course_detail.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_chapter.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_lesson.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/chapters/course_chapter_buy_button.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/apple_iap_purchase_section.dart';
+import 'package:pythagoras/features/courses/data/services/apple_iap_product_catalog.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/lessons/course_lessons_list.dart';
 
 class CourseChapterBody extends StatelessWidget {
@@ -90,39 +92,54 @@ class CourseChapterBody extends StatelessWidget {
             ],
           )
         else if (showActionButtons)
-          CourseChapterBuyButton(
-            price: chapter.price,
-            currencyLabel: chapter.currencyLabel,
-            isEnrolled: isEnrolled || chapter.isEnrolled,
-            requestStatus: chapter.requestStatus,
-            tabletLandscape: tabletLandscape,
-            onPressed: () async {
-              final didLogin = await AuthGuard.checkAuthAndExecute(context, () {
-                // ── iOS: direct enrollment (no WhatsApp redirect) ──
-                if (Theme.of(context).platform == TargetPlatform.iOS) {
-                  context.read<DirectRequestCubit>().requestChapter(chapter.id);
-                } else {
-                  // ── Android: WhatsApp redirect flow ──
-                  context.read<RequestEnrollmentCubit>().requestChapter(
-                    chapter.id,
-                    chapterTitle: chapter.title,
+          Column(
+            children: [
+              AppleIapPurchaseSection(
+                type: AppleIapProductType.chapter,
+                contentId: chapter.id,
+                tabletLandscape: tabletLandscape,
+              ),
+              CourseChapterBuyButton(
+                price: chapter.price,
+                currencyLabel: chapter.currencyLabel,
+                isEnrolled: isEnrolled || chapter.isEnrolled,
+                requestStatus: chapter.requestStatus,
+                tabletLandscape: tabletLandscape,
+                onPressed: () async {
+                  final didLogin = await AuthGuard.checkAuthAndExecute(
+                    context,
+                    () {
+                      // ── iOS: direct enrollment (no WhatsApp redirect) ──
+                      if (Theme.of(context).platform == TargetPlatform.iOS) {
+                        context.read<DirectRequestCubit>().requestChapter(
+                          chapter.id,
+                        );
+                      } else {
+                        // ── Android: WhatsApp redirect flow ──
+                        context.read<RequestEnrollmentCubit>().requestChapter(
+                          chapter.id,
+                          chapterTitle: chapter.title,
+                        );
+                      }
+                    },
                   );
-                }
-              });
 
-              if (didLogin == true && context.mounted) {
-                // If the user just logged in, they might already own this chapter or course!
-                // Refresh the parent course details so the UI updates accurately.
-                final courseDetailCubit = context.read<CourseDetailsCubit>();
-                if (courseDetailCubit.state is CourseDetailsLoaded) {
-                  final courseId =
-                      (courseDetailCubit.state as CourseDetailsLoaded)
-                          .courseDetail
-                          .id;
-                  courseDetailCubit.fetchCourseDetails(courseId);
-                }
-              }
-            },
+                  if (didLogin == true && context.mounted) {
+                    // If the user just logged in, they might already own this chapter or course!
+                    // Refresh the parent course details so the UI updates accurately.
+                    final courseDetailCubit = context
+                        .read<CourseDetailsCubit>();
+                    if (courseDetailCubit.state is CourseDetailsLoaded) {
+                      final courseId =
+                          (courseDetailCubit.state as CourseDetailsLoaded)
+                              .courseDetail
+                              .id;
+                      courseDetailCubit.fetchCourseDetails(courseId);
+                    }
+                  }
+                },
+              ),
+            ],
           ),
       ],
     );

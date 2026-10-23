@@ -1,6 +1,9 @@
 import 'dart:ui';
+import 'dart:async';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:pythagoras/core/routes/app_routes.dart';
 import 'package:pythagoras/core/theme/light_colors.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -14,16 +17,24 @@ import 'package:pythagoras/features/courses/presentation/cubit/courses_list/cour
 import 'package:pythagoras/features/profile/presentation/cubit/profile/profile_cubit.dart';
 
 import 'package:pythagoras/core/di/services_locator.dart';
+import 'package:pythagoras/core/services/remote_config_service.dart';
 import 'package:pythagoras/core/utils/easy_loading.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:chucker_flutter/chucker_flutter.dart';
 
 import 'package:pythagoras/core/cache/hive_boxes.dart';
+import 'package:pythagoras/firebase_options.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (defaultTargetPlatform == TargetPlatform.iOS) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
 
   PlatformDispatcher.instance.onError = (error, stack) {
     if (error.toString().contains('YouTube player failed to initialize')) {
@@ -53,6 +64,9 @@ Future<void> main() async {
   await Hive.openBox(HiveBoxes.cacheBox);
   await initializeDateFormatting('ar', null);
   await ServiceLocator().initDependencies();
+  if (defaultTargetPlatform == TargetPlatform.iOS) {
+    unawaited(sl<RemoteConfigService>().initialize());
+  }
 
   // final prefs = await SharedPreferences.getInstance();
   // await prefs.clear();
