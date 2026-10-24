@@ -37,8 +37,10 @@ class RemoteConfigService {
       );
       await remoteConfig.fetchAndActivate();
       _iosIapEnabled = remoteConfig.getBool(iosIapEnabledKey);
+      debugPrint('[IAP][RemoteConfig] $iosIapEnabledKey=$_iosIapEnabled');
     } catch (_) {
       _iosIapEnabled = false;
+      debugPrint('[IAP][RemoteConfig] initialization failed; enabled=false');
     }
   }
 }

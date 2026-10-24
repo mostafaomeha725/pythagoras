@@ -24,12 +24,16 @@ class AppleIapPurchaseSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (Theme.of(context).platform != TargetPlatform.iOS) {
+      debugPrint(
+        '[IAP][Section] hidden: platform=${Theme.of(context).platform}',
+      );
       return const SizedBox.shrink();
     }
 
     return BlocBuilder<RemoteConfigCubit, RemoteConfigState>(
       builder: (context, remoteConfigState) {
         if (!remoteConfigState.iosIapEnabled) {
+          debugPrint('[IAP][Section] hidden: ios_iap_enabled=false');
           return const SizedBox.shrink();
         }
 
@@ -46,6 +50,10 @@ class AppleIapPurchaseSection extends StatelessWidget {
             final products = state.products
                 .where((product) => matchingProductIds.contains(product.id))
                 .toList(growable: false);
+            debugPrint(
+              '[IAP][Section] course=$contentId status=${state.status} '
+              'matchingIds=$matchingProductIds products=${products.map((product) => product.id).toList()}',
+            );
 
             if (state.status == AppleIapStatus.unavailable) {
               return _message('الشراء عبر Apple غير متاح حاليًا');
@@ -73,6 +81,7 @@ class AppleIapPurchaseSection extends StatelessWidget {
               return _message(state.message ?? 'تعذر إتمام عملية الشراء');
             }
             if (products.isEmpty) {
+              debugPrint('[IAP][Section] hidden: no matching products');
               return const SizedBox.shrink();
             }
 

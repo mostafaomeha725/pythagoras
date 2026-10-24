@@ -45,6 +45,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
     emit(state.copyWith(status: AppleIapStatus.loading, clearMessage: true));
     try {
       final available = await service.isAvailable();
+      debugPrint('[IAP][Store] isAvailable=$available productIds=$productIds');
       if (!available) {
         emit(state.copyWith(status: AppleIapStatus.unavailable));
         return;
@@ -53,6 +54,10 @@ class AppleIapCubit extends Cubit<AppleIapState> {
       await _purchaseSubscription?.cancel();
       _purchaseSubscription = service.purchaseStream.listen(_handlePurchases);
       final response = await service.loadProducts();
+      debugPrint(
+        '[IAP][Store] productDetails=${response.productDetails.map((product) => '${product.id}:${product.price}').toList()} '
+        'notFoundIDs=${response.notFoundIDs} error=${response.error}',
+      );
       if (isClosed) return;
 
       if (response.error != null) {
@@ -77,6 +82,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
         ),
       );
     } catch (error) {
+      debugPrint('[IAP][Store] loadProducts error=$error');
       if (!isClosed) {
         emit(
           state.copyWith(
