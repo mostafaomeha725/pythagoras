@@ -23,10 +23,7 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<Either<Failure, void>> login(String phone, String password) async {
     final response = await networkService.postData(
       endPoint: EndPoints.login,
-      data: {
-        "phone": phone,
-        "password": password, // never printed in release
-      },
+      data: {"phone": phone, "password": password},
     );
 
     return response.fold((failure) => Left(failure), (data) async {

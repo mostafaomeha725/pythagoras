@@ -136,6 +136,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                   _pendingApplePurchaseKey = null;
                   await _appleIapCubit.completeConfirmedPurchase(purchaseKey);
                 }
+                if (!context.mounted) return;
                 // Refresh course details and courses list immediately after
                 // a successful iOS direct request — mirrors the same two
                 // calls Android makes when the app returns from WhatsApp
@@ -173,7 +174,11 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
             listenWhen: (previous, current) =>
                 previous.iosIapEnabled != current.iosIapEnabled,
             listener: (context, state) {
-              if (state.iosIapEnabled) {
+              if (state.iosIapEnabled &&
+                  AppleIapProductCatalog.hasProductFor(
+                    AppleIapProductType.course,
+                    widget.courseId,
+                  )) {
                 _appleIapCubit.loadProducts();
               }
             },

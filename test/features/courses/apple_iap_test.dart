@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:pythagoras/features/courses/data/services/apple_iap_service.dart';
+import 'package:pythagoras/features/courses/data/services/apple_iap_product_catalog.dart';
 import 'package:pythagoras/features/courses/data/services/apple_iap_store.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/apple_iap/apple_iap_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/apple_iap/apple_iap_state.dart';
@@ -14,6 +15,7 @@ class FakeAppleIapStore implements AppleIapStore {
   bool available = true;
   bool purchaseStarted = true;
   bool restoreCalled = false;
+  int loadProductsCalls = 0;
   ProductDetailsResponse response = ProductDetailsResponse(
     productDetails: const [],
     notFoundIDs: const [],
@@ -26,7 +28,10 @@ class FakeAppleIapStore implements AppleIapStore {
   Future<bool> isAvailable() async => available;
 
   @override
-  Future<ProductDetailsResponse> loadProducts() async => response;
+  Future<ProductDetailsResponse> loadProducts() async {
+    loadProductsCalls++;
+    return response;
+  }
 
   @override
   Future<bool> purchase(ProductDetails product) async => purchaseStarted;
@@ -106,6 +111,115 @@ void main() {
   tearDown(() async {
     await cubit.close();
     await store.close();
+  });
+
+  test('only Course 21 is eligible for automatic IAP product loading', () {
+    expect(
+      AppleIapProductCatalog.hasProductFor(AppleIapProductType.course, 21),
+      isTrue,
+    );
+    expect(
+      AppleIapProductCatalog.hasProductFor(AppleIapProductType.course, 22),
+      isFalse,
+    );
+    expect(
+      AppleIapProductCatalog.hasProductFor(AppleIapProductType.chapter, 1),
+      isFalse,
+    );
+  });
+
+  test('creating the Cubit does not query StoreKit automatically', () async {
+    final localStore = FakeAppleIapStore();
+    final localService = AppleIapService(
+      store: localStore,
+      productIds: {'pythagoras.course.21'},
+      isIos: true,
+    );
+    final localCubit = AppleIapCubit(
+      service: localService,
+      productIds: {'pythagoras.course.21'},
+      isIos: true,
+    );
+
+    expect(localStore.loadProductsCalls, 0);
+    await localCubit.close();
+    await localStore.close();
+  });
+
+  test('unavailable StoreKit does not expose a ready product', () async {
+    final localStore = FakeAppleIapStore()..available = false;
+    final localService = AppleIapService(
+      store: localStore,
+      productIds: {'test.product.course'},
+      isIos: true,
+    );
+    final localCubit = AppleIapCubit(
+      service: localService,
+      productIds: {'test.product.course'},
+      isIos: true,
+    );
+
+    await localCubit.loadProducts();
+
+    expect(localCubit.state.status, AppleIapStatus.unavailable);
+    expect(localCubit.state.products, isEmpty);
+    await localCubit.close();
+    await localStore.close();
+  });
+
+  test('StoreKit response errors become a failure state', () async {
+    final localStore = FakeAppleIapStore()
+      ..response = ProductDetailsResponse(
+        productDetails: const [],
+        notFoundIDs: const ['test.product.course'],
+        error: IAPError(
+          source: 'test',
+          code: 'storekit_no_response',
+          message: 'StoreKit response failed',
+        ),
+      );
+    final localService = AppleIapService(
+      store: localStore,
+      productIds: {'test.product.course'},
+      isIos: true,
+    );
+    final localCubit = AppleIapCubit(
+      service: localService,
+      productIds: {'test.product.course'},
+      isIos: true,
+    );
+
+    await localCubit.loadProducts();
+
+    expect(localCubit.state.status, AppleIapStatus.failure);
+    expect(localCubit.state.message, 'StoreKit response failed');
+    await localCubit.close();
+    await localStore.close();
+  });
+
+  test('not found products become unavailable without a product', () async {
+    final localStore = FakeAppleIapStore()
+      ..response = ProductDetailsResponse(
+        productDetails: const [],
+        notFoundIDs: const ['test.product.course'],
+      );
+    final localService = AppleIapService(
+      store: localStore,
+      productIds: {'test.product.course'},
+      isIos: true,
+    );
+    final localCubit = AppleIapCubit(
+      service: localService,
+      productIds: {'test.product.course'},
+      isIos: true,
+    );
+
+    await localCubit.loadProducts();
+
+    expect(localCubit.state.status, AppleIapStatus.unavailable);
+    expect(localCubit.state.products, isEmpty);
+    await localCubit.close();
+    await localStore.close();
   });
 
   test(

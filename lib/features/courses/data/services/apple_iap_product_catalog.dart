@@ -19,6 +19,12 @@ class AppleIapProductCatalog {
 
   static Set<String> get productIds => products.keys.toSet();
 
+  static bool hasProductFor(AppleIapProductType type, int contentId) {
+    return products.values.any(
+      (target) => target.type == type && target.contentId == contentId,
+    );
+  }
+
   static AppleIapProductTarget? targetFor(String productId) =>
       products[productId];
 }

@@ -30,6 +30,20 @@ class AppleIapPurchaseSection extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    final matchingProductIds = AppleIapProductCatalog.products.entries
+        .where(
+          (entry) =>
+              entry.value.type == type && entry.value.contentId == contentId,
+        )
+        .map((entry) => entry.key)
+        .toSet();
+    if (matchingProductIds.isEmpty) {
+      debugPrint(
+        '[IAP][Section] hidden: no catalog product for $type/$contentId',
+      );
+      return const SizedBox.shrink();
+    }
+
     return BlocBuilder<RemoteConfigCubit, RemoteConfigState>(
       builder: (context, remoteConfigState) {
         if (!remoteConfigState.iosIapEnabled) {
@@ -39,14 +53,6 @@ class AppleIapPurchaseSection extends StatelessWidget {
 
         return BlocBuilder<AppleIapCubit, AppleIapState>(
           builder: (context, state) {
-            final matchingProductIds = AppleIapProductCatalog.products.entries
-                .where(
-                  (entry) =>
-                      entry.value.type == type &&
-                      entry.value.contentId == contentId,
-                )
-                .map((entry) => entry.key)
-                .toSet();
             final products = state.products
                 .where((product) => matchingProductIds.contains(product.id))
                 .toList(growable: false);
