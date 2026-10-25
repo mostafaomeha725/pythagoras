@@ -13,21 +13,6 @@ class CourseDetailsCubit extends Cubit<CourseDetailsState> {
     emit(CourseDetailsLoading());
 
     try {
-      // 1. Try Cache (SWR Pattern)
-      final cacheResult = await getCourseCurriculumUseCase(
-        courseId,
-        fromCache: true,
-      );
-
-      bool hasCache = false;
-      cacheResult.fold((failure) {}, (courseDetail) {
-        if (isClosed) return;
-        hasCache = true;
-        emit(CourseDetailsLoaded(courseDetail: courseDetail));
-      });
-
-      // 2. Fetch Remote (Background revalidate)
-      // Using curriculum API to get both details and videos
       final result = await getCourseCurriculumUseCase(
         courseId,
         fromCache: false,
@@ -35,8 +20,7 @@ class CourseDetailsCubit extends Cubit<CourseDetailsState> {
 
       result.fold(
         (failure) {
-          // Only show error if we don't have cache to display
-          if (!hasCache && !isClosed) {
+          if (!isClosed) {
             emit(CourseDetailsError(failure.message));
           }
         },
@@ -47,7 +31,7 @@ class CourseDetailsCubit extends Cubit<CourseDetailsState> {
         },
       );
     } catch (error) {
-      if (!isClosed && state is! CourseDetailsLoaded) {
+      if (!isClosed) {
         emit(CourseDetailsError(error.toString()));
       }
     }

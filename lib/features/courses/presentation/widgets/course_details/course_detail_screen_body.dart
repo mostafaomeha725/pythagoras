@@ -52,8 +52,6 @@ class CourseDetailScreenBody extends StatelessWidget {
               course: course,
             );
           }),
-
-          SizedBox(height: 120.h),
         ],
       ),
     );

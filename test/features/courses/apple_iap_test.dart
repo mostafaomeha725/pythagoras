@@ -5,6 +5,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pythagoras/core/enums/app_enums.dart';
 import 'package:pythagoras/features/courses/data/services/apple_iap_service.dart';
 import 'package:pythagoras/features/courses/data/services/apple_iap_product_catalog.dart';
 import 'package:pythagoras/features/courses/data/services/apple_iap_store.dart';
@@ -161,9 +163,27 @@ void main() {
     await store.close();
   });
 
-  test('only Course 21 is eligible for automatic IAP product loading', () {
+  test('course product IDs map to the correct course IDs', () {
+    final course21 = AppleIapProductCatalog.targetFor('pythagoras.course.21');
+    final course29 = AppleIapProductCatalog.targetFor('pythagoras.course.29');
+
+    expect(course21?.type, AppleIapProductType.course);
+    expect(course21?.contentId, 21);
+    expect(course29?.type, AppleIapProductType.course);
+    expect(course29?.contentId, 29);
+    expect(
+      AppleIapProductCatalog.productIds,
+      containsAll(['pythagoras.course.21', 'pythagoras.course.29']),
+    );
+  });
+
+  test('Courses 21 and 29 are eligible for automatic IAP product loading', () {
     expect(
       AppleIapProductCatalog.hasProductFor(AppleIapProductType.course, 21),
+      isTrue,
+    );
+    expect(
+      AppleIapProductCatalog.hasProductFor(AppleIapProductType.course, 29),
       isTrue,
     );
     expect(
@@ -215,6 +235,40 @@ void main() {
     await localStore.close();
   });
 
+  test(
+    'StoreKit becoming unavailable clears stale products and blocks buying',
+    () async {
+      final localStore = FakeAppleIapStore()
+        ..response = ProductDetailsResponse(
+          productDetails: [product()],
+          notFoundIDs: const [],
+        );
+      final localService = AppleIapService(
+        store: localStore,
+        productIds: {'test.product.course'},
+        isIos: true,
+      );
+      final localCubit = AppleIapCubit(
+        service: localService,
+        productIds: {'test.product.course'},
+        isIos: true,
+      );
+      await localCubit.loadProducts();
+      expect(localCubit.state.status, AppleIapStatus.ready);
+      expect(localCubit.state.products, hasLength(1));
+
+      localStore.available = false;
+      await localCubit.updateIapEnabled(true);
+      await localCubit.purchase('test.product.course');
+
+      expect(localCubit.state.status, AppleIapStatus.unavailable);
+      expect(localCubit.state.products, isEmpty);
+      expect(localStore.purchaseCalls, 0);
+      await localCubit.close();
+      await localStore.close();
+    },
+  );
+
   test('disabled IAP flag blocks load, purchase, and restore calls', () async {
     final localStore = FakeAppleIapStore()..isIapEnabled = false;
     final localService = AppleIapService(
@@ -241,7 +295,7 @@ void main() {
     await localStore.close();
   });
 
-  test('enrolled courses cannot load or invoke Apple IAP', () async {
+  test('enrolled courses block purchase but still allow restore', () async {
     final localStore = FakeAppleIapStore();
     final localService = AppleIapService(
       store: localStore,
@@ -257,39 +311,52 @@ void main() {
 
     await localCubit.loadProducts();
     await localCubit.purchase('test.product.course');
-    await localCubit.restorePurchases();
+    final restore = localCubit.restorePurchases();
+    await settleStream();
+    localStore.purchaseController.add([
+      purchaseDetails(PurchaseStatus.restored),
+    ]);
+    await restore;
 
     expect(localCubit.state.products, isEmpty);
+    expect(localCubit.state.status, AppleIapStatus.restored);
+    expect(localCubit.state.transactionKey, isNull);
     expect(localStore.loadProductsCalls, 0);
     expect(localStore.purchaseCalls, 0);
-    expect(localStore.restoreCalls, 0);
+    expect(localStore.restoreCalls, 1);
+    expect(localStore.completedPurchases, hasLength(1));
     await localCubit.close();
     await localStore.close();
   });
 
-  test('pending enrollment requests also block Apple IAP', () async {
-    final localStore = FakeAppleIapStore();
-    final localService = AppleIapService(
-      store: localStore,
-      productIds: {'test.product.course'},
-      isIos: true,
-    );
-    final localCubit = AppleIapCubit(
-      service: localService,
-      productIds: {'test.product.course'},
-      isIos: true,
-      hasPendingRequest: true,
-    );
+  test(
+    'pending enrollment requests block purchase but allow restore',
+    () async {
+      final localStore = FakeAppleIapStore();
+      final localService = AppleIapService(
+        store: localStore,
+        productIds: {'test.product.course'},
+        isIos: true,
+      );
+      final localCubit = AppleIapCubit(
+        service: localService,
+        productIds: {'test.product.course'},
+        isIos: true,
+        restoreTimeout: Duration.zero,
+        hasPendingRequest: true,
+      );
 
-    await localCubit.loadProducts();
-    await localCubit.restorePurchases();
+      await localCubit.loadProducts();
+      await localCubit.restorePurchases();
 
-    expect(localCubit.state.products, isEmpty);
-    expect(localStore.loadProductsCalls, 0);
-    expect(localStore.restoreCalls, 0);
-    await localCubit.close();
-    await localStore.close();
-  });
+      expect(localCubit.state.products, isEmpty);
+      expect(localStore.loadProductsCalls, 0);
+      expect(localStore.restoreCalls, 1);
+      expect(localCubit.state.status, AppleIapStatus.restoreEmpty);
+      await localCubit.close();
+      await localStore.close();
+    },
+  );
 
   test('reenabling IAP reloads products after a disabled state', () async {
     final localStore = FakeAppleIapStore()
@@ -386,7 +453,7 @@ void main() {
   });
 
   test(
-    'API enrollment updates block and later restore IAP eligibility',
+    'API enrollment updates block purchase without blocking restore',
     () async {
       final localStore = FakeAppleIapStore()
         ..response = ProductDetailsResponse(
@@ -402,10 +469,12 @@ void main() {
         service: localService,
         productIds: {'test.product.course'},
         isIos: true,
+        restoreTimeout: Duration.zero,
       );
       await localCubit.loadProducts();
 
       await localCubit.updateCourseAccess(
+        isRequestStatusEligible: false,
         isEnrolled: true,
         hasPendingRequest: false,
       );
@@ -413,9 +482,21 @@ void main() {
       await localCubit.purchase('test.product.course');
       await localCubit.restorePurchases();
       expect(localStore.purchaseCalls, 0);
-      expect(localStore.restoreCalls, 0);
+      expect(localStore.restoreCalls, 1);
 
       await localCubit.updateCourseAccess(
+        isRequestStatusEligible: false,
+        isEnrolled: false,
+        hasPendingRequest: false,
+      );
+      await localCubit.purchase('test.product.course');
+      await localCubit.restorePurchases();
+      expect(localCubit.state.products, isEmpty);
+      expect(localStore.purchaseCalls, 0);
+      expect(localStore.restoreCalls, 2);
+
+      await localCubit.updateCourseAccess(
+        isRequestStatusEligible: true,
         isEnrolled: false,
         hasPendingRequest: false,
       );
@@ -467,6 +548,7 @@ void main() {
                 body: AppleIapPurchaseSection(
                   type: AppleIapProductType.course,
                   contentId: 21,
+                  isRequestStatusEligible: true,
                 ),
               ),
             ),
@@ -539,6 +621,7 @@ void main() {
                 body: const AppleIapPurchaseSection(
                   type: AppleIapProductType.course,
                   contentId: 21,
+                  isRequestStatusEligible: true,
                   tabletLandscape: true,
                 ),
               ),
@@ -578,28 +661,213 @@ void main() {
     timeout: const Timeout(Duration(seconds: 20)),
   );
 
-  testWidgets('Apple actions are hidden for enrolled or pending courses', (
+  testWidgets('Restore remains visible when purchase is ineligible', (
     tester,
   ) async {
+    final remoteConfigService = FakeRemoteConfigService(enabled: true);
+    final remoteConfigCubit = RemoteConfigCubit(
+      remoteConfigService: remoteConfigService,
+    );
+    await remoteConfigCubit.load();
+    final localStore = FakeAppleIapStore()
+      ..response = ProductDetailsResponse(
+        productDetails: [product()],
+        notFoundIDs: const [],
+      );
+    final localService = AppleIapService(
+      store: localStore,
+      productIds: {'test.product.course'},
+      isIos: true,
+    );
+    final localCubit = AppleIapCubit(
+      service: localService,
+      productIds: {'test.product.course'},
+      isIos: true,
+    );
+    await localCubit.loadProducts();
+
     for (final access in [
-      (isEnrolled: true, hasPendingRequest: false),
-      (isEnrolled: false, hasPendingRequest: true),
+      (
+        isRequestStatusEligible: true,
+        isEnrolled: true,
+        hasPendingRequest: false,
+      ),
+      (
+        isRequestStatusEligible: false,
+        isEnrolled: false,
+        hasPendingRequest: true,
+      ),
+      (
+        isRequestStatusEligible: false,
+        isEnrolled: false,
+        hasPendingRequest: false,
+      ),
     ]) {
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: AppleIapPurchaseSection(
-              type: AppleIapProductType.course,
-              contentId: 21,
-              isEnrolled: access.isEnrolled,
-              hasPendingRequest: access.hasPendingRequest,
+        MultiBlocProvider(
+          providers: [
+            BlocProvider<RemoteConfigCubit>.value(value: remoteConfigCubit),
+            BlocProvider<AppleIapCubit>.value(value: localCubit),
+          ],
+          child: MaterialApp(
+            theme: ThemeData(platform: TargetPlatform.iOS),
+            home: Scaffold(
+              body: AppleIapPurchaseSection(
+                type: AppleIapProductType.course,
+                contentId: 21,
+                isRequestStatusEligible: access.isRequestStatusEligible,
+                isEnrolled: access.isEnrolled,
+                hasPendingRequest: access.hasPendingRequest,
+              ),
             ),
           ),
         ),
       );
-      expect(find.text('استعادة المشتريات'), findsNothing);
+      expect(find.text('استعادة المشتريات'), findsOneWidget);
       expect(find.textContaining('شراء عبر Apple'), findsNothing);
     }
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.runAsync(() async {
+      await localCubit.close();
+      await remoteConfigCubit.close();
+      await localStore.close();
+      await remoteConfigService.updates.close();
+    });
+  });
+
+  testWidgets('unavailable Apple product shows a message but no buy button', (
+    tester,
+  ) async {
+    final remoteConfigService = FakeRemoteConfigService(enabled: true);
+    final remoteConfigCubit = RemoteConfigCubit(
+      remoteConfigService: remoteConfigService,
+    );
+    await remoteConfigCubit.load();
+    final localStore = FakeAppleIapStore()
+      ..response = ProductDetailsResponse(
+        productDetails: const [],
+        notFoundIDs: const ['pythagoras.course.21'],
+      );
+    final localService = AppleIapService(
+      store: localStore,
+      productIds: {'pythagoras.course.21'},
+      isIos: true,
+    );
+    final localCubit = AppleIapCubit(
+      service: localService,
+      productIds: {'pythagoras.course.21'},
+      isIos: true,
+    );
+    await localCubit.loadProducts();
+
+    await tester.pumpWidget(
+      ScreenUtilInit(
+        designSize: const Size(390, 844),
+        builder: (context, child) => MultiBlocProvider(
+          providers: [
+            BlocProvider<RemoteConfigCubit>.value(value: remoteConfigCubit),
+            BlocProvider<AppleIapCubit>.value(value: localCubit),
+          ],
+          child: MaterialApp(
+            theme: ThemeData(platform: TargetPlatform.iOS),
+            home: const Scaffold(
+              body: AppleIapPurchaseSection(
+                type: AppleIapProductType.course,
+                contentId: 21,
+                isRequestStatusEligible: true,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('الشراء عبر Apple غير متاح حاليًا'), findsOneWidget);
+    expect(find.textContaining('شراء عبر Apple -'), findsNothing);
+    expect(find.text('استعادة المشتريات'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.runAsync(() async {
+      await localCubit.close();
+      await remoteConfigCubit.close();
+      await localStore.close();
+      await remoteConfigService.updates.close();
+    });
+  });
+
+  testWidgets('Restore button delegates only one in-flight restore', (
+    tester,
+  ) async {
+    final remoteConfigService = FakeRemoteConfigService(enabled: true);
+    final remoteConfigCubit = RemoteConfigCubit(
+      remoteConfigService: remoteConfigService,
+    );
+    await remoteConfigCubit.load();
+    final localStore = FakeAppleIapStore()..restoreGate = Completer<void>();
+    final localService = AppleIapService(
+      store: localStore,
+      productIds: {'test.product.course'},
+      isIos: true,
+    );
+    final localCubit = AppleIapCubit(
+      service: localService,
+      productIds: {'test.product.course'},
+      isIos: true,
+      isEnrolled: true,
+      restoreTimeout: const Duration(seconds: 2),
+    );
+
+    await tester.pumpWidget(
+      ScreenUtilInit(
+        designSize: const Size(390, 844),
+        builder: (context, child) => MultiBlocProvider(
+          providers: [
+            BlocProvider<RemoteConfigCubit>.value(value: remoteConfigCubit),
+            BlocProvider<AppleIapCubit>.value(value: localCubit),
+          ],
+          child: MaterialApp(
+            theme: ThemeData(platform: TargetPlatform.iOS),
+            home: const Scaffold(
+              body: AppleIapPurchaseSection(
+                type: AppleIapProductType.course,
+                contentId: 21,
+                isRequestStatusEligible: false,
+                isEnrolled: true,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('استعادة المشتريات'), findsOneWidget);
+    expect(find.textContaining('شراء عبر Apple'), findsNothing);
+    await tester.tap(find.text('استعادة المشتريات'));
+    await tester.pump();
+    expect(localStore.restoreCalls, 1);
+    expect(localCubit.state.status, AppleIapStatus.loading);
+
+    await tester.tap(find.text('استعادة المشتريات'));
+    await tester.pump();
+    expect(localStore.restoreCalls, 1);
+
+    localStore.purchaseController.add([
+      purchaseDetails(PurchaseStatus.restored),
+    ]);
+    localStore.restoreGate!.complete();
+    await tester.pump();
+    await tester.pump();
+    expect(localCubit.state.status, AppleIapStatus.restored);
+    expect(localCubit.state.transactionKey, isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.runAsync(() async {
+      await localCubit.close();
+      await remoteConfigCubit.close();
+      await localStore.close();
+      await remoteConfigService.updates.close();
+    });
   });
 
   test('StoreKit response errors become a failure state', () async {
@@ -706,25 +974,32 @@ void main() {
     },
   );
 
-  test('cancellation and errors update state without completion', () async {
-    store.purchaseController.add([purchaseDetails(PurchaseStatus.canceled)]);
-    await settleStream();
-    expect(cubit.state.status, AppleIapStatus.cancelled);
-    expect(store.completedPurchases, isEmpty);
+  test(
+    'cancellation and errors are handled and their transactions completed',
+    () async {
+      final canceled = purchaseDetails(PurchaseStatus.canceled);
+      store.purchaseController.add([canceled]);
+      await settleStream();
+      expect(cubit.state.status, AppleIapStatus.cancelled);
+      expect(store.completedPurchases, [canceled]);
 
-    final error = IAPError(
-      source: 'test',
-      code: 'failed',
-      message: 'purchase failed',
-    );
-    store.purchaseController.add([
-      purchaseDetails(PurchaseStatus.error, id: 'transaction-2', error: error),
-    ]);
-    await settleStream();
-    expect(cubit.state.status, AppleIapStatus.failure);
-    expect(cubit.state.message, 'purchase failed');
-    expect(store.completedPurchases, isEmpty);
-  });
+      final error = IAPError(
+        source: 'test',
+        code: 'failed',
+        message: 'purchase failed',
+      );
+      final failedPurchase = purchaseDetails(
+        PurchaseStatus.error,
+        id: 'transaction-2',
+        error: error,
+      );
+      store.purchaseController.add([failedPurchase]);
+      await settleStream();
+      expect(cubit.state.status, AppleIapStatus.failure);
+      expect(cubit.state.message, 'purchase failed');
+      expect(store.completedPurchases, [canceled, failedPurchase]);
+    },
+  );
 
   test(
     'confirmed purchase is completed only after the request succeeds',
@@ -743,6 +1018,92 @@ void main() {
       expect(store.completedPurchases, [purchased]);
     },
   );
+
+  test(
+    'a local transaction key cannot be reused by a different student',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        PreferencesKeys.userId.name: 202,
+        'apple_iap_submitted_purchase_keys': ['apple-tx-previous-account'],
+        'apple_iap_submitted_purchase_owners': [
+          '101|apple-tx-previous-account',
+        ],
+      });
+      final preferences = await SharedPreferences.getInstance();
+      final localStore = FakeAppleIapStore()
+        ..response = ProductDetailsResponse(
+          productDetails: [product()],
+          notFoundIDs: const [],
+        );
+      final localService = AppleIapService(
+        store: localStore,
+        productIds: {'test.product.course'},
+        isIos: true,
+      );
+      final localCubit = AppleIapCubit(
+        service: localService,
+        productIds: {'test.product.course'},
+        isIos: true,
+        preferences: preferences,
+      );
+      await localCubit.loadProducts();
+
+      localStore.purchaseController.add([
+        purchaseDetails(
+          PurchaseStatus.purchased,
+          id: 'apple-tx-previous-account',
+        ),
+      ]);
+      await settleStream();
+
+      expect(localCubit.state.status, AppleIapStatus.failure);
+      expect(localCubit.state.transactionKey, isNull);
+      expect(localCubit.state.message, contains('حساب طالب آخر'));
+      expect(localStore.completedPurchases, hasLength(1));
+      await localCubit.close();
+      await localStore.close();
+    },
+  );
+
+  test('successful request records the transaction owner account', () async {
+    SharedPreferences.setMockInitialValues({PreferencesKeys.userId.name: 303});
+    final preferences = await SharedPreferences.getInstance();
+    final localStore = FakeAppleIapStore()
+      ..response = ProductDetailsResponse(
+        productDetails: [product()],
+        notFoundIDs: const [],
+      );
+    final localService = AppleIapService(
+      store: localStore,
+      productIds: {'test.product.course'},
+      isIos: true,
+    );
+    final localCubit = AppleIapCubit(
+      service: localService,
+      productIds: {'test.product.course'},
+      isIos: true,
+      preferences: preferences,
+    );
+    await localCubit.loadProducts();
+
+    final purchased = purchaseDetails(PurchaseStatus.purchased);
+    localStore.purchaseController.add([purchased]);
+    await settleStream();
+    expect(localCubit.state.status, AppleIapStatus.purchaseConfirmed);
+    expect(
+      preferences.getStringList('apple_iap_submitted_purchase_owners'),
+      isNull,
+    );
+
+    await localCubit.completeConfirmedPurchase('transaction-1');
+
+    expect(
+      preferences.getStringList('apple_iap_submitted_purchase_owners'),
+      contains('303|transaction-1'),
+    );
+    await localCubit.close();
+    await localStore.close();
+  });
 
   test(
     'a purchase that cannot start fails without leaving an active product',
@@ -786,9 +1147,13 @@ void main() {
     store.purchaseController.add([restored]);
     await restore;
     expect(cubit.state.status, AppleIapStatus.restored);
+    expect(cubit.state.status, isNot(AppleIapStatus.purchaseConfirmed));
     expect(cubit.state.transactionKey, isNull);
     expect(store.completedPurchases, hasLength(1));
-    expect(cubit.state.message, contains('دون إنشاء طلب'));
+    expect(
+      cubit.state.message,
+      'تمت استعادة المشتريات دون إنشاء طلب تفعيل جديد',
+    );
   });
 
   test(
@@ -857,6 +1222,42 @@ void main() {
     await localCubit.close();
     await localStore.close();
   });
+
+  test(
+    'pending restore times out without implying payment or activation',
+    () async {
+      final localStore = FakeAppleIapStore();
+      final localService = AppleIapService(
+        store: localStore,
+        productIds: {'test.product.course'},
+        isIos: true,
+      );
+      final localCubit = AppleIapCubit(
+        service: localService,
+        productIds: {'test.product.course'},
+        isIos: true,
+        restoreTimeout: const Duration(milliseconds: 20),
+      );
+      await localCubit.loadProducts();
+
+      final restore = localCubit.restorePurchases();
+      await settleStream();
+      localStore.purchaseController.add([
+        purchaseDetails(PurchaseStatus.pending),
+      ]);
+
+      await restore;
+
+      expect(localCubit.state.status, AppleIapStatus.failure);
+      expect(
+        localCubit.state.message,
+        contains('لم يتم تأكيد الدفع أو التفعيل'),
+      );
+      expect(localCubit.state.transactionKey, isNull);
+      await localCubit.close();
+      await localStore.close();
+    },
+  );
 
   test('restore times out when the StoreKit call never completes', () async {
     final localStore = FakeAppleIapStore()..restoreGate = Completer<void>();

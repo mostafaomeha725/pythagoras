@@ -1,8 +1,7 @@
-import 'dart:async';
-
 import 'package:dartz/dartz.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pythagoras/core/error/failure.dart';
+import 'package:pythagoras/features/courses/data/models/course_detail_model.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_detail.dart';
 import 'package:pythagoras/features/courses/domain/repositories/courses_repository.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/get_course_curriculum_use_case.dart';
@@ -52,61 +51,116 @@ void main() {
 
   tearDown(() => cubit.close());
 
-  test('starts in Initial and emits Loading before cache completes', () async {
-    final cache = Completer<Either<Failure, CourseDetail>>();
-    repository.handler = (fromCache) =>
-        fromCache ? cache.future : Future.value(const Right(course));
+  test('fetches current course status directly from the API', () async {
+    final cacheModes = <bool>[];
+    repository.handler = (fromCache) {
+      cacheModes.add(fromCache);
+      return Future.value(const Right(course));
+    };
 
     expect(cubit.state, isA<CourseDetailsInitial>());
     final request = cubit.fetchCourseDetails(21);
 
     expect(cubit.state, isA<CourseDetailsLoading>());
-    cache.complete(const Left(Failure('No cached data')));
     await request;
     expect(cubit.state, isA<CourseDetailsLoaded>());
+    expect(cacheModes, [false]);
   });
 
-  test('emits cached Loaded state, then remote Loaded state', () async {
-    repository.handler = (fromCache) => Future.value(
-      fromCache
-          ? const Right(course)
-          : Right(course.copyWith(title: 'Remote course')),
-    );
+  test(
+    'never displays cached enrollment before the current API response',
+    () async {
+      repository.handler = (fromCache) async {
+        if (fromCache) return const Right(course);
+        return Right(course.copyWith(title: 'Current account course'));
+      };
 
-    final states = <CourseDetailsState>[];
-    final subscription = cubit.stream.listen(states.add);
-    await cubit.fetchCourseDetails(21);
-    await Future<void>.delayed(Duration.zero);
-    await subscription.cancel();
+      final states = <CourseDetailsState>[];
+      final subscription = cubit.stream.listen(states.add);
+      await cubit.fetchCourseDetails(21);
+      await Future<void>.delayed(Duration.zero);
+      await subscription.cancel();
 
-    expect(states, hasLength(3));
-    expect(states[0], isA<CourseDetailsLoading>());
-    expect((states[1] as CourseDetailsLoaded).courseDetail.title, 'Course 21');
-    expect(
-      (states[2] as CourseDetailsLoaded).courseDetail.title,
-      'Remote course',
-    );
-  });
+      expect(states, hasLength(2));
+      expect(states[0], isA<CourseDetailsLoading>());
+      expect(
+        (states[1] as CourseDetailsLoaded).courseDetail.title,
+        'Current account course',
+      );
+    },
+  );
 
-  test('emits Error when cache and remote both fail', () async {
-    repository.handler = (fromCache) => Future.value(
-      Left(Failure(fromCache ? 'cache failed' : 'remote failed')),
-    );
+  test(
+    'a second account refresh uses its own API response, never cached status',
+    () async {
+      final accountResponses = [
+        course.copyWith(isEnrolled: true, requestStatus: 'accepted'),
+        course.copyWith(isEnrolled: false, requestStatus: 'not_requested'),
+      ];
+      final cacheModes = <bool>[];
+      repository.handler = (fromCache) {
+        cacheModes.add(fromCache);
+        return Future.value(Right(accountResponses.removeAt(0)));
+      };
 
-    await cubit.fetchCourseDetails(21);
+      await cubit.fetchCourseDetails(21);
+      expect(
+        (cubit.state as CourseDetailsLoaded).courseDetail.isEnrolled,
+        isTrue,
+      );
 
-    expect(cubit.state, isA<CourseDetailsError>());
-    expect((cubit.state as CourseDetailsError).message, 'remote failed');
-  });
+      await cubit.fetchCourseDetails(21);
+      final secondAccountCourse =
+          (cubit.state as CourseDetailsLoaded).courseDetail;
+      expect(secondAccountCourse.isEnrolled, isFalse);
+      expect(secondAccountCourse.requestStatus, 'not_requested');
+      expect(cacheModes, [false, false]);
+    },
+  );
 
-  test('emits Error when reading cache throws', () async {
+  test(
+    'course model normalizes request_status and handles unknown values safely',
+    () {
+      CourseDetailModel parseStatus(String requestStatus) =>
+          CourseDetailModel.fromJson({
+            'id': 21,
+            'title': 'Course 21',
+            'request_status': requestStatus,
+            'chapters': const [],
+          });
+
+      final accepted = parseStatus(' accepted ');
+      expect(accepted.requestStatus, 'accepted');
+      expect(accepted.isEnrolled, isTrue);
+
+      final pending = parseStatus('pending ');
+      expect(pending.requestStatus, 'pending');
+      expect(pending.isEnrolled, isFalse);
+
+      final unknown = parseStatus('unexpected ');
+      expect(unknown.requestStatus, 'unexpected');
+      expect(unknown.isEnrolled, isFalse);
+    },
+  );
+
+  test(
+    'emits API Error instead of falling back to cached enrollment',
+    () async {
+      repository.handler = (fromCache) =>
+          Future.value(const Left(Failure('remote failed')));
+
+      await cubit.fetchCourseDetails(21);
+
+      expect(cubit.state, isA<CourseDetailsError>());
+      expect((cubit.state as CourseDetailsError).message, 'remote failed');
+    },
+  );
+
+  test('emits Error when the current API request throws', () async {
     repository.handler = (fromCache) {
-      if (fromCache) {
-        return Future<Either<Failure, CourseDetail>>.error(
-          StateError('cache exception'),
-        );
-      }
-      return Future.value(const Right(course));
+      return Future<Either<Failure, CourseDetail>>.error(
+        StateError('API exception'),
+      );
     };
 
     await cubit.fetchCourseDetails(21);
@@ -114,7 +168,7 @@ void main() {
     expect(cubit.state, isA<CourseDetailsError>());
     expect(
       (cubit.state as CourseDetailsError).message,
-      contains('cache exception'),
+      contains('API exception'),
     );
   });
 }

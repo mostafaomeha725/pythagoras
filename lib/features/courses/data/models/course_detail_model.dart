@@ -30,6 +30,10 @@ class CourseDetailModel extends CourseDetail {
   factory CourseDetailModel.fromJson(Map<String, dynamic> json) {
     final general = json['general'] as Map<String, dynamic>? ?? {};
     final chaptersData = json['chapters'] as List<dynamic>? ?? [];
+    final requestStatus = (json['request_status'] as String?)
+        ?.trim()
+        .toLowerCase();
+    final isEnrolled = json['is_enrolled'] as bool? ?? false;
 
     return CourseDetailModel(
       id: json['id'] as int,
@@ -40,16 +44,14 @@ class CourseDetailModel extends CourseDetail {
       imageUrl: json['image_url'] as String?,
       introVideoUrl: json['intro_video_url'] as String?,
       introVideoType: json['intro_video_type'] as String?,
-      isEnrolled:
-          json['is_enrolled'] as bool? ??
-          (json['request_status'] == 'accepted'),
+      isEnrolled: isEnrolled || requestStatus == 'accepted',
       price: json['price'] as String? ?? '0',
       discountPrice: json['discount_price'] as String?,
       finalPrice: json['final_price'] as num? ?? 0,
       currencyLabel: json['currency_label'] as String? ?? '',
       studentsCount: json['students_count'] as int? ?? 0,
       isSaved: json['is_saved'] as bool? ?? false,
-      requestStatus: json['request_status'] as String?,
+      requestStatus: requestStatus,
       chapterRequest: json['chapter_request'] as String?,
       rating: general['rating'] as num? ?? 0,
       category: general['category'] as String? ?? '',

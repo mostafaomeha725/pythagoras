@@ -101,11 +101,13 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
           BlocListener<CourseDetailsCubit, CourseDetailsState>(
             listener: (context, state) {
               if (state is! CourseDetailsLoaded) return;
+              final requestStatus = state.courseDetail.requestStatus
+                  ?.trim()
+                  .toLowerCase();
               _appleIapCubit.updateCourseAccess(
+                isRequestStatusEligible: requestStatus == 'not_requested',
                 isEnrolled: state.courseDetail.isEnrolled,
-                hasPendingRequest:
-                    state.courseDetail.requestStatus?.trim().toLowerCase() ==
-                    'pending',
+                hasPendingRequest: requestStatus == 'pending',
               );
             },
           ),
@@ -130,6 +132,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                   );
                 }
               } else if (state is RequestEnrollmentError) {
+                EasyLoading.dismiss();
                 EasyLoading.showError(state.message);
               }
             },
@@ -140,6 +143,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
               if (state is DirectRequestLoading) {
                 EasyLoading.show(status: 'جاري التحميل...');
               } else if (state is DirectRequestSuccess) {
+                EasyLoading.dismiss();
                 EasyLoading.showSuccess(state.message);
                 final purchaseKey = _pendingApplePurchaseKey;
                 if (purchaseKey != null) {
@@ -156,12 +160,45 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                   context.read<CoursesListCubit>().fetchCourses();
                 }
               } else if (state is DirectRequestError) {
+                EasyLoading.dismiss();
                 EasyLoading.showError(state.message);
               }
             },
           ),
           BlocListener<AppleIapCubit, AppleIapState>(
             listener: (context, state) {
+              if (state.status == AppleIapStatus.loading &&
+                  state.message == 'جاري استعادة المشتريات...') {
+                EasyLoading.show(status: state.message);
+              } else if (state.status == AppleIapStatus.pending) {
+                EasyLoading.show(status: 'جاري انتظار تأكيد Apple...');
+              } else if (state.status == AppleIapStatus.purchaseConfirmed) {
+                EasyLoading.dismiss();
+              } else if (state.status == AppleIapStatus.restored) {
+                EasyLoading.dismiss();
+                EasyLoading.showInfo(
+                  'تمت استعادة معاملة Apple. هذا لا يعني تفعيل الكورس؛ يعتمد التفعيل على حالة الحساب من الخادم.',
+                );
+              } else if (state.status == AppleIapStatus.restoreEmpty) {
+                EasyLoading.dismiss();
+                EasyLoading.showInfo(
+                  state.message ?? 'لم يتم العثور على مشتريات سابقة',
+                );
+              } else if (state.status == AppleIapStatus.cancelled) {
+                EasyLoading.dismiss();
+                EasyLoading.showInfo(state.message ?? 'تم إلغاء عملية الشراء');
+              } else if (state.status == AppleIapStatus.failure) {
+                EasyLoading.dismiss();
+                EasyLoading.showError(
+                  state.message ?? 'تعذر إتمام عملية Apple',
+                );
+              } else if (state.status == AppleIapStatus.verificationRequired) {
+                EasyLoading.dismiss();
+                EasyLoading.showInfo(
+                  'المعاملة مستلمة، لكن تعذر التحقق من تفعيل الكورس.',
+                );
+              }
+
               if (state.status != AppleIapStatus.purchaseConfirmed ||
                   state.transactionKey == null ||
                   _pendingApplePurchaseKey != null) {
@@ -250,6 +287,11 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                             AppleIapPurchaseSection(
                               type: AppleIapProductType.course,
                               contentId: updatedCourse.id,
+                              isRequestStatusEligible:
+                                  updatedCourse.requestStatus
+                                      ?.trim()
+                                      .toLowerCase() ==
+                                  'not_requested',
                               isEnrolled: updatedCourse.isEnrolled,
                               hasPendingRequest:
                                   updatedCourse.requestStatus
@@ -257,7 +299,41 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                                       .toLowerCase() ==
                                   'pending',
                             ),
-                            CourseDetailBottomButton(course: updatedCourse),
+                            BlocBuilder<AppleIapCubit, AppleIapState>(
+                              builder: (context, appleIapState) {
+                                final requestStatus = updatedCourse
+                                    .requestStatus
+                                    ?.trim()
+                                    .toLowerCase();
+                                final productIds = AppleIapProductCatalog
+                                    .products
+                                    .entries
+                                    .where(
+                                      (entry) =>
+                                          entry.value.type ==
+                                              AppleIapProductType.course &&
+                                          entry.value.contentId ==
+                                              updatedCourse.id,
+                                    )
+                                    .map((entry) => entry.key)
+                                    .toSet();
+                                final hasVisibleAppleActions =
+                                    Theme.of(context).platform ==
+                                        TargetPlatform.iOS &&
+                                    remoteConfigState.iosIapEnabled &&
+                                    requestStatus == 'not_requested' &&
+                                    !updatedCourse.isEnrolled &&
+                                    appleIapState.products.any(
+                                      (product) =>
+                                          productIds.contains(product.id),
+                                    );
+                                return CourseDetailBottomButton(
+                                  course: updatedCourse,
+                                  appleIapActionsVisible:
+                                      hasVisibleAppleActions,
+                                );
+                              },
+                            ),
                           ],
                         );
                       }

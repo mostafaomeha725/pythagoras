@@ -13,18 +13,29 @@ import 'package:pythagoras/features/courses/presentation/cubit/request_enrollmen
 import 'package:pythagoras/core/widgets/custom_button.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_detail.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/apple_iap_action_spacing.dart';
 
 class CourseDetailBottomButton extends StatelessWidget {
   final CourseDetail course;
+  final bool appleIapActionsVisible;
 
-  const CourseDetailBottomButton({super.key, required this.course});
+  const CourseDetailBottomButton({
+    super.key,
+    required this.course,
+    this.appleIapActionsVisible = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final isPending = course.requestStatus?.trim().toLowerCase() == 'pending';
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 24.h),
+      padding: EdgeInsets.fromLTRB(
+        20.w,
+        appleIapActionsVisible ? appleIapActionSpacing.h : 16.h,
+        20.w,
+        24.h,
+      ),
       child: SafeArea(
         top: false,
         child: AppButton(

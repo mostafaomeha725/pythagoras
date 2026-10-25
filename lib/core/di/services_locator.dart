@@ -96,7 +96,11 @@ class ServiceLocator {
     );
     sl.registerFactory(() => RemoteConfigCubit(remoteConfigService: sl()));
     sl.registerFactory(
-      () => AppleIapCubit(service: sl<AppleIapService>(), preferences: sl()),
+      () => AppleIapCubit(
+        service: sl<AppleIapService>(),
+        preferences: sl(),
+        isRequestStatusEligible: false,
+      ),
     );
   }
 

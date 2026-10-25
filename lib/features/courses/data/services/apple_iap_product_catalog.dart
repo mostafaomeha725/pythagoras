@@ -10,10 +10,15 @@ class AppleIapProductTarget {
 class AppleIapProductCatalog {
   const AppleIapProductCatalog._();
 
+  // Temporary mapping until course data provides apple_product_id.
   static const Map<String, AppleIapProductTarget> products = {
     'pythagoras.course.21': AppleIapProductTarget(
       type: AppleIapProductType.course,
       contentId: 21,
+    ),
+    'pythagoras.course.29': AppleIapProductTarget(
+      type: AppleIapProductType.course,
+      contentId: 29,
     ),
   };
 
