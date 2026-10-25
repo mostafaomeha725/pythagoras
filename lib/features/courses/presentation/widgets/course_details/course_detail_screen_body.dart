@@ -57,3 +57,17 @@ class CourseDetailScreenBody extends StatelessWidget {
     );
   }
 }
+
+class CourseDetailBodyRegion extends StatelessWidget {
+  final Widget child;
+
+  const CourseDetailBodyRegion({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
+      return Flexible(fit: FlexFit.loose, child: child);
+    }
+    return Expanded(child: child);
+  }
+}

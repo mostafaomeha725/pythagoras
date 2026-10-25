@@ -170,6 +170,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
               if (state.status == AppleIapStatus.loading &&
                   state.message == 'جاري استعادة المشتريات...') {
                 EasyLoading.show(status: state.message);
+              } else if (state.status == AppleIapStatus.purchasing) {
+                EasyLoading.show(status: 'جاري بدء عملية الشراء عبر Apple...');
               } else if (state.status == AppleIapStatus.pending) {
                 EasyLoading.show(status: 'جاري انتظار تأكيد Apple...');
               } else if (state.status == AppleIapStatus.purchaseConfirmed) {
@@ -191,6 +193,16 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                 EasyLoading.dismiss();
                 EasyLoading.showError(
                   state.message ?? 'تعذر إتمام عملية Apple',
+                );
+              } else if (state.status == AppleIapStatus.transactionConflict) {
+                EasyLoading.dismiss();
+                EasyLoading.showError(
+                  state.message ?? 'هذه المعاملة مرتبطة بحساب طالب آخر',
+                );
+              } else if (state.status == AppleIapStatus.purchaseTimedOut) {
+                EasyLoading.dismiss();
+                EasyLoading.showInfo(
+                  state.message ?? 'لم يصل تأكيد من Apple؛ استخدم Restore.',
                 );
               } else if (state.status == AppleIapStatus.verificationRequired) {
                 EasyLoading.dismiss();
@@ -276,7 +288,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                         // ── Mobile Portrait & Tablet Portrait: original layout untouched ──
                         return Column(
                           children: [
-                            Expanded(
+                            CourseDetailBodyRegion(
                               child: SafeArea(
                                 top: false,
                                 child: CourseDetailScreenBody(

@@ -69,7 +69,22 @@ class AppleIapPurchaseSection extends StatelessWidget {
 
             final purchaseEligible =
                 isRequestStatusEligible && !isEnrolled && !hasPendingRequest;
-            final canPurchase = purchaseEligible && products.isNotEmpty;
+            final blocksCurrentProduct =
+                products.any(
+                  (product) => product.id == state.activeProductId,
+                ) &&
+                (state.status == AppleIapStatus.transactionConflict ||
+                    state.status == AppleIapStatus.purchaseTimedOut ||
+                    state.status == AppleIapStatus.restored);
+            final canPurchase =
+                purchaseEligible &&
+                !products.any(
+                  (product) => context
+                      .read<AppleIapCubit>()
+                      .purchaseNeedsReconciliationFor(product.id),
+                ) &&
+                !blocksCurrentProduct &&
+                products.isNotEmpty;
             final productUnavailable =
                 purchaseEligible &&
                 products.isEmpty &&

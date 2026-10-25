@@ -12,6 +12,8 @@ enum AppleIapStatus {
   restoreEmpty,
   purchaseConfirmed,
   verificationRequired,
+  transactionConflict,
+  purchaseTimedOut,
   unavailable,
   failure,
 }

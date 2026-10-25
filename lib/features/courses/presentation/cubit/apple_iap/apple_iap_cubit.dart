@@ -19,10 +19,15 @@ class AppleIapCubit extends Cubit<AppleIapState> {
   final bool _isIos;
   final SharedPreferences? _preferences;
   final Duration _restoreTimeout;
+  final Duration _purchaseResponseTimeout;
   StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
+  Timer? _purchaseResponseTimer;
   final Set<String> _processedTerminalPurchaseKeys = <String>{};
   final Set<String> _completedRestoredPurchaseKeys = <String>{};
   final Map<String, PurchaseDetails> _pendingPurchases = {};
+  final Set<String> _restoredProductIds = <String>{};
+  String? _unresolvedProductId;
+  String? _transactionConflictProductId;
   Completer<bool>? _restoreCompleter;
   Future<void>? _restoreFuture;
   bool _isCourseBlocked;
@@ -39,11 +44,13 @@ class AppleIapCubit extends Cubit<AppleIapState> {
     bool? isIos,
     SharedPreferences? preferences,
     Duration restoreTimeout = const Duration(seconds: 10),
+    Duration purchaseResponseTimeout = const Duration(seconds: 90),
     bool isEnrolled = false,
     bool hasPendingRequest = false,
     bool isRequestStatusEligible = true,
   }) : _preferences = preferences,
        _restoreTimeout = restoreTimeout,
+       _purchaseResponseTimeout = purchaseResponseTimeout,
        _isCourseBlocked =
            !isRequestStatusEligible || isEnrolled || hasPendingRequest,
        productIds = productIds ?? AppleIapProductCatalog.productIds,
@@ -144,7 +151,10 @@ class AppleIapCubit extends Cubit<AppleIapState> {
         _isCourseBlocked ||
         _restoreFuture != null ||
         _isPurchaseInProgress ||
-        state.status != AppleIapStatus.ready) {
+        _unresolvedProductId == productId ||
+        state.status == AppleIapStatus.loading ||
+        _transactionConflictProductId == productId ||
+        _restoredProductIds.contains(productId)) {
       return;
     }
     ProductDetails? product;
@@ -156,6 +166,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
     }
     if (product == null) return;
 
+    debugPrint('[IAP][Purchase] requested productId=$productId');
     emit(
       state.copyWith(
         status: AppleIapStatus.purchasing,
@@ -164,18 +175,35 @@ class AppleIapCubit extends Cubit<AppleIapState> {
       ),
     );
     try {
-      final started = await service.purchase(product);
+      final started = await service
+          .purchase(product)
+          .timeout(_purchaseResponseTimeout);
       if (!started && !isClosed) {
+        _purchaseResponseTimer?.cancel();
         emit(
           state.copyWith(
             status: AppleIapStatus.failure,
-            message: 'تعذر بدء عملية الشراء',
+            message:
+                'تعذر بدء عملية الشراء. إذا كان Apple ID يملك المنتج بالفعل، استخدم استعادة المشتريات بدل تكرار الشراء.',
             clearActiveProductId: true,
           ),
+        );
+      } else if (started &&
+          !isClosed &&
+          state.status == AppleIapStatus.purchasing) {
+        _purchaseResponseTimer?.cancel();
+        _purchaseResponseTimer = Timer(
+          _purchaseResponseTimeout,
+          _emitPurchaseTimedOut,
         );
       }
     } catch (error) {
       if (!isClosed) {
+        _purchaseResponseTimer?.cancel();
+        if (error is TimeoutException) {
+          _emitPurchaseTimedOut();
+          return;
+        }
         emit(
           state.copyWith(
             status: AppleIapStatus.failure,
@@ -198,6 +226,28 @@ class AppleIapCubit extends Cubit<AppleIapState> {
       state.status == AppleIapStatus.purchasing ||
       state.status == AppleIapStatus.pending ||
       state.status == AppleIapStatus.purchaseConfirmed;
+
+  bool get purchaseNeedsReconciliation => _unresolvedProductId != null;
+
+  bool purchaseNeedsReconciliationFor(String productId) =>
+      _unresolvedProductId == productId;
+
+  void _emitPurchaseTimedOut() {
+    if (isClosed ||
+        (state.status != AppleIapStatus.purchasing &&
+            state.status != AppleIapStatus.pending)) {
+      return;
+    }
+    _unresolvedProductId = state.activeProductId;
+    emit(
+      state.copyWith(
+        status: AppleIapStatus.purchaseTimedOut,
+        message: state.status == AppleIapStatus.pending
+            ? 'معاملة Apple ما زالت معلّقة. لم نبدأ محاولة أخرى؛ استخدم استعادة المشتريات للتحقق.'
+            : 'لم يصل تأكيد من Apple. لم نبدأ محاولة أخرى؛ استخدم استعادة المشتريات للتحقق.',
+      ),
+    );
+  }
 
   Future<void> updateIapEnabled(bool enabled) async {
     if (isClosed) return;
@@ -362,10 +412,28 @@ class AppleIapCubit extends Cubit<AppleIapState> {
 
       final purchaseKey = _purchaseKey(purchase);
       final terminalPurchaseKey = '${purchase.status}:$purchaseKey';
+      if (purchase.status != PurchaseStatus.pending) {
+        _purchaseResponseTimer?.cancel();
+        if (_unresolvedProductId == purchase.productID) {
+          _unresolvedProductId = null;
+        }
+      }
+      debugPrint(
+        '[IAP][Transaction] status=${purchase.status} '
+        'productId=${purchase.productID} '
+        'previouslySubmitted=${_submittedPurchaseKeys.contains(purchaseKey)}',
+      );
 
       switch (purchase.status) {
         case PurchaseStatus.pending:
           emit(state.copyWith(status: AppleIapStatus.pending));
+          if (_restoreFuture == null) {
+            _purchaseResponseTimer?.cancel();
+            _purchaseResponseTimer = Timer(
+              _purchaseResponseTimeout,
+              _emitPurchaseTimedOut,
+            );
+          }
         case PurchaseStatus.canceled:
           restoreFailed = true;
           if (!_processedTerminalPurchaseKeys.add(terminalPurchaseKey)) {
@@ -387,7 +455,8 @@ class AppleIapCubit extends Cubit<AppleIapState> {
           emit(
             state.copyWith(
               status: AppleIapStatus.failure,
-              message: purchase.error?.message ?? 'فشلت عملية الشراء',
+              message:
+                  '${purchase.error?.message ?? 'فشلت عملية الشراء'}. إذا كان Apple ID يملك المنتج بالفعل، استخدم استعادة المشتريات بدل تكرار الشراء.',
               clearActiveProductId: true,
             ),
           );
@@ -397,25 +466,17 @@ class AppleIapCubit extends Cubit<AppleIapState> {
             continue;
           }
           if (_submittedPurchaseKeys.contains(purchaseKey)) {
-            await service.completePurchase(purchase);
             final currentUserId = _preferences?.getInt(
               PreferencesKeys.userId.name,
             );
-            final previousOwnerId = _submittedPurchaseOwners[purchaseKey];
-            final message =
-                previousOwnerId != null &&
-                    currentUserId != null &&
-                    previousOwnerId != currentUserId
-                ? 'هذه المعاملة مسجلة محليًا لحساب طالب آخر. لم يتم نقلها أو إنشاء طلب جديد؛ سجّل الدخول بالحساب الأصلي أو تواصل مع الدعم.'
-                : 'وُجد سجل محلي لهذه المعاملة، لكن لا يمكن تأكيد حالة طلب التفعيل أو ارتباطه بالحساب الحالي من الخادم. لم يتم إنشاء طلب جديد.';
             emit(
-              state.copyWith(
-                status: AppleIapStatus.failure,
-                clearActiveProductId: true,
-                clearTransactionKey: true,
-                message: message,
+              _transactionConflictState(
+                _submittedTransactionMessage(purchaseKey, currentUserId),
+                productId: purchase.productID,
               ),
             );
+            _transactionConflictProductId = purchase.productID;
+            _completePreviouslySubmittedPurchase(purchase);
             continue;
           }
           _pendingPurchases[purchaseKey] = purchase;
@@ -434,14 +495,34 @@ class AppleIapCubit extends Cubit<AppleIapState> {
                 _completedRestoredPurchaseKeys.contains(purchaseKey);
             continue;
           }
+          final currentUserId = _preferences?.getInt(
+            PreferencesKeys.userId.name,
+          );
+          final previousOwnerId = _submittedPurchaseOwners[purchaseKey];
+          if (_submittedPurchaseKeys.contains(purchaseKey) &&
+              previousOwnerId != null &&
+              currentUserId != null &&
+              previousOwnerId != currentUserId) {
+            restoreFailed = true;
+            emit(
+              _transactionConflictState(
+                _submittedTransactionMessage(purchaseKey, currentUserId),
+                productId: purchase.productID,
+              ),
+            );
+            _transactionConflictProductId = purchase.productID;
+            _completePreviouslySubmittedPurchase(purchase);
+            continue;
+          }
           try {
             await service.completePurchase(purchase);
             _completedRestoredPurchaseKeys.add(purchaseKey);
+            _restoredProductIds.add(purchase.productID);
             restoreSucceeded = true;
             emit(
               state.copyWith(
                 status: AppleIapStatus.restored,
-                clearActiveProductId: true,
+                activeProductId: purchase.productID,
                 clearTransactionKey: true,
                 message: 'تمت استعادة المشتريات دون إنشاء طلب تفعيل جديد',
               ),
@@ -463,6 +544,40 @@ class AppleIapCubit extends Cubit<AppleIapState> {
       _finishRestore(false);
     } else if (restoreSucceeded) {
       _finishRestore(true);
+    }
+  }
+
+  String _submittedTransactionMessage(String purchaseKey, int? currentUserId) {
+    final previousOwnerId = _submittedPurchaseOwners[purchaseKey];
+    if (previousOwnerId != null &&
+        currentUserId != null &&
+        previousOwnerId != currentUserId) {
+      return 'هذه المعاملة مسجلة محليًا لحساب طالب آخر. لم يتم نقلها أو إنشاء طلب جديد؛ سجّل الدخول بالحساب الأصلي أو تواصل مع الدعم.';
+    }
+    return 'هذه المعاملة مسجلة مسبقًا. لم يتم إنشاء طلب جديد أو تفعيل هذا الحساب؛ استخدم الحساب المرتبط بها أو تواصل مع الدعم.';
+  }
+
+  AppleIapState _transactionConflictState(
+    String message, {
+    required String productId,
+  }) {
+    return state.copyWith(
+      status: AppleIapStatus.transactionConflict,
+      activeProductId: productId,
+      clearTransactionKey: true,
+      message: message,
+    );
+  }
+
+  Future<void> _completePreviouslySubmittedPurchase(
+    PurchaseDetails purchase,
+  ) async {
+    try {
+      await service.completePurchase(purchase);
+    } catch (error) {
+      debugPrint(
+        '[IAP][Store] duplicate transaction completion failed: $error',
+      );
     }
   }
 
@@ -499,6 +614,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
 
   @override
   Future<void> close() async {
+    _purchaseResponseTimer?.cancel();
     await _purchaseSubscription?.cancel();
     _finishRestore(false);
     return super.close();
