@@ -15,9 +15,14 @@ class AppleIapCubit extends Cubit<AppleIapState> {
   final Set<String> productIds;
   final bool _isIos;
   final SharedPreferences? _preferences;
+  final Duration _restoreTimeout;
   StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
   final Set<String> _processedTerminalPurchaseKeys = <String>{};
+  final Set<String> _completedRestoredPurchaseKeys = <String>{};
   final Map<String, PurchaseDetails> _pendingPurchases = {};
+  Completer<bool>? _restoreCompleter;
+  Future<void>? _restoreFuture;
+  bool _isCourseBlocked;
   late final Set<String> _submittedPurchaseKeys = {
     ...?_preferences?.getStringList(_submittedPurchaseKeysKey),
   };
@@ -28,7 +33,12 @@ class AppleIapCubit extends Cubit<AppleIapState> {
     Set<String>? productIds,
     bool? isIos,
     SharedPreferences? preferences,
+    Duration restoreTimeout = const Duration(seconds: 10),
+    bool isEnrolled = false,
+    bool hasPendingRequest = false,
   }) : _preferences = preferences,
+       _restoreTimeout = restoreTimeout,
+       _isCourseBlocked = isEnrolled || hasPendingRequest,
        productIds = productIds ?? AppleIapProductCatalog.productIds,
        _isIos = isIos ?? defaultTargetPlatform == TargetPlatform.iOS,
        super(const AppleIapState());
@@ -37,6 +47,17 @@ class AppleIapCubit extends Cubit<AppleIapState> {
 
   Future<void> _loadProducts() async {
     if (isClosed || !_isIos) return;
+    if (!service.isIapEnabled || _isCourseBlocked) {
+      emit(
+        state.copyWith(
+          status: AppleIapStatus.unavailable,
+          products: const [],
+          clearActiveProductId: true,
+          clearMessage: true,
+        ),
+      );
+      return;
+    }
     if (productIds.isEmpty) {
       emit(state.copyWith(status: AppleIapStatus.unavailable));
       return;
@@ -52,7 +73,10 @@ class AppleIapCubit extends Cubit<AppleIapState> {
       }
 
       await _purchaseSubscription?.cancel();
-      _purchaseSubscription = service.purchaseStream.listen(_handlePurchases);
+      _purchaseSubscription = service.purchaseStream.listen(
+        _handlePurchases,
+        onError: _handlePurchaseStreamError,
+      );
       final response = await service.loadProducts();
       debugPrint(
         '[IAP][Store] productDetails=${response.productDetails.map((product) => '${product.id}:${product.price}').toList()} '
@@ -95,7 +119,14 @@ class AppleIapCubit extends Cubit<AppleIapState> {
   }
 
   Future<void> purchase(String productId) async {
-    if (isClosed || state.status == AppleIapStatus.purchasing) return;
+    if (isClosed ||
+        !_isIos ||
+        !service.isIapEnabled ||
+        _isCourseBlocked ||
+        _restoreFuture != null ||
+        _isPurchaseInProgress) {
+      return;
+    }
     ProductDetails? product;
     for (final item in state.products) {
       if (item.id == productId) {
@@ -136,11 +167,82 @@ class AppleIapCubit extends Cubit<AppleIapState> {
     }
   }
 
-  Future<void> restorePurchases() async {
-    if (isClosed || !_isIos) return;
+  Future<void> restorePurchases() {
+    if (isClosed ||
+        !_isIos ||
+        !service.isIapEnabled ||
+        _isCourseBlocked ||
+        _isPurchaseInProgress) {
+      return Future<void>.value();
+    }
+    return _restoreFuture ??= _restorePurchases();
+  }
+
+  bool get _isPurchaseInProgress =>
+      state.status == AppleIapStatus.purchasing ||
+      state.status == AppleIapStatus.pending ||
+      state.status == AppleIapStatus.purchaseConfirmed;
+
+  Future<void> updateIapEnabled(bool enabled) async {
+    if (isClosed) return;
+    _loadFuture = null;
+    if (!enabled || _isCourseBlocked) {
+      emit(
+        state.copyWith(
+          status: AppleIapStatus.unavailable,
+          products: const [],
+          clearActiveProductId: true,
+          clearMessage: true,
+        ),
+      );
+      return;
+    }
+    await loadProducts();
+  }
+
+  Future<void> updateCourseAccess({
+    required bool isEnrolled,
+    required bool hasPendingRequest,
+  }) async {
+    if (isClosed) return;
+    final isBlocked = isEnrolled || hasPendingRequest;
+    if (_isCourseBlocked == isBlocked) return;
+    _isCourseBlocked = isBlocked;
+    await updateIapEnabled(service.isIapEnabled);
+  }
+
+  Future<void> _restorePurchases() async {
+    final restoreCompleter = Completer<bool>();
+    _restoreCompleter = restoreCompleter;
     try {
-      emit(state.copyWith(status: AppleIapStatus.loading, clearMessage: true));
-      await service.restorePurchases();
+      emit(
+        state.copyWith(
+          status: AppleIapStatus.loading,
+          message: 'جاري استعادة المشتريات...',
+        ),
+      );
+      final restoreResults =
+          await Future.wait<dynamic>([
+            service.restorePurchases(),
+            restoreCompleter.future,
+          ], eagerError: true).timeout(
+            _restoreTimeout,
+            onTimeout: () async => [
+              null,
+              restoreCompleter.isCompleted
+                  ? await restoreCompleter.future
+                  : false,
+            ],
+          );
+      final restored = restoreResults[1] == true;
+      if (!restored && !isClosed && state.status == AppleIapStatus.loading) {
+        emit(
+          state.copyWith(
+            status: AppleIapStatus.restoreEmpty,
+            message: 'لم يتم العثور على مشتريات سابقة',
+          ),
+        );
+      }
     } catch (error) {
       if (!isClosed) {
         emit(
@@ -150,6 +252,12 @@ class AppleIapCubit extends Cubit<AppleIapState> {
           ),
         );
       }
+    } finally {
+      if (!restoreCompleter.isCompleted) {
+        restoreCompleter.complete(false);
+      }
+      _restoreCompleter = null;
+      _restoreFuture = null;
     }
   }
 
@@ -165,18 +273,43 @@ class AppleIapCubit extends Cubit<AppleIapState> {
     await service.completePurchase(purchase);
   }
 
+  void _finishRestore(bool restored) {
+    final completer = _restoreCompleter;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete(restored);
+    }
+  }
+
+  void _handlePurchaseStreamError(Object error, StackTrace stackTrace) {
+    if (isClosed) return;
+    emit(
+      state.copyWith(
+        status: AppleIapStatus.failure,
+        message: error.toString(),
+        clearActiveProductId: true,
+      ),
+    );
+    _finishRestore(false);
+  }
+
   Future<void> _handlePurchases(List<PurchaseDetails> purchases) async {
+    var restoreSucceeded = false;
+    var restoreFailed = false;
     for (final purchase in purchases) {
       if (isClosed) return;
       if (!productIds.contains(purchase.productID)) continue;
 
       final purchaseKey = _purchaseKey(purchase);
+      final terminalPurchaseKey = '${purchase.status}:$purchaseKey';
 
       switch (purchase.status) {
         case PurchaseStatus.pending:
           emit(state.copyWith(status: AppleIapStatus.pending));
         case PurchaseStatus.canceled:
-          if (!_processedTerminalPurchaseKeys.add(purchaseKey)) continue;
+          restoreFailed = true;
+          if (!_processedTerminalPurchaseKeys.add(terminalPurchaseKey)) {
+            continue;
+          }
           emit(
             state.copyWith(
               status: AppleIapStatus.cancelled,
@@ -185,7 +318,10 @@ class AppleIapCubit extends Cubit<AppleIapState> {
             ),
           );
         case PurchaseStatus.error:
-          if (!_processedTerminalPurchaseKeys.add(purchaseKey)) continue;
+          restoreFailed = true;
+          if (!_processedTerminalPurchaseKeys.add(terminalPurchaseKey)) {
+            continue;
+          }
           emit(
             state.copyWith(
               status: AppleIapStatus.failure,
@@ -194,7 +330,9 @@ class AppleIapCubit extends Cubit<AppleIapState> {
             ),
           );
         case PurchaseStatus.purchased:
-          if (!_processedTerminalPurchaseKeys.add(purchaseKey)) continue;
+          if (!_processedTerminalPurchaseKeys.add(terminalPurchaseKey)) {
+            continue;
+          }
           if (_submittedPurchaseKeys.contains(purchaseKey)) {
             await service.completePurchase(purchase);
             emit(
@@ -217,17 +355,41 @@ class AppleIapCubit extends Cubit<AppleIapState> {
             ),
           );
         case PurchaseStatus.restored:
-          if (!_processedTerminalPurchaseKeys.add(purchaseKey)) continue;
-          await service.completePurchase(purchase);
-          emit(
-            state.copyWith(
-              status: AppleIapStatus.restored,
-              clearActiveProductId: true,
-              clearTransactionKey: true,
-              message: 'تمت استعادة المشتريات دون إنشاء طلب تفعيل جديد',
-            ),
-          );
+          if (!_processedTerminalPurchaseKeys.add(terminalPurchaseKey)) {
+            restoreSucceeded =
+                restoreSucceeded ||
+                _completedRestoredPurchaseKeys.contains(purchaseKey);
+            continue;
+          }
+          try {
+            await service.completePurchase(purchase);
+            _completedRestoredPurchaseKeys.add(purchaseKey);
+            restoreSucceeded = true;
+            emit(
+              state.copyWith(
+                status: AppleIapStatus.restored,
+                clearActiveProductId: true,
+                clearTransactionKey: true,
+                message: 'تمت استعادة المشتريات دون إنشاء طلب تفعيل جديد',
+              ),
+            );
+          } catch (error) {
+            _processedTerminalPurchaseKeys.remove(terminalPurchaseKey);
+            restoreFailed = true;
+            emit(
+              state.copyWith(
+                status: AppleIapStatus.failure,
+                message: error.toString(),
+                clearActiveProductId: true,
+              ),
+            );
+          }
       }
+    }
+    if (restoreFailed) {
+      _finishRestore(false);
+    } else if (restoreSucceeded) {
+      _finishRestore(true);
     }
   }
 
@@ -247,6 +409,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
   @override
   Future<void> close() async {
     await _purchaseSubscription?.cancel();
+    _finishRestore(false);
     return super.close();
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/foundation.dart';
 import 'package:pythagoras/core/services/remote_config_service.dart';
@@ -6,6 +8,7 @@ import 'remote_config_state.dart';
 class RemoteConfigCubit extends Cubit<RemoteConfigState> {
   final RemoteConfigService remoteConfigService;
   Future<void>? _loadFuture;
+  StreamSubscription<bool>? _updatesSubscription;
 
   RemoteConfigCubit({required this.remoteConfigService})
     : super(const RemoteConfigState());
@@ -21,6 +24,11 @@ class RemoteConfigCubit extends Cubit<RemoteConfigState> {
     try {
       await remoteConfigService.initialize();
       if (isClosed) return;
+      _updatesSubscription ??= remoteConfigService.iosIapEnabledChanges.listen(
+        _emitFeatureState,
+        onError: (Object error, StackTrace stackTrace) =>
+            _emitFeatureState(false, errorMessage: error.toString()),
+      );
       emit(
         state.copyWith(
           iosIapEnabled: remoteConfigService.iosIapEnabled,
@@ -41,5 +49,23 @@ class RemoteConfigCubit extends Cubit<RemoteConfigState> {
         ),
       );
     }
+  }
+
+  void _emitFeatureState(bool enabled, {String? errorMessage}) {
+    if (isClosed) return;
+    emit(
+      state.copyWith(
+        iosIapEnabled: enabled,
+        isLoading: false,
+        errorMessage: errorMessage,
+        clearErrorMessage: errorMessage == null,
+      ),
+    );
+  }
+
+  @override
+  Future<void> close() async {
+    await _updatesSubscription?.cancel();
+    return super.close();
   }
 }

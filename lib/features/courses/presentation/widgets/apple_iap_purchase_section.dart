@@ -12,17 +12,22 @@ import 'package:pythagoras/features/courses/presentation/cubit/remote_config/rem
 class AppleIapPurchaseSection extends StatelessWidget {
   final AppleIapProductType type;
   final int contentId;
+  final bool isEnrolled;
+  final bool hasPendingRequest;
   final bool tabletLandscape;
 
   const AppleIapPurchaseSection({
     super.key,
     required this.type,
     required this.contentId,
+    this.isEnrolled = false,
+    this.hasPendingRequest = false,
     this.tabletLandscape = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (isEnrolled || hasPendingRequest) return const SizedBox.shrink();
     if (Theme.of(context).platform != TargetPlatform.iOS) {
       debugPrint(
         '[IAP][Section] hidden: platform=${Theme.of(context).platform}',
@@ -64,43 +69,53 @@ class AppleIapPurchaseSection extends StatelessWidget {
             if (state.status == AppleIapStatus.unavailable) {
               return _message('الشراء عبر Apple غير متاح حاليًا');
             }
-            if (state.status == AppleIapStatus.pending) {
-              return _message('جاري انتظار تأكيد عملية الشراء');
-            }
-            if (state.status == AppleIapStatus.verificationRequired) {
-              return _message('تم استلام المعاملة وتحتاج إلى تحقق موثوق');
-            }
-            if (state.status == AppleIapStatus.restored) {
-              return _message(
+            final statusMessage = switch (state.status) {
+              AppleIapStatus.loading => state.message,
+              AppleIapStatus.pending => 'جاري انتظار تأكيد عملية الشراء',
+              AppleIapStatus.verificationRequired =>
+                'تم استلام المعاملة وتحتاج إلى تحقق موثوق',
+              AppleIapStatus.restored =>
                 state.message ?? 'تمت استعادة المشتريات دون طلب تفعيل جديد',
-              );
-            }
-            if (state.status == AppleIapStatus.purchaseConfirmed) {
-              return _message(
+              AppleIapStatus.restoreEmpty =>
+                state.message ?? 'لم يتم العثور على مشتريات سابقة',
+              AppleIapStatus.purchaseConfirmed =>
                 'تم تأكيد الشراء، وجاري إرسال طلب التفعيل للمراجعة',
-              );
-            }
-            if (state.status == AppleIapStatus.cancelled) {
-              return _message(state.message ?? 'تم إلغاء عملية الشراء');
-            }
-            if (state.status == AppleIapStatus.failure) {
-              return _message(state.message ?? 'تعذر إتمام عملية الشراء');
-            }
+              AppleIapStatus.cancelled =>
+                state.message ?? 'تم إلغاء عملية الشراء',
+              AppleIapStatus.failure =>
+                state.message ?? 'تعذر إتمام عملية الشراء',
+              _ => null,
+            };
             if (products.isEmpty) {
+              if (statusMessage != null) return _message(statusMessage);
               debugPrint('[IAP][Section] hidden: no matching products');
               return const SizedBox.shrink();
             }
 
             final product = products.first;
+            final isBusy =
+                state.status == AppleIapStatus.loading ||
+                state.status == AppleIapStatus.purchasing ||
+                state.status == AppleIapStatus.pending ||
+                state.status == AppleIapStatus.purchaseConfirmed;
             return Padding(
               padding: tabletLandscape
                   ? const EdgeInsets.fromLTRB(16, 0, 16, 10)
                   : EdgeInsets.fromLTRB(16.w, 0, 16.w, 10.h),
               child: Column(
                 children: [
+                  if (statusMessage != null) ...[
+                    AppText(
+                      statusMessage,
+                      alignment: AlignmentDirectional.center,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                    ),
+                    SizedBox(height: tabletLandscape ? 6 : 6.h),
+                  ],
                   AppButton(
                     text: 'شراء عبر Apple - ${product.price}',
-                    onPressed: state.status == AppleIapStatus.purchasing
+                    onPressed: isBusy
                         ? null
                         : () => context.read<AppleIapCubit>().purchase(
                             product.id,
@@ -112,7 +127,7 @@ class AppleIapPurchaseSection extends StatelessWidget {
                   SizedBox(height: tabletLandscape ? 6 : 6.h),
                   AppButton(
                     text: 'استعادة المشتريات',
-                    onPressed: state.status == AppleIapStatus.purchasing
+                    onPressed: isBusy
                         ? null
                         : () =>
                               context.read<AppleIapCubit>().restorePurchases(),

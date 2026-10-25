@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pythagoras/core/di/services_locator.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/course_details/course_details_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/course_details/course_details_state.dart';
@@ -99,6 +98,17 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
       ],
       child: MultiBlocListener(
         listeners: [
+          BlocListener<CourseDetailsCubit, CourseDetailsState>(
+            listener: (context, state) {
+              if (state is! CourseDetailsLoaded) return;
+              _appleIapCubit.updateCourseAccess(
+                isEnrolled: state.courseDetail.isEnrolled,
+                hasPendingRequest:
+                    state.courseDetail.requestStatus?.trim().toLowerCase() ==
+                    'pending',
+              );
+            },
+          ),
           // ── Android: WhatsApp redirect flow (unchanged) ──────────────────
           BlocListener<RequestEnrollmentCubit, RequestEnrollmentState>(
             listener: (context, state) async {
@@ -174,13 +184,13 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
             listenWhen: (previous, current) =>
                 previous.iosIapEnabled != current.iosIapEnabled,
             listener: (context, state) {
-              if (state.iosIapEnabled &&
-                  AppleIapProductCatalog.hasProductFor(
-                    AppleIapProductType.course,
-                    widget.courseId,
-                  )) {
-                _appleIapCubit.loadProducts();
-              }
+              _appleIapCubit.updateIapEnabled(
+                state.iosIapEnabled &&
+                    AppleIapProductCatalog.hasProductFor(
+                      AppleIapProductType.course,
+                      widget.courseId,
+                    ),
+              );
             },
           ),
         ],
@@ -227,31 +237,27 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                         }
 
                         // ── Mobile Portrait & Tablet Portrait: original layout untouched ──
-                        return Stack(
+                        return Column(
                           children: [
-                            SafeArea(
-                              top: false,
-                              child: CourseDetailScreenBody(
-                                course: updatedCourse,
+                            Expanded(
+                              child: SafeArea(
+                                top: false,
+                                child: CourseDetailScreenBody(
+                                  course: updatedCourse,
+                                ),
                               ),
                             ),
-                            Positioned(
-                              bottom: 76.h,
-                              left: 0,
-                              right: 0,
-                              child: AppleIapPurchaseSection(
-                                type: AppleIapProductType.course,
-                                contentId: updatedCourse.id,
-                              ),
+                            AppleIapPurchaseSection(
+                              type: AppleIapProductType.course,
+                              contentId: updatedCourse.id,
+                              isEnrolled: updatedCourse.isEnrolled,
+                              hasPendingRequest:
+                                  updatedCourse.requestStatus
+                                      ?.trim()
+                                      .toLowerCase() ==
+                                  'pending',
                             ),
-                            Positioned(
-                              bottom: 0,
-                              left: 0,
-                              right: 0,
-                              child: CourseDetailBottomButton(
-                                course: updatedCourse,
-                              ),
-                            ),
+                            CourseDetailBottomButton(course: updatedCourse),
                           ],
                         );
                       }

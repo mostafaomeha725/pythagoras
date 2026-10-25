@@ -9,6 +9,7 @@ enum AppleIapStatus {
   pending,
   cancelled,
   restored,
+  restoreEmpty,
   purchaseConfirmed,
   verificationRequired,
   unavailable,

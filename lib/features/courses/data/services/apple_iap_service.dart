@@ -8,14 +8,17 @@ class AppleIapService implements AppleIapStore {
   late final AppleIapStore _store;
   final Set<String> productIds;
   final bool _isIos;
+  final bool Function() _isIapEnabled;
 
   AppleIapService({
     AppleIapStore? store,
     InAppPurchase? inAppPurchase,
     Set<String>? productIds,
     bool? isIos,
+    bool Function()? isIapEnabled,
   }) : productIds = productIds ?? AppleIapProductCatalog.productIds,
-       _isIos = isIos ?? defaultTargetPlatform == TargetPlatform.iOS {
+       _isIos = isIos ?? defaultTargetPlatform == TargetPlatform.iOS,
+       _isIapEnabled = isIapEnabled ?? (() => store?.isIapEnabled ?? false) {
     _store =
         store ??
         _InAppPurchaseStore(
@@ -25,26 +28,40 @@ class AppleIapService implements AppleIapStore {
   }
 
   @override
+  bool get isIapEnabled => _isIapEnabled();
+
+  @override
   Stream<List<PurchaseDetails>> get purchaseStream => _store.purchaseStream;
 
   @override
   Future<bool> isAvailable() async {
-    if (!_isIos) return false;
+    if (!_isIos || !isIapEnabled) return false;
     return _store.isAvailable();
   }
 
   @override
   Future<ProductDetailsResponse> loadProducts() {
+    if (!_isIos || !isIapEnabled) {
+      return Future.value(
+        ProductDetailsResponse(
+          productDetails: const [],
+          notFoundIDs: productIds.toList(growable: false),
+        ),
+      );
+    }
     return _store.loadProducts();
   }
 
   @override
   Future<bool> purchase(ProductDetails product) {
+    if (!_isIos || !isIapEnabled) return Future.value(false);
     return _store.purchase(product);
   }
 
   @override
-  Future<void> restorePurchases() => _store.restorePurchases();
+  Future<void> restorePurchases() async {
+    if (_isIos && isIapEnabled) await _store.restorePurchases();
+  }
 
   @override
   Future<void> completePurchase(PurchaseDetails purchase) async {
@@ -59,6 +76,9 @@ class _InAppPurchaseStore implements AppleIapStore {
   final Set<String> _productIds;
 
   _InAppPurchaseStore(this._inAppPurchase, this._productIds);
+
+  @override
+  bool get isIapEnabled => true;
 
   @override
   Stream<List<PurchaseDetails>> get purchaseStream =>
