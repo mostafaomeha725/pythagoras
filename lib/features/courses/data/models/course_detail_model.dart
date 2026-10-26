@@ -21,6 +21,7 @@ class CourseDetailModel extends CourseDetail {
     required super.isSaved,
     super.requestStatus,
     super.chapterRequest,
+    super.appleProductId,
     required super.rating,
     required super.category,
     super.instructor,
@@ -30,10 +31,16 @@ class CourseDetailModel extends CourseDetail {
   factory CourseDetailModel.fromJson(Map<String, dynamic> json) {
     final general = json['general'] as Map<String, dynamic>? ?? {};
     final chaptersData = json['chapters'] as List<dynamic>? ?? [];
+    final appleProductId = (json['apple_product_id'] ?? json['appleProductId'])
+        ?.toString();
     final requestStatus = (json['request_status'] as String?)
         ?.trim()
         .toLowerCase();
     final isEnrolled = json['is_enrolled'] as bool? ?? false;
+
+    final chapters = chaptersData
+        .map((e) => CourseChapterModel.fromJson(e))
+        .toList();
 
     return CourseDetailModel(
       id: json['id'] as int,
@@ -53,14 +60,13 @@ class CourseDetailModel extends CourseDetail {
       isSaved: json['is_saved'] as bool? ?? false,
       requestStatus: requestStatus,
       chapterRequest: json['chapter_request'] as String?,
+      appleProductId: appleProductId,
       rating: general['rating'] as num? ?? 0,
       category: general['category'] as String? ?? '',
       instructor: json['instructor'] != null
           ? CourseDetailInstructorModel.fromJson(json['instructor'])
           : null,
-      chapters: chaptersData
-          .map((e) => CourseChapterModel.fromJson(e))
-          .toList(),
+      chapters: chapters,
     );
   }
 }

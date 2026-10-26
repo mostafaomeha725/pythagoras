@@ -6,21 +6,34 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dartz/dartz.dart';
 import 'package:pythagoras/core/enums/app_enums.dart';
+import 'package:pythagoras/core/error/failure.dart';
 import 'package:pythagoras/core/cache/preferences_storage.dart';
-import 'package:pythagoras/features/courses/data/services/apple_iap_service.dart';
+import 'package:pythagoras/core/di/services_locator.dart';
+import 'package:pythagoras/features/courses/domain/repositories/courses_repository.dart';
+import 'package:pythagoras/features/courses/domain/use_cases/request_chapter_direct_use_case.dart';
+import 'package:pythagoras/features/courses/domain/use_cases/request_course_direct_use_case.dart';
+import 'package:pythagoras/features/courses/data/services/apple_iap_service.dart'
+    as apple_iap_service;
 import 'package:pythagoras/features/courses/data/services/apple_iap_product_catalog.dart';
 import 'package:pythagoras/features/courses/data/services/apple_iap_store.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/apple_iap/apple_iap_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/apple_iap/apple_iap_state.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_state.dart';
 import 'package:pythagoras/core/services/remote_config_service.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/remote_config/remote_config_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/apple_iap_purchase_section.dart';
+import 'package:pythagoras/features/courses/data/models/course_model.dart';
+import 'package:pythagoras/features/courses/data/models/course_chapter_model.dart';
+import 'package:pythagoras/features/courses/data/models/course_detail_model.dart';
 
 class FakeAppleIapStore implements AppleIapStore {
   final StreamController<List<PurchaseDetails>> purchaseController =
       StreamController<List<PurchaseDetails>>.broadcast();
   final List<PurchaseDetails> completedPurchases = [];
+  final List<String> purchasedProductIds = [];
   bool available = true;
   @override
   bool isIapEnabled = true;
@@ -34,6 +47,7 @@ class FakeAppleIapStore implements AppleIapStore {
   Object? completeError;
   int completeCalls = 0;
   int loadProductsCalls = 0;
+  Set<String> queriedProductIds = {};
   ProductDetailsResponse response = ProductDetailsResponse(
     productDetails: const [],
     notFoundIDs: const [],
@@ -46,14 +60,16 @@ class FakeAppleIapStore implements AppleIapStore {
   Future<bool> isAvailable() async => available;
 
   @override
-  Future<ProductDetailsResponse> loadProducts() async {
+  Future<ProductDetailsResponse> loadProducts(Set<String> productIds) async {
     loadProductsCalls++;
+    queriedProductIds = productIds;
     return response;
   }
 
   @override
   Future<bool> purchase(ProductDetails product) async {
     purchaseCalls++;
+    purchasedProductIds.add(product.id);
     return purchaseStarted;
   }
 
@@ -79,6 +95,30 @@ class FakeAppleIapStore implements AppleIapStore {
   Future<void> close() => purchaseController.close();
 }
 
+class AppleIapService extends apple_iap_service.AppleIapService {
+  AppleIapService({
+    super.store,
+    super.inAppPurchase,
+    super.productIds,
+    super.isIos,
+    super.isIapEnabled,
+    bool Function()? isAuthenticated,
+  }) : super(isAuthenticated: isAuthenticated ?? (() => true));
+}
+
+class FakeDirectRequestRepository implements CoursesRepository {
+  int? requestedChapterId;
+
+  @override
+  Future<Either<Failure, String>> requestChapterDirect(int chapterId) async {
+    requestedChapterId = chapterId;
+    return Left(Failure('activation failed'));
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 class FakeRemoteConfigService extends RemoteConfigService {
   final StreamController<bool> updates = StreamController<bool>.broadcast(
     sync: true,
@@ -101,7 +141,7 @@ class FakeRemoteConfigService extends RemoteConfigService {
 
   void setEnabled(bool value) {
     enabled = value;
-    updates.add(value);
+    updates.add(enabled);
   }
 }
 
@@ -142,6 +182,77 @@ Future<void> settleStream() async {
 }
 
 void main() {
+  test('Course and chapter models retain API apple product ids', () {
+    final course = CourseModel.fromJson({
+      'id': 21,
+      'title': 'Course',
+      'price': '199',
+      'apple_product_id': 'course.product.21',
+    });
+    final courseDetail = CourseDetailModel.fromJson({
+      'id': 21,
+      'title': 'Course',
+      'level': 'Level',
+      'class_name': 'Class',
+      'price': '199',
+      'final_price': 199,
+      'currency_label': 'SAR',
+      'students_count': 0,
+      'is_saved': false,
+      'rating': 0,
+      'category': 'Category',
+      'is_enrolled': false,
+      'apple_product_id': 'course.product.21',
+      'chapters': [
+        {
+          'id': 245,
+          'title': 'Chapter',
+          'order': 1,
+          'price': '49',
+          'currency': 'SAR',
+          'currency_label': 'SAR',
+          'apple_product_id': 'chapter.product.245',
+          'request_status': 'not_requested',
+          'is_enrolled': false,
+        },
+      ],
+    });
+
+    final chapter = CourseChapterModel.fromJson({
+      'id': 245,
+      'title': 'Chapter',
+      'order': 1,
+      'price': '49',
+      'currency': 'SAR',
+      'currency_label': 'ر.س',
+      'apple_product_id': 'chapter.product.245',
+    });
+
+    expect(course.appleProductId, 'course.product.21');
+    expect(chapter.appleProductId, 'chapter.product.245');
+    expect(courseDetail.appleProductId, 'course.product.21');
+    expect(courseDetail.chapters.single.appleProductId, 'chapter.product.245');
+  });
+
+  test('missing and blank API product IDs stay unavailable', () {
+    final missingCourse = CourseModel.fromJson({
+      'id': 21,
+      'title': 'Course',
+      'price': '199',
+    });
+    final blankChapter = CourseChapterModel.fromJson({
+      'id': 245,
+      'title': 'Chapter',
+      'order': 1,
+      'price': '49',
+      'currency': 'SAR',
+      'currency_label': 'SAR',
+      'apple_product_id': '  ',
+    });
+
+    expect(missingCourse.appleProductId, isNull);
+    expect(blankChapter.appleProductId, '  ');
+  });
   late FakeAppleIapStore store;
   late AppleIapService service;
   late AppleIapCubit cubit;
@@ -170,38 +281,289 @@ void main() {
     await store.close();
   });
 
-  test('course product IDs map to the correct course IDs', () {
-    final course21 = AppleIapProductCatalog.targetFor('pythagoras.course.21');
-    final course29 = AppleIapProductCatalog.targetFor('pythagoras.course.29');
+  test(
+    'API product IDs load and resolve to their actual course and chapter',
+    () async {
+      final localStore = FakeAppleIapStore()
+        ..response = ProductDetailsResponse(
+          productDetails: [
+            product(id: 'api.course.id'),
+            product(id: 'api.chapter.id'),
+          ],
+          notFoundIDs: const [],
+        );
+      final localService = AppleIapService(store: localStore, isIos: true);
+      final localCubit = AppleIapCubit(service: localService, isIos: true);
 
-    expect(course21?.type, AppleIapProductType.course);
-    expect(course21?.contentId, 21);
-    expect(course29?.type, AppleIapProductType.course);
-    expect(course29?.contentId, 29);
-    expect(
-      AppleIapProductCatalog.productIds,
-      containsAll(['pythagoras.course.21', 'pythagoras.course.29']),
+      await localCubit.updateCourseAndChapterAccess(
+        courseId: 21,
+        isRequestStatusEligible: true,
+        isEnrolled: false,
+        hasPendingRequest: false,
+        eligibleChapterIds: {245},
+        courseAppleProductId: 'api.course.id',
+        chapterAppleProductIds: {245: 'api.chapter.id'},
+      );
+
+      expect(localStore.queriedProductIds, {'api.course.id', 'api.chapter.id'});
+      expect(
+        localCubit.targetFor('api.course.id')?.type,
+        AppleIapProductType.course,
+      );
+      expect(localCubit.targetFor('api.course.id')?.contentId, 21);
+      expect(
+        localCubit.targetFor('api.chapter.id')?.type,
+        AppleIapProductType.chapter,
+      );
+      expect(localCubit.targetFor('api.chapter.id')?.contentId, 245);
+      expect(localCubit.targetFor('api.chapter.id')?.parentContentId, 21);
+
+      await localCubit.purchase('api.course.id');
+      expect(localStore.purchasedProductIds, ['api.course.id']);
+      localStore.purchaseController.add([
+        purchaseDetails(
+          PurchaseStatus.canceled,
+          id: 'course-cancelled',
+          productId: 'api.course.id',
+        ),
+      ]);
+      await settleStream();
+      await localCubit.purchase('api.chapter.id');
+      expect(localStore.purchasedProductIds, [
+        'api.course.id',
+        'api.chapter.id',
+      ]);
+
+      await localCubit.close();
+      await localStore.close();
+    },
+  );
+
+  test('duplicate course and chapter product IDs are rejected', () async {
+    final localStore = FakeAppleIapStore();
+    final localService = AppleIapService(store: localStore, isIos: true);
+    final localCubit = AppleIapCubit(service: localService, isIos: true);
+
+    await localCubit.updateCourseAndChapterAccess(
+      courseId: 21,
+      isRequestStatusEligible: true,
+      isEnrolled: false,
+      hasPendingRequest: false,
+      eligibleChapterIds: {245},
+      courseAppleProductId: 'same.product.id',
+      chapterAppleProductIds: {245: 'same.product.id'},
     );
+
+    expect(localCubit.targetFor('same.product.id'), isNull);
+    expect(localStore.loadProductsCalls, 0);
+    expect(localStore.purchaseCalls, 0);
+
+    await localCubit.close();
+    await localStore.close();
   });
 
-  test('Courses 21 and 29 are eligible for automatic IAP product loading', () {
-    expect(
-      AppleIapProductCatalog.hasProductFor(AppleIapProductType.course, 21),
-      isTrue,
+  test(
+    'missing API product IDs never query StoreKit or start a purchase',
+    () async {
+      final localStore = FakeAppleIapStore();
+      final localService = AppleIapService(store: localStore, isIos: true);
+      final localCubit = AppleIapCubit(service: localService, isIos: true);
+
+      await localCubit.updateCourseAndChapterAccess(
+        courseId: 21,
+        isRequestStatusEligible: true,
+        isEnrolled: false,
+        hasPendingRequest: false,
+        eligibleChapterIds: {245},
+        courseAppleProductId: ' ',
+        chapterAppleProductIds: {245: null},
+      );
+      await localCubit.purchase('unknown.product.id');
+
+      expect(localStore.loadProductsCalls, 0);
+      expect(localStore.purchaseCalls, 0);
+      expect(localCubit.targetFor('unknown.product.id'), isNull);
+
+      await localCubit.close();
+      await localStore.close();
+    },
+  );
+
+  test('guest cannot purchase or restore through Cubit or service', () async {
+    final localStore = FakeAppleIapStore()
+      ..response = ProductDetailsResponse(
+        productDetails: [product()],
+        notFoundIDs: const [],
+      );
+    final localService = apple_iap_service.AppleIapService(
+      store: localStore,
+      isIos: true,
     );
-    expect(
-      AppleIapProductCatalog.hasProductFor(AppleIapProductType.course, 29),
-      isTrue,
+    final localCubit = AppleIapCubit(
+      service: localService,
+      productIds: {'test.product.course'},
+      isIos: true,
     );
-    expect(
-      AppleIapProductCatalog.hasProductFor(AppleIapProductType.course, 22),
-      isFalse,
-    );
-    expect(
-      AppleIapProductCatalog.hasProductFor(AppleIapProductType.chapter, 1),
-      isFalse,
-    );
+    await localCubit.loadProducts();
+
+    await localService.purchase(product());
+    await localService.restorePurchases();
+    await localCubit.purchase('test.product.course');
+    await localCubit.restorePurchases();
+
+    expect(localStore.purchaseCalls, 0);
+    expect(localStore.restoreCalls, 0);
+
+    await localCubit.close();
+    await localStore.close();
   });
+
+  test('authenticated user can purchase and restore through Cubit', () async {
+    final localStore = FakeAppleIapStore()
+      ..response = ProductDetailsResponse(
+        productDetails: [product()],
+        notFoundIDs: const [],
+      );
+    final localService = AppleIapService(
+      store: localStore,
+      isIos: true,
+      isAuthenticated: () => true,
+    );
+    final localCubit = AppleIapCubit(
+      service: localService,
+      productIds: {'test.product.course'},
+      isIos: true,
+    );
+    await localCubit.loadProducts();
+
+    await localCubit.purchase('test.product.course');
+    expect(localStore.purchaseCalls, 1);
+    localStore.purchaseController.add([
+      purchaseDetails(PurchaseStatus.canceled, id: 'cancel-before-restore'),
+    ]);
+    await settleStream();
+
+    final restore = localCubit.restorePurchases();
+    await settleStream();
+    localStore.purchaseController.add([
+      purchaseDetails(PurchaseStatus.restored, id: 'authenticated-restore'),
+    ]);
+    await restore;
+
+    expect(localStore.restoreCalls, 1);
+    expect(localCubit.state.status, AppleIapStatus.restored);
+
+    await localCubit.close();
+    await localStore.close();
+  });
+
+  test(
+    'ios_iap_enabled controls course and chapter purchases together',
+    () async {
+      var iapEnabled = true;
+      final localStore = FakeAppleIapStore()
+        ..response = ProductDetailsResponse(
+          productDetails: [
+            product(id: 'api.course.id'),
+            product(id: 'api.chapter.id'),
+          ],
+          notFoundIDs: const [],
+        );
+      final localService = AppleIapService(
+        store: localStore,
+        isIos: true,
+        isIapEnabled: () => iapEnabled,
+      );
+      final localCubit = AppleIapCubit(service: localService, isIos: true);
+
+      await localCubit.updateCourseAndChapterAccess(
+        courseId: 21,
+        isRequestStatusEligible: true,
+        isEnrolled: false,
+        hasPendingRequest: false,
+        eligibleChapterIds: {245},
+        courseAppleProductId: 'api.course.id',
+        chapterAppleProductIds: {245: 'api.chapter.id'},
+      );
+      expect(localStore.queriedProductIds, {'api.course.id', 'api.chapter.id'});
+
+      iapEnabled = false;
+      await localCubit.updateIapEnabled(false);
+      await localCubit.purchase('api.course.id');
+      await localCubit.purchase('api.chapter.id');
+      expect(localStore.purchasedProductIds, isEmpty);
+
+      iapEnabled = true;
+      await localCubit.updateIapEnabled(true);
+      expect(localStore.queriedProductIds, {'api.course.id', 'api.chapter.id'});
+      await localCubit.purchase('api.course.id');
+      localStore.purchaseController.add([
+        purchaseDetails(
+          PurchaseStatus.canceled,
+          id: 'course-cancelled-for-gate-test',
+          productId: 'api.course.id',
+        ),
+      ]);
+      await settleStream();
+      await localCubit.purchase('api.chapter.id');
+      expect(localStore.purchasedProductIds, [
+        'api.course.id',
+        'api.chapter.id',
+      ]);
+
+      await localCubit.close();
+      await localStore.close();
+    },
+  );
+
+  test('Android does not query StoreKit or purchase Apple products', () async {
+    final localStore = FakeAppleIapStore();
+    final localService = AppleIapService(store: localStore, isIos: false);
+    final localCubit = AppleIapCubit(service: localService, isIos: false);
+
+    await localCubit.updateCourseAndChapterAccess(
+      courseId: 21,
+      isRequestStatusEligible: true,
+      isEnrolled: false,
+      hasPendingRequest: false,
+      eligibleChapterIds: {245},
+      courseAppleProductId: 'api.course.id',
+      chapterAppleProductIds: {245: 'api.chapter.id'},
+    );
+    await localCubit.purchase('api.course.id');
+
+    expect(localStore.loadProductsCalls, 0);
+    expect(localStore.purchaseCalls, 0);
+
+    await localCubit.close();
+    await localStore.close();
+  });
+
+  test(
+    'chapter direct request sends the target chapter ID and exposes API failure',
+    () async {
+      final repository = FakeDirectRequestRepository();
+      final requestCubit = DirectRequestCubit(
+        requestChapterDirectUseCase: RequestChapterDirectUseCase(repository),
+        requestCourseDirectUseCase: RequestCourseDirectUseCase(repository),
+      );
+      const target = AppleIapProductTarget(
+        type: AppleIapProductType.chapter,
+        contentId: 245,
+        parentContentId: 21,
+      );
+
+      await requestCubit.requestChapter(target.contentId);
+
+      expect(repository.requestedChapterId, 245);
+      expect(requestCubit.state, isA<DirectRequestError>());
+      expect(
+        (requestCubit.state as DirectRequestError).message,
+        'activation failed',
+      );
+      await requestCubit.close();
+    },
+  );
 
   test('creating the Cubit does not query StoreKit automatically', () async {
     final localStore = FakeAppleIapStore();
@@ -555,6 +917,7 @@ void main() {
                 body: AppleIapPurchaseSection(
                   type: AppleIapProductType.course,
                   contentId: 21,
+                  appleProductId: 'pythagoras.course.21',
                   isRequestStatusEligible: true,
                 ),
               ),
@@ -628,6 +991,7 @@ void main() {
                 body: const AppleIapPurchaseSection(
                   type: AppleIapProductType.course,
                   contentId: 21,
+                  appleProductId: 'pythagoras.course.21',
                   isRequestStatusEligible: true,
                   tabletLandscape: true,
                 ),
@@ -727,6 +1091,7 @@ void main() {
                 body: AppleIapPurchaseSection(
                   type: AppleIapProductType.course,
                   contentId: 21,
+                  appleProductId: 'pythagoras.course.21',
                   isRequestStatusEligible: access.isRequestStatusEligible,
                   isEnrolled: access.isEnrolled,
                   hasPendingRequest: access.hasPendingRequest,
@@ -791,6 +1156,7 @@ void main() {
               body: AppleIapPurchaseSection(
                 type: AppleIapProductType.course,
                 contentId: 21,
+                appleProductId: 'pythagoras.course.21',
                 isRequestStatusEligible: true,
               ),
             ),
@@ -812,9 +1178,158 @@ void main() {
     });
   });
 
+  testWidgets('missing API product ID shows a message and blocks buying', (
+    tester,
+  ) async {
+    final remoteConfigService = FakeRemoteConfigService(enabled: true);
+    final remoteConfigCubit = RemoteConfigCubit(
+      remoteConfigService: remoteConfigService,
+    );
+    await remoteConfigCubit.load();
+    final localStore = FakeAppleIapStore();
+    final localService = AppleIapService(store: localStore, isIos: true);
+    final localCubit = AppleIapCubit(service: localService, isIos: true);
+    await localCubit.updateCourseAndChapterAccess(
+      courseId: 21,
+      isRequestStatusEligible: true,
+      isEnrolled: false,
+      hasPendingRequest: false,
+      eligibleChapterIds: const {},
+      courseAppleProductId: null,
+      chapterAppleProductIds: const {},
+    );
+
+    await tester.pumpWidget(
+      ScreenUtilInit(
+        designSize: const Size(390, 844),
+        builder: (context, child) => MultiBlocProvider(
+          providers: [
+            BlocProvider<RemoteConfigCubit>.value(value: remoteConfigCubit),
+            BlocProvider<AppleIapCubit>.value(value: localCubit),
+          ],
+          child: MaterialApp(
+            theme: ThemeData(platform: TargetPlatform.iOS),
+            home: const Scaffold(
+              body: AppleIapPurchaseSection(
+                type: AppleIapProductType.course,
+                contentId: 21,
+                appleProductId: '  ',
+                isRequestStatusEligible: true,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      find.text('الشراء عبر Apple غير متاح لهذا المحتوى حاليًا'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('شراء عبر Apple -'), findsNothing);
+    expect(localStore.loadProductsCalls, 0);
+    expect(localStore.purchaseCalls, 0);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.runAsync(() async {
+      await localCubit.close();
+      await remoteConfigCubit.close();
+      await localStore.close();
+      await remoteConfigService.updates.close();
+    });
+  });
+
+  testWidgets('guest purchase and restore actions show the login sheet', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = PreferencesStorage(
+      await SharedPreferences.getInstance(),
+    );
+    await sl.reset();
+    sl.registerSingleton<PreferencesStorage>(preferences);
+
+    final remoteConfigService = FakeRemoteConfigService(enabled: true);
+    final remoteConfigCubit = RemoteConfigCubit(
+      remoteConfigService: remoteConfigService,
+    );
+    await remoteConfigCubit.load();
+    final localStore = FakeAppleIapStore()
+      ..response = ProductDetailsResponse(
+        productDetails: [product(id: 'guest.course.product')],
+        notFoundIDs: const [],
+      );
+    final localService = AppleIapService(
+      store: localStore,
+      productIds: {'guest.course.product'},
+      isIos: true,
+      isAuthenticated: () => preferences.isAuthenticated,
+    );
+    final localCubit = AppleIapCubit(
+      service: localService,
+      productIds: {'guest.course.product'},
+      isIos: true,
+    );
+    await localCubit.loadProducts();
+
+    await tester.pumpWidget(
+      ScreenUtilInit(
+        designSize: const Size(390, 844),
+        builder: (context, child) => MultiBlocProvider(
+          providers: [
+            BlocProvider<RemoteConfigCubit>.value(value: remoteConfigCubit),
+            BlocProvider<AppleIapCubit>.value(value: localCubit),
+          ],
+          child: MaterialApp(
+            theme: ThemeData(platform: TargetPlatform.iOS),
+            home: const Scaffold(
+              body: AppleIapPurchaseSection(
+                type: AppleIapProductType.course,
+                contentId: 21,
+                appleProductId: 'guest.course.product',
+                isRequestStatusEligible: true,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.textContaining('شراء عبر Apple -'));
+    await tester.pumpAndSettle();
+    expect(find.text('يجب تسجيل الدخول أولًا'), findsOneWidget);
+    expect(localStore.purchaseCalls, 0);
+    expect(localStore.restoreCalls, 0);
+
+    tester.state<NavigatorState>(find.byType(Navigator).first).pop();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('استعادة المشتريات'));
+    await tester.pumpAndSettle();
+    expect(find.text('يجب تسجيل الدخول أولًا'), findsOneWidget);
+    expect(localStore.purchaseCalls, 0);
+    expect(localStore.restoreCalls, 0);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.runAsync(() async {
+      await localCubit.close();
+      await remoteConfigCubit.close();
+      await localStore.close();
+      await remoteConfigService.updates.close();
+      await sl.reset();
+    });
+  });
+
   testWidgets('Restore button delegates only one in-flight restore', (
     tester,
   ) async {
+    SharedPreferences.setMockInitialValues({
+      PreferencesKeys.userToken.name: 'authenticated-test-token',
+    });
+    await sl.reset();
+    sl.registerSingleton<PreferencesStorage>(
+      PreferencesStorage(await SharedPreferences.getInstance()),
+    );
+
     final remoteConfigService = FakeRemoteConfigService(enabled: true);
     final remoteConfigCubit = RemoteConfigCubit(
       remoteConfigService: remoteConfigService,
@@ -883,6 +1398,7 @@ void main() {
       await remoteConfigCubit.close();
       await localStore.close();
       await remoteConfigService.updates.close();
+      await sl.reset();
     });
   });
 
@@ -971,6 +1487,12 @@ void main() {
     'pending then purchased stays verification-gated and deduplicated',
     () async {
       expect(cubit.state.status, AppleIapStatus.ready);
+      var confirmedEvents = 0;
+      final subscription = cubit.stream.listen((state) {
+        if (state.status == AppleIapStatus.purchaseConfirmed) {
+          confirmedEvents++;
+        }
+      });
 
       store.purchaseController.add([purchaseDetails(PurchaseStatus.pending)]);
       await settleStream();
@@ -987,6 +1509,8 @@ void main() {
       store.purchaseController.add([purchased]);
       await settleStream();
       expect(store.completedPurchases, isEmpty);
+      expect(confirmedEvents, 1);
+      await subscription.cancel();
     },
   );
 
@@ -1469,6 +1993,50 @@ void main() {
       cubit.state.message,
       'تمت استعادة المشتريات دون إنشاء طلب تفعيل جديد',
     );
+  });
+
+  test('original student can restore their recorded transaction', () async {
+    SharedPreferences.setMockInitialValues({
+      PreferencesKeys.userId.name: 101,
+      'apple_iap_submitted_purchase_keys': ['apple-tx-student-a'],
+      'apple_iap_submitted_purchase_owners': ['101|apple-tx-student-a'],
+    });
+    final preferences = await SharedPreferences.getInstance();
+    final localStore = FakeAppleIapStore()
+      ..response = ProductDetailsResponse(
+        productDetails: [product()],
+        notFoundIDs: const [],
+      );
+    final localService = AppleIapService(
+      store: localStore,
+      productIds: {'test.product.course'},
+      isIos: true,
+    );
+    final localCubit = AppleIapCubit(
+      service: localService,
+      productIds: {'test.product.course'},
+      isIos: true,
+      preferences: preferences,
+    );
+    await localCubit.loadProducts();
+
+    final restore = localCubit.restorePurchases();
+    await settleStream();
+    localStore.purchaseController.add([
+      purchaseDetails(PurchaseStatus.restored, id: 'apple-tx-student-a'),
+    ]);
+    await restore;
+
+    expect(localCubit.state.status, AppleIapStatus.restored);
+    expect(localCubit.state.transactionKey, isNull);
+    expect(localStore.restoreCalls, 1);
+    expect(localStore.completedPurchases, hasLength(1));
+    expect(
+      preferences.getStringList('apple_iap_submitted_purchase_owners'),
+      contains('101|apple-tx-student-a'),
+    );
+    await localCubit.close();
+    await localStore.close();
   });
 
   test(

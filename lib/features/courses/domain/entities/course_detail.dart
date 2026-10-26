@@ -20,6 +20,7 @@ class CourseDetail {
   final bool isSaved;
   final String? requestStatus;
   final String? chapterRequest;
+  final String? appleProductId;
 
   final num rating;
   final String category;
@@ -45,6 +46,7 @@ class CourseDetail {
     required this.isSaved,
     this.requestStatus,
     this.chapterRequest,
+    this.appleProductId,
     required this.rating,
     required this.category,
     this.instructor,
@@ -69,6 +71,7 @@ class CourseDetail {
     bool? isSaved,
     String? requestStatus,
     String? chapterRequest,
+    String? appleProductId,
     num? rating,
     String? category,
     CourseDetailInstructor? instructor,
@@ -92,6 +95,7 @@ class CourseDetail {
       isSaved: isSaved ?? this.isSaved,
       requestStatus: requestStatus ?? this.requestStatus,
       chapterRequest: chapterRequest ?? this.chapterRequest,
+      appleProductId: appleProductId ?? this.appleProductId,
       rating: rating ?? this.rating,
       category: category ?? this.category,
       instructor: instructor ?? this.instructor,

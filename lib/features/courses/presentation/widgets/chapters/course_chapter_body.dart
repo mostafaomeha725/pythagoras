@@ -7,6 +7,7 @@ import 'package:pythagoras/features/courses/presentation/cubit/request_enrollmen
 import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/course_details/course_details_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/course_details/course_details_state.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/apple_iap/apple_iap_cubit.dart';
 import 'package:pythagoras/core/utils/auth_guard.dart';
 import 'package:pythagoras/core/theme/light_colors.dart';
 import 'package:pythagoras/core/widgets/custom_button.dart';
@@ -42,10 +43,14 @@ class CourseChapterBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final requestStatus = chapter.requestStatus.trim().toLowerCase();
+    final chapterIsEnrolled =
+        isEnrolled || chapter.isEnrolled || requestStatus == 'accepted';
+
     return Column(
       children: [
         // Divider removed per user request
-        if (isEnrolled || chapter.isEnrolled)
+        if (chapterIsEnrolled)
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -97,12 +102,27 @@ class CourseChapterBody extends StatelessWidget {
               AppleIapPurchaseSection(
                 type: AppleIapProductType.chapter,
                 contentId: chapter.id,
+                appleProductId: chapter.appleProductId,
+                isRequestStatusEligible: requestStatus == 'not_requested',
+                isEnrolled: chapterIsEnrolled,
+                hasPendingRequest: requestStatus == 'pending',
                 tabletLandscape: tabletLandscape,
+                onPurchase: (productId) async {
+                  await context.read<AppleIapCubit>().purchase(productId);
+                },
+                onAuthenticated: () {
+                  final courseId = course?.id;
+                  if (courseId != null) {
+                    context.read<CourseDetailsCubit>().fetchCourseDetails(
+                      courseId,
+                    );
+                  }
+                },
               ),
               CourseChapterBuyButton(
                 price: chapter.price,
                 currencyLabel: chapter.currencyLabel,
-                isEnrolled: isEnrolled || chapter.isEnrolled,
+                isEnrolled: chapterIsEnrolled,
                 requestStatus: chapter.requestStatus,
                 tabletLandscape: tabletLandscape,
                 onPressed: () async {

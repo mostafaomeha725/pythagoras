@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:pythagoras/core/widgets/custom_button.dart';
+import 'package:pythagoras/core/utils/auth_guard.dart';
 import 'package:pythagoras/features/courses/data/services/apple_iap_product_catalog.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/apple_iap_action_spacing.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/apple_iap/apple_iap_cubit.dart';
@@ -12,6 +16,9 @@ import 'package:pythagoras/features/courses/presentation/cubit/remote_config/rem
 class AppleIapPurchaseSection extends StatelessWidget {
   final AppleIapProductType type;
   final int contentId;
+  final String? appleProductId;
+  final FutureOr<void> Function(String productId)? onPurchase;
+  final VoidCallback? onAuthenticated;
   final bool isRequestStatusEligible;
   final bool isEnrolled;
   final bool hasPendingRequest;
@@ -21,6 +28,9 @@ class AppleIapPurchaseSection extends StatelessWidget {
     super.key,
     required this.type,
     required this.contentId,
+    this.appleProductId,
+    this.onPurchase,
+    this.onAuthenticated,
     this.isRequestStatusEligible = false,
     this.isEnrolled = false,
     this.hasPendingRequest = false,
@@ -36,35 +46,26 @@ class AppleIapPurchaseSection extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final matchingProductIds = AppleIapProductCatalog.products.entries
-        .where(
-          (entry) =>
-              entry.value.type == type && entry.value.contentId == contentId,
-        )
-        .map((entry) => entry.key)
-        .toSet();
-    if (matchingProductIds.isEmpty) {
-      debugPrint(
-        '[IAP][Section] hidden: no catalog product for $type/$contentId',
-      );
-      return const SizedBox.shrink();
-    }
+    final productId = appleProductId?.trim();
+    final hasProductId = productId != null && productId.isNotEmpty;
 
     return BlocBuilder<RemoteConfigCubit, RemoteConfigState>(
       builder: (context, remoteConfigState) {
         if (!remoteConfigState.iosIapEnabled) {
-          debugPrint('[IAP][Section] hidden: ios_iap_enabled=false');
+          debugPrint('[IAP][Section] hidden: IAP flag disabled for $type');
           return const SizedBox.shrink();
         }
 
         return BlocBuilder<AppleIapCubit, AppleIapState>(
           builder: (context, state) {
-            final products = state.products
-                .where((product) => matchingProductIds.contains(product.id))
-                .toList(growable: false);
+            final products = hasProductId
+                ? state.products
+                      .where((product) => product.id == productId)
+                      .toList(growable: false)
+                : const <ProductDetails>[];
             debugPrint(
-              '[IAP][Section] course=$contentId status=${state.status} '
-              'matchingIds=$matchingProductIds products=${products.map((product) => product.id).toList()}',
+              '[IAP][Section] type=$type contentId=$contentId status=${state.status} '
+              'productId=$productId products=${products.map((product) => product.id).toList()}',
             );
 
             final purchaseEligible =
@@ -88,7 +89,17 @@ class AppleIapPurchaseSection extends StatelessWidget {
             final productUnavailable =
                 purchaseEligible &&
                 products.isEmpty &&
+                hasProductId &&
+                !context.read<AppleIapCubit>().isProductConfigurationConflict(
+                  productId,
+                ) &&
                 state.status == AppleIapStatus.unavailable;
+            final productIdMissing = purchaseEligible && !hasProductId;
+            final productConfigurationError =
+                purchaseEligible &&
+                context.read<AppleIapCubit>().isProductConfigurationConflict(
+                  productId,
+                );
             final isBusy =
                 state.status == AppleIapStatus.loading ||
                 state.status == AppleIapStatus.purchasing ||
@@ -100,6 +111,24 @@ class AppleIapPurchaseSection extends StatelessWidget {
                   : EdgeInsets.fromLTRB(16.w, 0, 16.w, 0),
               child: Column(
                 children: [
+                  if (productIdMissing)
+                    Padding(
+                      padding: EdgeInsets.only(bottom: appleIapActionSpacing.h),
+                      child: Text(
+                        'الشراء عبر Apple غير متاح لهذا المحتوى حاليًا',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                  if (productConfigurationError)
+                    Padding(
+                      padding: EdgeInsets.only(bottom: appleIapActionSpacing.h),
+                      child: Text(
+                        'إعداد الشراء عبر Apple غير صالح لهذا المحتوى. يرجى التواصل مع الدعم.',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
                   if (productUnavailable)
                     Padding(
                       padding: EdgeInsets.only(bottom: appleIapActionSpacing.h),
@@ -114,8 +143,8 @@ class AppleIapPurchaseSection extends StatelessWidget {
                       text: 'شراء عبر Apple - ${products.first.price}',
                       onPressed: isBusy
                           ? null
-                          : () => context.read<AppleIapCubit>().purchase(
-                              products.first.id,
+                          : () => unawaited(
+                              _purchase(context, products.first.id),
                             ),
                       radius: tabletLandscape ? 12 : 12.r,
                       height: tabletLandscape ? 48 : 48.h,
@@ -131,8 +160,7 @@ class AppleIapPurchaseSection extends StatelessWidget {
                     text: 'استعادة المشتريات',
                     onPressed: isBusy
                         ? null
-                        : () =>
-                              context.read<AppleIapCubit>().restorePurchases(),
+                        : () => unawaited(_restore(context)),
                     radius: tabletLandscape ? 12 : 12.r,
                     height: tabletLandscape ? 42 : 42.h,
                     textSize: tabletLandscape ? 13 : 13.sp,
@@ -147,5 +175,23 @@ class AppleIapPurchaseSection extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<void> _purchase(BuildContext context, String productId) async {
+    final didLogin = await AuthGuard.checkAuthAndExecute(context, () async {
+      final onPurchase = this.onPurchase;
+      if (onPurchase != null) {
+        await onPurchase(productId);
+      } else {
+        await context.read<AppleIapCubit>().purchase(productId);
+      }
+    });
+    if (didLogin && context.mounted) onAuthenticated?.call();
+  }
+
+  Future<void> _restore(BuildContext context) async {
+    await AuthGuard.checkAuthAndExecute(context, () async {
+      await context.read<AppleIapCubit>().restorePurchases();
+    });
   }
 }

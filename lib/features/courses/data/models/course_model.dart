@@ -16,9 +16,13 @@ class CourseModel extends Course {
     super.currencyLabel,
     super.studentsCount,
     super.isSaved,
+    super.appleProductId,
   });
 
   factory CourseModel.fromJson(Map<String, dynamic> json) {
+    final appleProductId = (json['apple_product_id'] ?? json['appleProductId'])
+        ?.toString();
+
     return CourseModel(
       id: json['id'].toString(),
       title: json['title'] ?? '',
@@ -35,6 +39,7 @@ class CourseModel extends Course {
       currencyLabel: json['currency_label'] ?? '',
       studentsCount: json['students_count'] ?? 0,
       isSaved: json['is_saved'] ?? false,
+      appleProductId: appleProductId,
     );
   }
 }

@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pythagoras/features/courses/domain/entities/course_chapter.dart';
+import 'package:pythagoras/features/courses/domain/entities/course_detail.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/chapters/course_chapter_tile.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_screen_body.dart';
 
 void main() {
@@ -19,6 +23,94 @@ void main() {
     ),
     (name: 'request action only', footerChildren: <double>[16, 52]),
   ];
+  const shortCourse = CourseDetail(
+    id: 21,
+    title: 'Course 21',
+    description: 'Short description',
+    level: 'Secondary',
+    className: 'Class 1',
+    isEnrolled: false,
+    price: '100',
+    finalPrice: 100,
+    currencyLabel: 'EGP',
+    studentsCount: 0,
+    isSaved: false,
+    requestStatus: 'not_requested',
+    rating: 0,
+    category: 'Math',
+    chapters: [
+      CourseChapter(
+        id: 1,
+        title: 'Chapter 1',
+        order: 1,
+        price: '0',
+        currency: 'EGP',
+        currencyLabel: 'EGP',
+      ),
+    ],
+  );
+
+  testWidgets('actual short course content keeps iOS footer close', (
+    tester,
+  ) async {
+    for (final size in sizes) {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      const safeBottom = 34.0;
+
+      await tester.pumpWidget(
+        ScreenUtilInit(
+          designSize: const Size(390, 844),
+          builder: (context, child) => MaterialApp(
+            theme: ThemeData(platform: TargetPlatform.iOS),
+            home: MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                padding: const EdgeInsets.only(bottom: safeBottom),
+                viewPadding: const EdgeInsets.only(bottom: safeBottom),
+              ),
+              child: Scaffold(
+                body: Column(
+                  children: [
+                    CourseDetailBodyRegion(
+                      child: SafeArea(
+                        top: false,
+                        bottom: false,
+                        child: CourseDetailScreenBody(
+                          key: const ValueKey('actual-course-body'),
+                          course: shortCourse,
+                        ),
+                      ),
+                    ),
+                    const Padding(
+                      key: ValueKey('actual-footer'),
+                      padding: EdgeInsets.only(bottom: 24),
+                      child: SafeArea(top: false, child: SizedBox(height: 150)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final chapterRect = tester.getRect(find.byType(CourseChapterTile));
+      final footerRect = tester.getRect(
+        find.byKey(const ValueKey('actual-footer')),
+      );
+      final gap = footerRect.top - chapterRect.bottom;
+
+      expect(gap, lessThanOrEqualTo(8), reason: 'gap was $gap at $size');
+      expect(
+        tester.getRect(find.byKey(const ValueKey('actual-footer'))).bottom,
+        lessThanOrEqualTo(size.height),
+      );
+      expect(tester.takeException(), isNull);
+    }
+
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
 
   for (final platform in [TargetPlatform.iOS, TargetPlatform.android]) {
     for (final scenario in scenarios) {

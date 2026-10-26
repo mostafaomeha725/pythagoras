@@ -13,6 +13,7 @@ class CourseChapter {
   final String currencyLabel;
   final String requestStatus;
   final bool isEnrolled;
+  final String? appleProductId;
   final List<CourseLesson> videos;
   final List<CourseQuiz> quizzes;
   final List<CourseAssignment> assignments;
@@ -28,6 +29,7 @@ class CourseChapter {
     required this.currencyLabel,
     this.requestStatus = 'not_requested',
     this.isEnrolled = false,
+    this.appleProductId,
     this.videos = const [],
     this.quizzes = const [],
     this.assignments = const [],
@@ -44,6 +46,7 @@ class CourseChapter {
     String? currencyLabel,
     String? requestStatus,
     bool? isEnrolled,
+    String? appleProductId,
     List<CourseLesson>? videos,
     List<CourseQuiz>? quizzes,
     List<CourseAssignment>? assignments,
@@ -59,6 +62,7 @@ class CourseChapter {
       currencyLabel: currencyLabel ?? this.currencyLabel,
       requestStatus: requestStatus ?? this.requestStatus,
       isEnrolled: isEnrolled ?? this.isEnrolled,
+      appleProductId: appleProductId ?? this.appleProductId,
       videos: videos ?? this.videos,
       quizzes: quizzes ?? this.quizzes,
       assignments: assignments ?? this.assignments,

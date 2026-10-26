@@ -65,7 +65,8 @@ class CourseVideoPlayerManager extends ChangeNotifier {
       final isStuck = isInitializing || (adapter?.isBuffering ?? true);
       if (currentVideoUrl != url || _isDisposed || !isStuck) return;
 
-      final hasInternet = await CourseVideoNetworkChecker.hasInternetConnection();
+      final hasInternet =
+          await CourseVideoNetworkChecker.hasInternetConnection();
       if (currentVideoUrl != url ||
           _isDisposed ||
           (!isInitializing && !(adapter?.isBuffering ?? true))) {

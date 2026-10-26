@@ -15,6 +15,7 @@ class Course {
   final String? currencyLabel;
   final int? studentsCount;
   final bool? isSaved;
+  final String? appleProductId;
 
   Course({
     required this.id,
@@ -31,6 +32,7 @@ class Course {
     this.currencyLabel,
     this.studentsCount,
     this.isSaved,
+    this.appleProductId,
   });
 
   /// Evaluates request status for course and chapter according to business rules:

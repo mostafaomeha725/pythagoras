@@ -6,7 +6,7 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:pythagoras/core/enums/app_enums.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pythagoras/features/courses/data/services/apple_iap_product_catalog.dart';
-import 'package:pythagoras/features/courses/data/services/apple_iap_store.dart';
+import 'package:pythagoras/features/courses/data/services/apple_iap_service.dart';
 
 import 'apple_iap_state.dart';
 
@@ -14,8 +14,8 @@ class AppleIapCubit extends Cubit<AppleIapState> {
   static const _submittedPurchaseKeysKey = 'apple_iap_submitted_purchase_keys';
   static const _submittedPurchaseOwnersKey =
       'apple_iap_submitted_purchase_owners';
-  final AppleIapStore service;
-  final Set<String> productIds;
+  final AppleIapService service;
+  final Map<String, AppleIapProductTarget> _productTargets;
   final bool _isIos;
   final SharedPreferences? _preferences;
   final Duration _restoreTimeout;
@@ -26,11 +26,14 @@ class AppleIapCubit extends Cubit<AppleIapState> {
   final Set<String> _completedRestoredPurchaseKeys = <String>{};
   final Map<String, PurchaseDetails> _pendingPurchases = {};
   final Set<String> _restoredProductIds = <String>{};
+  final Set<int> _eligibleChapterIds = <int>{};
+  final Set<String> _conflictingProductIds = <String>{};
   String? _unresolvedProductId;
   String? _transactionConflictProductId;
   Completer<bool>? _restoreCompleter;
   Future<void>? _restoreFuture;
   bool _isCourseBlocked;
+  int? _chapterParentCourseId;
   late final Set<String> _submittedPurchaseKeys = {
     ...?_preferences?.getStringList(_submittedPurchaseKeysKey),
   };
@@ -41,6 +44,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
   AppleIapCubit({
     required this.service,
     Set<String>? productIds,
+    Map<String, AppleIapProductTarget>? productTargets,
     bool? isIos,
     SharedPreferences? preferences,
     Duration restoreTimeout = const Duration(seconds: 10),
@@ -49,30 +53,37 @@ class AppleIapCubit extends Cubit<AppleIapState> {
     bool hasPendingRequest = false,
     bool isRequestStatusEligible = true,
   }) : _preferences = preferences,
+       _productTargets = Map.of(
+         productTargets ??
+             {
+               for (final productId in productIds ?? const <String>{})
+                 productId: const AppleIapProductTarget(
+                   type: AppleIapProductType.course,
+                   contentId: 0,
+                 ),
+             },
+       ),
        _restoreTimeout = restoreTimeout,
        _purchaseResponseTimeout = purchaseResponseTimeout,
        _isCourseBlocked =
            !isRequestStatusEligible || isEnrolled || hasPendingRequest,
-       productIds = productIds ?? AppleIapProductCatalog.productIds,
        _isIos = isIos ?? defaultTargetPlatform == TargetPlatform.iOS,
        super(const AppleIapState());
+
+  Set<String> get productIds => _productTargets.keys.toSet();
+
+  AppleIapProductTarget? targetFor(String productId) =>
+      _productTargets[productId];
+
+  bool isProductConfigurationConflict(String? productId) =>
+      productId != null && _conflictingProductIds.contains(productId.trim());
 
   Future<void> loadProducts() => _loadFuture ??= _loadProducts();
 
   Future<void> _loadProducts() async {
     if (isClosed || !_isIos) return;
-    if (!service.isIapEnabled || _isCourseBlocked) {
-      emit(
-        state.copyWith(
-          status: AppleIapStatus.unavailable,
-          products: const [],
-          clearActiveProductId: true,
-          clearMessage: true,
-        ),
-      );
-      return;
-    }
-    if (productIds.isEmpty) {
+    final requestedProductIds = _eligibleProductIds;
+    if (requestedProductIds.isEmpty) {
       emit(
         state.copyWith(
           status: AppleIapStatus.unavailable,
@@ -99,7 +110,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
       }
 
       _listenToPurchaseStream();
-      final response = await service.loadProducts();
+      final response = await service.loadProducts(requestedProductIds);
       debugPrint(
         '[IAP][Store] productDetails=${response.productDetails.map((product) => '${product.id}:${product.price}').toList()} '
         'notFoundIDs=${response.notFoundIDs} error=${response.error}',
@@ -119,7 +130,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
       }
 
       final products = response.productDetails
-          .where((product) => productIds.contains(product.id))
+          .where((product) => requestedProductIds.contains(product.id))
           .toList(growable: false);
       emit(
         state.copyWith(
@@ -147,8 +158,8 @@ class AppleIapCubit extends Cubit<AppleIapState> {
   Future<void> purchase(String productId) async {
     if (isClosed ||
         !_isIos ||
-        !service.isIapEnabled ||
-        _isCourseBlocked ||
+        !service.isAuthenticated ||
+        !_isProductEnabled(productId) ||
         _restoreFuture != null ||
         _isPurchaseInProgress ||
         _unresolvedProductId == productId ||
@@ -167,6 +178,8 @@ class AppleIapCubit extends Cubit<AppleIapState> {
     if (product == null) return;
 
     debugPrint('[IAP][Purchase] requested productId=$productId');
+    final target = targetFor(productId);
+    if (target == null) return;
     emit(
       state.copyWith(
         status: AppleIapStatus.purchasing,
@@ -216,7 +229,11 @@ class AppleIapCubit extends Cubit<AppleIapState> {
   }
 
   Future<void> restorePurchases() {
-    if (isClosed || !_isIos || !service.isIapEnabled || _isPurchaseInProgress) {
+    if (isClosed ||
+        !_isIos ||
+        !service.isAuthenticated ||
+        !service.isIapEnabledOnIos ||
+        _isPurchaseInProgress) {
       return Future<void>.value();
     }
     return _restoreFuture ??= _restorePurchases();
@@ -252,7 +269,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
   Future<void> updateIapEnabled(bool enabled) async {
     if (isClosed) return;
     _loadFuture = null;
-    if (!enabled || _isCourseBlocked) {
+    if (!enabled) {
       emit(
         state.copyWith(
           status: AppleIapStatus.unavailable,
@@ -276,7 +293,97 @@ class AppleIapCubit extends Cubit<AppleIapState> {
         !isRequestStatusEligible || isEnrolled || hasPendingRequest;
     if (_isCourseBlocked == isBlocked) return;
     _isCourseBlocked = isBlocked;
-    await updateIapEnabled(service.isIapEnabled);
+    await updateIapEnabled(service.isIapEnabledOnIos);
+  }
+
+  Future<void> updateCourseAndChapterAccess({
+    required int courseId,
+    required bool isRequestStatusEligible,
+    required bool isEnrolled,
+    required bool hasPendingRequest,
+    required Set<int> eligibleChapterIds,
+    required String? courseAppleProductId,
+    required Map<int, String?> chapterAppleProductIds,
+  }) async {
+    if (isClosed) return;
+    _isCourseBlocked =
+        !isRequestStatusEligible || isEnrolled || hasPendingRequest;
+    _chapterParentCourseId = courseId;
+    _eligibleChapterIds
+      ..clear()
+      ..addAll(eligibleChapterIds);
+
+    final candidates = <String, AppleIapProductTarget>{};
+    final conflictingIds = <String>{};
+    void addTarget(String? rawProductId, AppleIapProductTarget target) {
+      final productId = rawProductId?.trim();
+      if (productId == null || productId.isEmpty) return;
+      final previous = candidates[productId];
+      if (previous != null &&
+          (previous.type != target.type ||
+              previous.contentId != target.contentId ||
+              previous.parentContentId != target.parentContentId)) {
+        conflictingIds.add(productId);
+        return;
+      }
+      candidates[productId] = target;
+    }
+
+    addTarget(
+      courseAppleProductId,
+      AppleIapProductTarget(
+        type: AppleIapProductType.course,
+        contentId: courseId,
+      ),
+    );
+    for (final entry in chapterAppleProductIds.entries) {
+      addTarget(
+        entry.value,
+        AppleIapProductTarget(
+          type: AppleIapProductType.chapter,
+          contentId: entry.key,
+          parentContentId: courseId,
+        ),
+      );
+    }
+
+    for (final productId in conflictingIds) {
+      candidates.remove(productId);
+      debugPrint(
+        '[IAP][Configuration error] Product ID "$productId" is assigned to multiple course/chapter targets.',
+      );
+    }
+    _conflictingProductIds
+      ..clear()
+      ..addAll(conflictingIds);
+    _productTargets
+      ..clear()
+      ..addAll(candidates);
+    await updateIapEnabled(service.isIapEnabledOnIos);
+  }
+
+  Set<String> get _eligibleProductIds => _productTargets.entries
+      .where(
+        (entry) =>
+            service.isProductEnabled(entry.key) &&
+            _isProductAccessEligible(entry.value),
+      )
+      .map((entry) => entry.key)
+      .toSet();
+
+  bool _isProductEnabled(String productId) {
+    final target = targetFor(productId);
+    return target != null &&
+        service.isProductEnabled(productId) &&
+        _isProductAccessEligible(target);
+  }
+
+  bool _isProductAccessEligible(AppleIapProductTarget target) {
+    if (target.type == AppleIapProductType.chapter) {
+      return target.parentContentId == _chapterParentCourseId &&
+          _eligibleChapterIds.contains(target.contentId);
+    }
+    return !_isCourseBlocked;
   }
 
   Future<void> _restorePurchases() async {

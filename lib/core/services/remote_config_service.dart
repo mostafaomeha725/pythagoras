@@ -32,9 +32,7 @@ class RemoteConfigService {
     });
   }
 
-  Future<void> initialize() {
-    return _initialization ??= _initialize();
-  }
+  Future<void> initialize() => _initialization ??= _initialize();
 
   Future<void> _initialize() async {
     if (!_isIos) return;

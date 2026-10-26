@@ -63,6 +63,11 @@ class PreferencesStorage {
     return _preferences.getString(PreferencesKeys.userToken.name);
   }
 
+  bool get isAuthenticated {
+    final token = getUserToken();
+    return token != null && token.isNotEmpty;
+  }
+
   Future<void> deleteUserToken() async {
     await _preferences.remove(PreferencesKeys.userToken.name);
   }

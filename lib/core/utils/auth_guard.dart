@@ -16,9 +16,8 @@ class AuthGuard {
     FutureOr<void> Function() action,
   ) async {
     final prefs = sl<PreferencesStorage>();
-    final token = prefs.getUserToken();
 
-    if (token != null && token.isNotEmpty) {
+    if (prefs.isAuthenticated) {
       await action();
       return false; // Already logged in
     } else {
@@ -29,7 +28,7 @@ class AuthGuard {
           // Re-fetch global data for the new user
           context.read<ProfileCubit>().getAccountInfo();
           context.read<CoursesListCubit>().fetchCourses();
-          
+
           await action();
         }
         return true; // New login occurred

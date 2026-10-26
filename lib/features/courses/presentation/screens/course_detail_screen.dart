@@ -104,10 +104,27 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
               final requestStatus = state.courseDetail.requestStatus
                   ?.trim()
                   .toLowerCase();
-              _appleIapCubit.updateCourseAccess(
+              final eligibleChapterIds = state.courseDetail.chapters
+                  .where(
+                    (chapter) =>
+                        !state.courseDetail.isEnrolled &&
+                        !chapter.isEnrolled &&
+                        chapter.requestStatus.trim().toLowerCase() ==
+                            'not_requested',
+                  )
+                  .map((chapter) => chapter.id)
+                  .toSet();
+              _appleIapCubit.updateCourseAndChapterAccess(
+                courseId: state.courseDetail.id,
                 isRequestStatusEligible: requestStatus == 'not_requested',
                 isEnrolled: state.courseDetail.isEnrolled,
                 hasPendingRequest: requestStatus == 'pending',
+                eligibleChapterIds: eligibleChapterIds,
+                courseAppleProductId: state.courseDetail.appleProductId,
+                chapterAppleProductIds: {
+                  for (final chapter in state.courseDetail.chapters)
+                    chapter.id: chapter.appleProductId,
+                },
               );
             },
           ),
@@ -161,7 +178,13 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                 }
               } else if (state is DirectRequestError) {
                 EasyLoading.dismiss();
-                EasyLoading.showError(state.message);
+                final hasApplePayment = _pendingApplePurchaseKey != null;
+                EasyLoading.showError(
+                  hasApplePayment
+                      ? 'تم الدفع عبر Apple، لكن طلب التفعيل لم يكتمل: ${state.message}. أعد محاولة التفعيل من داخل التطبيق دون شراء المنتج مرة أخرى.'
+                      : state.message,
+                  duration: const Duration(seconds: 6),
+                );
               }
             },
           ),
@@ -179,8 +202,20 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
               } else if (state.status == AppleIapStatus.restored) {
                 EasyLoading.dismiss();
                 EasyLoading.showInfo(
-                  'تمت استعادة معاملة Apple. هذا لا يعني تفعيل الكورس؛ يعتمد التفعيل على حالة الحساب من الخادم.',
+                  'تمت استعادة معاملة Apple. جارٍ تحديث حالة الكورس من حسابك؛ التفعيل يعتمد على حالة الطلب وموافقة الإدارة.',
                 );
+                final restoredTarget = _appleIapCubit.targetFor(
+                  state.activeProductId ?? '',
+                );
+                if (restoredTarget != null &&
+                    (restoredTarget.type == AppleIapProductType.course
+                        ? restoredTarget.contentId == widget.courseId
+                        : restoredTarget.parentContentId == widget.courseId)) {
+                  _courseDetailsCubit.fetchCourseDetails(widget.courseId);
+                }
+                if (mounted) {
+                  context.read<CoursesListCubit>().fetchCourses();
+                }
               } else if (state.status == AppleIapStatus.restoreEmpty) {
                 EasyLoading.dismiss();
                 EasyLoading.showInfo(
@@ -217,29 +252,30 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                 return;
               }
 
-              final target = AppleIapProductCatalog.targetFor(
+              final target = _appleIapCubit.targetFor(
                 state.activeProductId ?? '',
               );
-              if (target?.type != AppleIapProductType.course ||
-                  target?.contentId != widget.courseId) {
+              if (target == null || _pendingApplePurchaseKey != null) {
                 return;
               }
 
               _pendingApplePurchaseKey = state.transactionKey;
-              _directRequestCubit.requestCourse(widget.courseId);
+              if (target.type == AppleIapProductType.course &&
+                  target.contentId == widget.courseId) {
+                _directRequestCubit.requestCourse(target.contentId);
+              } else if (target.type == AppleIapProductType.chapter &&
+                  target.parentContentId == widget.courseId) {
+                _directRequestCubit.requestChapter(target.contentId);
+              } else {
+                _pendingApplePurchaseKey = null;
+              }
             },
           ),
           BlocListener<RemoteConfigCubit, RemoteConfigState>(
             listenWhen: (previous, current) =>
                 previous.iosIapEnabled != current.iosIapEnabled,
             listener: (context, state) {
-              _appleIapCubit.updateIapEnabled(
-                state.iosIapEnabled &&
-                    AppleIapProductCatalog.hasProductFor(
-                      AppleIapProductType.course,
-                      widget.courseId,
-                    ),
-              );
+              _appleIapCubit.updateIapEnabled(state.iosIapEnabled);
             },
           ),
         ],
@@ -291,6 +327,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                             CourseDetailBodyRegion(
                               child: SafeArea(
                                 top: false,
+                                bottom:
+                                    Theme.of(context).platform !=
+                                    TargetPlatform.iOS,
                                 child: CourseDetailScreenBody(
                                   course: updatedCourse,
                                 ),
@@ -299,6 +338,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                             AppleIapPurchaseSection(
                               type: AppleIapProductType.course,
                               contentId: updatedCourse.id,
+                              appleProductId: updatedCourse.appleProductId,
                               isRequestStatusEligible:
                                   updatedCourse.requestStatus
                                       ?.trim()
@@ -317,27 +357,18 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                                     .requestStatus
                                     ?.trim()
                                     .toLowerCase();
-                                final productIds = AppleIapProductCatalog
-                                    .products
-                                    .entries
-                                    .where(
-                                      (entry) =>
-                                          entry.value.type ==
-                                              AppleIapProductType.course &&
-                                          entry.value.contentId ==
-                                              updatedCourse.id,
-                                    )
-                                    .map((entry) => entry.key)
-                                    .toSet();
+                                final productId = updatedCourse.appleProductId
+                                    ?.trim();
                                 final hasVisibleAppleActions =
                                     Theme.of(context).platform ==
                                         TargetPlatform.iOS &&
                                     remoteConfigState.iosIapEnabled &&
                                     requestStatus == 'not_requested' &&
                                     !updatedCourse.isEnrolled &&
+                                    productId != null &&
+                                    productId.isNotEmpty &&
                                     appleIapState.products.any(
-                                      (product) =>
-                                          productIds.contains(product.id),
+                                      (product) => product.id == productId,
                                     );
                                 return CourseDetailBottomButton(
                                   course: updatedCourse,

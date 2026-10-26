@@ -7,7 +7,7 @@ abstract interface class AppleIapStore {
 
   Future<bool> isAvailable();
 
-  Future<ProductDetailsResponse> loadProducts();
+  Future<ProductDetailsResponse> loadProducts(Set<String> productIds);
 
   Future<bool> purchase(ProductDetails product);
 

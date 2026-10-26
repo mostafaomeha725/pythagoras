@@ -15,6 +15,7 @@ class CourseChapterModel extends CourseChapter {
     required super.currencyLabel,
     super.requestStatus,
     super.isEnrolled,
+    super.appleProductId,
     super.videos,
     super.quizzes,
     super.assignments,
@@ -27,9 +28,12 @@ class CourseChapterModel extends CourseChapter {
     final quizzesData = json['quizzes'] as List<dynamic>? ?? [];
     final assignmentsData = json['assignments'] as List<dynamic>? ?? [];
     final resourcesData = json['resources'] as List<dynamic>? ?? [];
-    
+    final appleProductId = (json['apple_product_id'] ?? json['appleProductId'])
+        ?.toString();
+    final chapterId = json['id'] as int? ?? 0;
+
     return CourseChapterModel(
-      id: json['id'] as int,
+      id: chapterId,
       title: json['title'] as String,
       order: json['order'] as int? ?? 0,
       price: json['price'] as String? ?? '0',
@@ -37,10 +41,15 @@ class CourseChapterModel extends CourseChapter {
       currencyLabel: json['currency_label'] as String? ?? '',
       requestStatus: json['request_status'] as String? ?? 'not_requested',
       isEnrolled: json['is_enrolled'] as bool? ?? false,
+      appleProductId: appleProductId,
       videos: videosData.map((v) => CourseLessonModel.fromJson(v)).toList(),
       quizzes: quizzesData.map((q) => CourseQuizModel.fromJson(q)).toList(),
-      assignments: assignmentsData.map((a) => CourseAssignmentModel.fromJson(a)).toList(),
-      resources: resourcesData.map((r) => CourseResourceModel.fromJson(r)).toList(),
+      assignments: assignmentsData
+          .map((a) => CourseAssignmentModel.fromJson(a))
+          .toList(),
+      resources: resourcesData
+          .map((r) => CourseResourceModel.fromJson(r))
+          .toList(),
       statistics: json['statistics'] != null
           ? CourseChapterStatisticsModel.fromJson(json['statistics'])
           : null,

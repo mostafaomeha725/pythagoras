@@ -92,6 +92,7 @@ class ServiceLocator {
     sl.registerLazySingleton(
       () => AppleIapService(
         isIapEnabled: () => sl<RemoteConfigService>().iosIapEnabled,
+        isAuthenticated: () => sl<PreferencesStorage>().isAuthenticated,
       ),
     );
     sl.registerFactory(() => RemoteConfigCubit(remoteConfigService: sl()));
