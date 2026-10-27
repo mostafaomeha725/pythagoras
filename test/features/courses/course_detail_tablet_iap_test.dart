@@ -1,0 +1,560 @@
+import 'dart:async';
+
+import 'package:dartz/dartz.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_easyloading/flutter_easyloading.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pythagoras/core/cache/preferences_storage.dart';
+import 'package:pythagoras/core/di/services_locator.dart';
+import 'package:pythagoras/core/enums/app_enums.dart';
+import 'package:pythagoras/core/error/failure.dart';
+import 'package:pythagoras/core/services/remote_config_service.dart';
+import 'package:pythagoras/features/courses/data/services/apple_iap_service.dart';
+import 'package:pythagoras/features/courses/data/services/apple_iap_store.dart';
+import 'package:pythagoras/features/courses/domain/entities/course.dart';
+import 'package:pythagoras/features/courses/domain/entities/course_detail.dart';
+import 'package:pythagoras/features/courses/domain/repositories/courses_repository.dart';
+import 'package:pythagoras/features/courses/domain/use_cases/get_course_curriculum_use_case.dart';
+import 'package:pythagoras/features/courses/domain/use_cases/get_courses_use_case.dart';
+import 'package:pythagoras/features/courses/domain/use_cases/request_chapter_direct_use_case.dart';
+import 'package:pythagoras/features/courses/domain/use_cases/request_chapter_use_case.dart';
+import 'package:pythagoras/features/courses/domain/use_cases/request_course_direct_use_case.dart';
+import 'package:pythagoras/features/courses/domain/use_cases/request_course_use_case.dart';
+import 'package:pythagoras/features/courses/data/models/course_detail_model.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/apple_iap/apple_iap_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/course_details/course_details_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/courses_list/courses_list_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/remote_config/remote_config_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/request_enrollment/request_enrollment_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/screens/course_detail_screen.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/chapters/course_chapter_tile.dart';
+
+class _TabletStore implements AppleIapStore {
+  final StreamController<List<PurchaseDetails>> purchases =
+      StreamController<List<PurchaseDetails>>.broadcast();
+  final List<String> purchasedIds = [];
+  final List<PurchaseDetails> completed = [];
+  Set<String> queriedIds = {};
+  ProductDetailsResponse response = ProductDetailsResponse(
+    productDetails: const [],
+    notFoundIDs: const [],
+  );
+  int restoreCalls = 0;
+  bool available = true;
+
+  @override
+  bool get isIapEnabled => true;
+
+  @override
+  Stream<List<PurchaseDetails>> get purchaseStream => purchases.stream;
+
+  @override
+  Future<bool> isAvailable() async => available;
+
+  @override
+  Future<ProductDetailsResponse> loadProducts(Set<String> productIds) async {
+    queriedIds = productIds;
+    return response;
+  }
+
+  @override
+  Future<bool> purchase(ProductDetails product) async {
+    purchasedIds.add(product.id);
+    return true;
+  }
+
+  @override
+  Future<void> restorePurchases() async {
+    restoreCalls++;
+  }
+
+  @override
+  Future<void> completePurchase(PurchaseDetails purchase) async {
+    completed.add(purchase);
+  }
+
+  Future<void> close() => purchases.close();
+}
+
+class _TabletRemoteConfig extends RemoteConfigService {
+  final StreamController<bool> changes = StreamController<bool>.broadcast(
+    sync: true,
+  );
+  bool enabled;
+
+  _TabletRemoteConfig({required this.enabled}) : super(isIos: false);
+
+  @override
+  bool get iosIapEnabled => enabled;
+
+  @override
+  Stream<bool> get iosIapEnabledChanges => changes.stream;
+
+  @override
+  Future<void> initialize() async {}
+
+  void setEnabled(bool value) {
+    enabled = value;
+    changes.add(value);
+  }
+}
+
+class _TabletCoursesRepository implements CoursesRepository {
+  final CourseDetail course;
+  int? requestedCourseId;
+  int? requestedChapterId;
+
+  _TabletCoursesRepository(this.course);
+
+  @override
+  Future<Either<Failure, CourseDetail>> getCourseCurriculum(
+    int courseId, {
+    bool fromCache = false,
+  }) async => Right(course);
+
+  @override
+  Future<Either<Failure, List<Course>>> getCourses({
+    int? classId,
+    int? semester,
+    bool fromCache = false,
+  }) async => const Right([]);
+
+  @override
+  Future<Either<Failure, String>> requestCourseDirect(int courseId) async {
+    requestedCourseId = courseId;
+    return const Right('تم استلام الطلب');
+  }
+
+  @override
+  Future<Either<Failure, String>> requestChapterDirect(int chapterId) async {
+    requestedChapterId = chapterId;
+    return const Right('تم استلام الطلب');
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _TabletHarness {
+  final CourseDetailModel course;
+  final _TabletCoursesRepository repository;
+  final _TabletStore store;
+  final _TabletRemoteConfig remoteConfig;
+  final CoursesListCubit coursesListCubit;
+
+  const _TabletHarness({
+    required this.course,
+    required this.repository,
+    required this.store,
+    required this.remoteConfig,
+    required this.coursesListCubit,
+  });
+}
+
+ProductDetails _storeProduct(String id, String price) => ProductDetails(
+  id: id,
+  title: 'Tablet test product',
+  description: 'StoreKit test product',
+  price: price,
+  rawPrice: 1,
+  currencyCode: 'USD',
+);
+
+PurchaseDetails _purchase(
+  String productId, {
+  PurchaseStatus status = PurchaseStatus.purchased,
+}) {
+  final purchase = PurchaseDetails(
+    purchaseID: 'tablet-transaction-$productId',
+    productID: productId,
+    verificationData: PurchaseVerificationData(
+      localVerificationData: 'local',
+      serverVerificationData: 'server',
+      source: 'test',
+    ),
+    transactionDate: '1',
+    status: status,
+  );
+  return purchase..pendingCompletePurchase = true;
+}
+
+Future<_TabletHarness> _pumpCourseDetailScreen(
+  WidgetTester tester, {
+  required Size size,
+  bool remoteConfigEnabled = true,
+  bool authenticated = true,
+  String? courseProductId = 'tablet.course.21',
+  String? chapterProductId = 'tablet.chapter.245',
+  String courseRequestStatus = 'not_requested',
+  String chapterRequestStatus = 'not_requested',
+  bool courseEnrolled = false,
+  bool chapterEnrolled = false,
+  List<ProductDetails>? storeProducts,
+}) async {
+  SharedPreferences.setMockInitialValues({
+    if (authenticated) PreferencesKeys.userToken.name: 'tablet-test-token',
+    if (authenticated) PreferencesKeys.userId.name: 21,
+  });
+  final sharedPreferences = await SharedPreferences.getInstance();
+  final preferencesStorage = PreferencesStorage(sharedPreferences);
+  await sl.reset();
+  sl.registerSingleton<PreferencesStorage>(preferencesStorage);
+
+  final course = CourseDetailModel.fromJson({
+    'id': 21,
+    'title': 'Tablet course',
+    'level': 'Level',
+    'class_name': 'Class',
+    'price': '100',
+    'final_price': 100,
+    'currency_label': 'SAR',
+    'students_count': 10,
+    'is_saved': false,
+    'is_enrolled': courseEnrolled,
+    'request_status': courseRequestStatus,
+    'apple_product_id': courseProductId,
+    'general': {'rating': 4.5, 'category': 'Math'},
+    'chapters': [
+      {
+        'id': 245,
+        'title': 'Chapter 245',
+        'order': 1,
+        'price': '25',
+        'currency': 'SAR',
+        'currency_label': 'SAR',
+        'request_status': chapterRequestStatus,
+        'is_enrolled': chapterEnrolled,
+        'apple_product_id': chapterProductId,
+      },
+    ],
+  });
+  final repository = _TabletCoursesRepository(course);
+  final store = _TabletStore()
+    ..response = ProductDetailsResponse(
+      productDetails:
+          storeProducts ??
+          [
+            if (courseProductId != null)
+              _storeProduct(courseProductId, r'$2.99'),
+            if (chapterProductId != null)
+              _storeProduct(chapterProductId, r'$0.99'),
+          ],
+      notFoundIDs: const [],
+    );
+  final remoteConfig = _TabletRemoteConfig(enabled: remoteConfigEnabled);
+  final service = AppleIapService(
+    store: store,
+    isIos: true,
+    isIapEnabled: () => remoteConfig.iosIapEnabled,
+    isAuthenticated: () => preferencesStorage.isAuthenticated,
+  );
+  final coursesListCubit = CoursesListCubit(GetCoursesUseCase(repository));
+
+  sl.registerFactory(
+    () => CourseDetailsCubit(GetCourseCurriculumUseCase(repository)),
+  );
+  sl.registerFactory(
+    () => RequestEnrollmentCubit(
+      RequestCourseUseCase(repository),
+      RequestChapterUseCase(repository),
+    ),
+  );
+  sl.registerFactory(
+    () => DirectRequestCubit(
+      requestCourseDirectUseCase: RequestCourseDirectUseCase(repository),
+      requestChapterDirectUseCase: RequestChapterDirectUseCase(repository),
+    ),
+  );
+  sl.registerFactory(
+    () => RemoteConfigCubit(remoteConfigService: remoteConfig),
+  );
+  sl.registerFactory(
+    () => AppleIapCubit(
+      service: service,
+      preferences: sharedPreferences,
+      isIos: true,
+    ),
+  );
+
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = size;
+  await tester.pumpWidget(
+    ScreenUtilInit(
+      designSize: const Size(390, 844),
+      builder: (context, child) => MaterialApp(
+        theme: ThemeData(platform: TargetPlatform.iOS),
+        builder: EasyLoading.init(),
+        home: BlocProvider<CoursesListCubit>.value(
+          value: coursesListCubit,
+          child: const CourseDetailScreen(
+            courseId: 21,
+            courseTitle: 'Tablet course',
+            isEnrolled: false,
+          ),
+        ),
+      ),
+    ),
+  );
+  await _pumpTabletFrames(tester);
+
+  return _TabletHarness(
+    course: course,
+    repository: repository,
+    store: store,
+    remoteConfig: remoteConfig,
+    coursesListCubit: coursesListCubit,
+  );
+}
+
+Future<void> _pumpTabletFrames(WidgetTester tester, {int count = 6}) async {
+  for (var frame = 0; frame < count; frame++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+}
+
+Future<void> _disposeTabletHarness(
+  WidgetTester tester,
+  _TabletHarness harness,
+) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await _pumpTabletFrames(tester, count: 2);
+  await tester.runAsync(() async {
+    await Future<void>.delayed(Duration.zero);
+    await harness.coursesListCubit.close();
+    await harness.store.close();
+    await harness.remoteConfig.changes.close();
+    await sl.reset();
+  });
+  tester.view.resetPhysicalSize();
+  tester.view.resetDevicePixelRatio();
+}
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets(
+    'tablet landscape keeps its layout and supports course and chapter IAP',
+    (tester) async {
+      final harness = await _pumpCourseDetailScreen(
+        tester,
+        size: const Size(1024, 768),
+      );
+
+      expect(find.text(r'شراء عبر Apple - $2.99'), findsOneWidget);
+      expect(find.text('استعادة المشتريات'), findsOneWidget);
+      expect(find.text('طلب الدورة'), findsOneWidget);
+      expect(harness.store.queriedIds, {
+        'tablet.course.21',
+        'tablet.chapter.245',
+      });
+
+      await tester.tap(find.textContaining('شراء عبر Apple -'));
+      await tester.pump();
+      expect(harness.store.purchasedIds, ['tablet.course.21']);
+      harness.store.purchases.add([
+        _purchase('tablet.course.21', status: PurchaseStatus.canceled),
+      ]);
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.text('Chapter 245'));
+      await _pumpTabletFrames(tester);
+      expect(find.text(r'شراء عبر Apple - $0.99'), findsOneWidget);
+      expect(find.text('استعادة المشتريات'), findsNWidgets(2));
+
+      final chapterBuyButton = find.descendant(
+        of: find.byType(CourseChapterTile),
+        matching: find.text(r'شراء عبر Apple - $0.99'),
+      );
+      await tester.tap(chapterBuyButton);
+      await tester.pump();
+      expect(harness.store.purchasedIds, [
+        'tablet.course.21',
+        'tablet.chapter.245',
+      ]);
+
+      harness.store.purchases.add([_purchase('tablet.chapter.245')]);
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
+      expect(harness.repository.requestedChapterId, 245);
+      expect(harness.store.completed, hasLength(2));
+
+      await tester.tap(find.text('استعادة المشتريات').first);
+      await _pumpTabletFrames(tester);
+      expect(harness.store.restoreCalls, 1);
+      harness.store.purchases.add([
+        _purchase('tablet.chapter.245', status: PurchaseStatus.restored),
+      ]);
+      await _pumpTabletFrames(tester);
+      expect(harness.store.completed, hasLength(3));
+
+      await _disposeTabletHarness(tester, harness);
+    },
+  );
+
+  testWidgets(
+    'tablet portrait keeps the phone IAP section and StoreKit price',
+    (tester) async {
+      final harness = await _pumpCourseDetailScreen(
+        tester,
+        size: const Size(800, 1180),
+      );
+
+      expect(find.text(r'شراء عبر Apple - $2.99'), findsOneWidget);
+      expect(find.text('استعادة المشتريات'), findsOneWidget);
+      expect(find.text('طلب الدورة'), findsOneWidget);
+
+      await _disposeTabletHarness(tester, harness);
+    },
+  );
+
+  testWidgets('tablet Remote Config hides and re-enables Apple actions', (
+    tester,
+  ) async {
+    final harness = await _pumpCourseDetailScreen(
+      tester,
+      size: const Size(1024, 768),
+      remoteConfigEnabled: false,
+    );
+
+    expect(find.textContaining('شراء عبر Apple -'), findsNothing);
+    expect(find.text('استعادة المشتريات'), findsNothing);
+    expect(find.text('طلب الدورة'), findsOneWidget);
+
+    harness.remoteConfig.setEnabled(true);
+    await _pumpTabletFrames(tester);
+    expect(find.text(r'شراء عبر Apple - $2.99'), findsOneWidget);
+    expect(find.text('استعادة المشتريات'), findsOneWidget);
+
+    harness.remoteConfig.setEnabled(false);
+    await _pumpTabletFrames(tester);
+    expect(find.textContaining('شراء عبر Apple -'), findsNothing);
+    expect(find.text('استعادة المشتريات'), findsNothing);
+
+    await _disposeTabletHarness(tester, harness);
+  });
+
+  testWidgets(
+    'tablet hides purchase for missing, unavailable, or pending course',
+    (tester) async {
+      final missingProduct = await _pumpCourseDetailScreen(
+        tester,
+        size: const Size(1024, 768),
+        courseProductId: null,
+        chapterProductId: null,
+      );
+      expect(find.textContaining('شراء عبر Apple -'), findsNothing);
+      expect(
+        find.text('الشراء عبر Apple غير متاح لهذا المحتوى حاليًا'),
+        findsOneWidget,
+      );
+      expect(find.text('استعادة المشتريات'), findsOneWidget);
+      await _disposeTabletHarness(tester, missingProduct);
+
+      final unavailableProduct = await _pumpCourseDetailScreen(
+        tester,
+        size: const Size(1024, 768),
+        storeProducts: const [],
+      );
+      expect(find.textContaining('شراء عبر Apple -'), findsNothing);
+      expect(find.text('الشراء عبر Apple غير متاح حاليًا'), findsOneWidget);
+      expect(find.text('استعادة المشتريات'), findsOneWidget);
+      await _disposeTabletHarness(tester, unavailableProduct);
+
+      final pendingCourse = await _pumpCourseDetailScreen(
+        tester,
+        size: const Size(1024, 768),
+        courseRequestStatus: 'pending',
+        chapterProductId: null,
+      );
+      expect(find.textContaining('شراء عبر Apple -'), findsNothing);
+      expect(find.text('استعادة المشتريات'), findsOneWidget);
+      expect(find.text('قيد الانتظار'), findsNWidgets(2));
+      await _disposeTabletHarness(tester, pendingCourse);
+    },
+  );
+
+  testWidgets(
+    'tablet blocks chapter purchase when chapter or course is owned/pending',
+    (tester) async {
+      final pendingChapter = await _pumpCourseDetailScreen(
+        tester,
+        size: const Size(1024, 768),
+        chapterRequestStatus: 'pending',
+      );
+      await tester.tap(find.text('Chapter 245'));
+      await _pumpTabletFrames(tester);
+      expect(
+        find.descendant(
+          of: find.byType(CourseChapterTile),
+          matching: find.textContaining('شراء عبر Apple -'),
+        ),
+        findsNothing,
+      );
+      expect(pendingChapter.store.queriedIds, {'tablet.course.21'});
+      await _disposeTabletHarness(tester, pendingChapter);
+
+      final enrolledCourse = await _pumpCourseDetailScreen(
+        tester,
+        size: const Size(1024, 768),
+        courseEnrolled: true,
+        courseRequestStatus: 'accepted',
+      );
+      await tester.tap(find.text('Chapter 245'));
+      await _pumpTabletFrames(tester);
+      expect(find.textContaining('شراء عبر Apple -'), findsNothing);
+      expect(find.text('عرض الدورة'), findsOneWidget);
+      expect(enrolledCourse.store.queriedIds, isEmpty);
+      await _disposeTabletHarness(tester, enrolledCourse);
+
+      final enrolledChapter = await _pumpCourseDetailScreen(
+        tester,
+        size: const Size(1024, 768),
+        chapterEnrolled: true,
+        chapterRequestStatus: 'accepted',
+      );
+      await tester.tap(find.text('Chapter 245'));
+      await _pumpTabletFrames(tester);
+      expect(
+        find.descendant(
+          of: find.byType(CourseChapterTile),
+          matching: find.textContaining('شراء عبر Apple -'),
+        ),
+        findsNothing,
+      );
+      await _disposeTabletHarness(tester, enrolledChapter);
+    },
+  );
+
+  testWidgets('guest tablet purchase and restore show login without StoreKit', (
+    tester,
+  ) async {
+    final harness = await _pumpCourseDetailScreen(
+      tester,
+      size: const Size(1024, 768),
+      authenticated: false,
+    );
+
+    await tester.tap(find.textContaining('شراء عبر Apple -'));
+    await _pumpTabletFrames(tester);
+    expect(find.text('يجب تسجيل الدخول أولًا'), findsOneWidget);
+    expect(harness.store.purchasedIds, isEmpty);
+    expect(harness.store.restoreCalls, 0);
+
+    tester.state<NavigatorState>(find.byType(Navigator).first).pop();
+    await _pumpTabletFrames(tester);
+    await tester.tap(find.text('استعادة المشتريات'));
+    await _pumpTabletFrames(tester);
+    expect(find.text('يجب تسجيل الدخول أولًا'), findsOneWidget);
+    expect(harness.store.purchasedIds, isEmpty);
+    expect(harness.store.restoreCalls, 0);
+
+    await _disposeTabletHarness(tester, harness);
+  });
+}

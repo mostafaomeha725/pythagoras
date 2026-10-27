@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_detail.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/course_details/course_details_cubit.dart';
+import 'package:pythagoras/features/courses/data/services/apple_iap_product_catalog.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/apple_iap_purchase_section.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_curriculum_card.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_info_card.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_tablet_action_button.dart';
@@ -50,26 +54,20 @@ class CourseDetailTabletLandscape extends StatelessWidget {
                       left: horizontalPadding,
                       right: horizontalPadding,
                       top: 4.0,
-                      bottom: 84.0,
+                      bottom: 190.0,
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Right Column (Curriculum + Chapters)
                         Expanded(
-                          child: CourseDetailCurriculumCard(
-                            course: course,
-                          ),
+                          child: CourseDetailCurriculumCard(course: course),
                         ),
 
                         const SizedBox(width: 20),
 
                         // Left Column (Image + Title + Rating + Description)
-                        Expanded(
-                          child: CourseDetailInfoCard(
-                            course: course,
-                          ),
-                        ),
+                        Expanded(child: CourseDetailInfoCard(course: course)),
                       ],
                     ),
                   ),
@@ -85,7 +83,29 @@ class CourseDetailTabletLandscape extends StatelessWidget {
           bottom: 16,
           right: horizontalPadding,
           width: columnWidth,
-          child: CourseDetailTabletActionButton(course: course),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppleIapPurchaseSection(
+                type: AppleIapProductType.course,
+                contentId: course.id,
+                appleProductId: course.appleProductId,
+                isRequestStatusEligible:
+                    course.requestStatus?.trim().toLowerCase() ==
+                    'not_requested',
+                isEnrolled: course.isEnrolled,
+                hasPendingRequest:
+                    course.requestStatus?.trim().toLowerCase() == 'pending',
+                tabletLandscape: true,
+                onAuthenticated: () {
+                  context.read<CourseDetailsCubit>().fetchCourseDetails(
+                    course.id,
+                  );
+                },
+              ),
+              CourseDetailTabletActionButton(course: course),
+            ],
+          ),
         ),
       ],
     );
