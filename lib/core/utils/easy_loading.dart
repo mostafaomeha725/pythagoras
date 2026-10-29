@@ -89,6 +89,68 @@ void showNoInternetError([String? message]) {
 }
 
 /// ===============================
+/// VERIFICATION DIAGNOSTIC
+/// ===============================
+void showVerificationDiagnostic(
+  BuildContext context,
+  String diagnosticText,
+) {
+  hideLoading();
+
+  final content = diagnosticText.trim();
+  if (content.isEmpty) return;
+
+  showDialog(
+    context: context,
+    barrierDismissible: true,
+    builder: (dialogContext) => Dialog(
+      insetPadding: const EdgeInsets.all(16),
+      backgroundColor: Colors.black.withOpacity(0.92),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420, maxHeight: 420),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.white70),
+                  SizedBox(width: 8),
+                  Text(
+                    'Apple verification response',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: SelectableText(
+                    content,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      height: 1.6,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// ===============================
 /// SUCCESS
 /// ===============================
 void showSuccess(String message) {

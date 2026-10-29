@@ -39,6 +39,8 @@ import 'package:pythagoras/features/courses/domain/entities/course_reviews_data.
 import 'package:pythagoras/features/courses/data/models/course_review_model.dart';
 import 'package:pythagoras/features/courses/data/models/course_reviews_data_model.dart';
 import 'package:pythagoras/features/courses/domain/repositories/courses_repository.dart';
+import 'package:pythagoras/features/courses/domain/entities/apple_purchase_verification_diagnostic.dart';
+import 'package:pythagoras/features/courses/data/services/apple_purchase_response_sanitizer.dart';
 
 class CoursesRepositoryImpl implements CoursesRepository {
   final NetworkService networkService;
@@ -324,6 +326,92 @@ class CoursesRepositoryImpl implements CoursesRepository {
       });
     } catch (e) {
       return Left(Failure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, String>> enrollCourse(int courseId) {
+    return _enrollContent(
+      endPoint: EndPoints.enrollCourse,
+      idField: 'courseId',
+      contentId: courseId,
+      failureMessage: 'فشل في تسجيل الدورة',
+    );
+  }
+
+  @override
+  Future<Either<Failure, String>> enrollChapter(int chapterId) {
+    return _enrollContent(
+      endPoint: EndPoints.enrollChapter,
+      idField: 'chapterId',
+      contentId: chapterId,
+      failureMessage: 'فشل في تسجيل الفصل',
+    );
+  }
+
+  @override
+  Future<ApplePurchaseVerificationDiagnostic> verifyApplePurchase(
+    String signedTransaction,
+  ) async {
+    try {
+      final response = await networkService.postSensitiveData(
+        endPoint: EndPoints.verifyApplePurchase,
+        data: {'signedTransaction': signedTransaction},
+      );
+
+      if (response.isHttpResponse) {
+        return ApplePurchaseVerificationDiagnostic.http(
+          statusCode: response.statusCode!,
+          responseBody: ApplePurchaseResponseSanitizer.sanitizeBody(
+            response.responseBody ?? '',
+          ),
+        );
+      }
+      return ApplePurchaseVerificationDiagnostic.networkError(
+        ApplePurchaseResponseSanitizer.sanitizeText(
+          response.networkError ?? 'تعذر الاتصال بخدمة التحقق',
+        ),
+      );
+    } catch (_) {
+      return const ApplePurchaseVerificationDiagnostic.networkError(
+        'تعذر الاتصال بخدمة التحقق',
+      );
+    }
+  }
+
+  Future<Either<Failure, String>> _enrollContent({
+    required String endPoint,
+    required String idField,
+    required int contentId,
+    required String failureMessage,
+  }) async {
+    try {
+      final response = await networkService.postData(
+        endPoint: endPoint,
+        data: {idField: contentId},
+      );
+
+      return response.fold((failure) => Left(failure), (data) {
+        if (data is Map &&
+            (data['enrolled'] == true || data['alreadyEnrolled'] == true)) {
+          final message = data['message']?.toString();
+          return Right(
+            message != null && message.isNotEmpty
+                ? message
+                : 'تم تأكيد تسجيل المحتوى',
+          );
+        }
+
+        return Left(
+          Failure(
+            data is Map
+                ? data['message']?.toString() ?? failureMessage
+                : failureMessage,
+          ),
+        );
+      });
+    } catch (error) {
+      return Left(Failure(error.toString()));
     }
   }
 
@@ -977,6 +1065,7 @@ class CoursesRepositoryImpl implements CoursesRepository {
       return Left(Failure(e.toString()));
     }
   }
+
   @override
   Future<Either<Failure, void>> downloadResourceNative({
     required int resourceId,
@@ -984,7 +1073,8 @@ class CoursesRepositoryImpl implements CoursesRepository {
     required String fileName,
   }) async {
     try {
-      final url = '${AppStrings.baseUrl}${EndPoints.downloadResource(resourceId)}';
+      final url =
+          '${AppStrings.baseUrl}${EndPoints.downloadResource(resourceId)}';
       final success = await NativeDownloadService().enqueueDownload(
         url: url,
         title: title,

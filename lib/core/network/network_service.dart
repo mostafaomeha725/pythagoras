@@ -17,8 +17,26 @@ import '/core/network/endpoints.dart';
 import 'authorization_interceptor.dart';
 import 'connectivity_interceptor.dart';
 
+class SensitiveHttpResult {
+  final int? statusCode;
+  final String? responseBody;
+  final String? networkError;
+
+  const SensitiveHttpResult.http({
+    required this.statusCode,
+    required this.responseBody,
+  }) : networkError = null;
+
+  const SensitiveHttpResult.networkError(this.networkError)
+    : statusCode = null,
+      responseBody = null;
+
+  bool get isHttpResponse => statusCode != null;
+}
+
 class NetworkService {
   final Dio dio;
+  late final Dio _sensitiveDio = _createSensitiveDio();
 
   NetworkService(this.dio) {
     dio.options
@@ -48,6 +66,18 @@ class NetworkService {
       ),
     );
     // }
+  }
+
+  Dio _createSensitiveDio() {
+    final interceptors = Interceptors()
+      ..addAll(
+        dio.interceptors.where(
+          (interceptor) =>
+              interceptor is! ChuckerDioInterceptor &&
+              interceptor is! PrettyDioLogger,
+        ),
+      );
+    return dio.clone(interceptors: interceptors);
   }
 
   void addHeaders() {
@@ -108,6 +138,57 @@ class NetworkService {
       return handleDioExceoptions(e);
     } catch (e) {
       return Left(Failure(e.toString()));
+    }
+  }
+
+  Future<SensitiveHttpResult> postSensitiveData({
+    required String endPoint,
+    Map<String, dynamic>? data,
+    Map<String, dynamic>? queryParameters,
+    bool isRaw = true,
+  }) async {
+    try {
+      final response = await _sensitiveDio.post(
+        endPoint,
+        data: data == null
+            ? null
+            : isRaw
+            ? data
+            : FormData.fromMap(data),
+        queryParameters: queryParameters,
+        options: Options(
+          responseType: ResponseType.plain,
+          validateStatus: (_) => true,
+        ),
+      );
+      return SensitiveHttpResult.http(
+        statusCode: response.statusCode ?? 0,
+        responseBody: response.data?.toString() ?? '',
+      );
+    } on SocketException {
+      return const SensitiveHttpResult.networkError(
+        AppStrings.noInternetConnection,
+      );
+    } on FormatException {
+      return const SensitiveHttpResult.networkError(
+        'تعذر قراءة استجابة الخادم',
+      );
+    } on DioException catch (error) {
+      final response = error.response;
+      if (response != null) {
+        return SensitiveHttpResult.http(
+          statusCode: response.statusCode ?? 0,
+          responseBody: response.data?.toString() ?? '',
+        );
+      }
+      return handleDioExceoptions(error).fold(
+        (failure) => SensitiveHttpResult.networkError(failure.message),
+        (_) => const SensitiveHttpResult.networkError(
+          AppStrings.noInternetConnection,
+        ),
+      );
+    } catch (error) {
+      return SensitiveHttpResult.networkError(error.toString());
     }
   }
 

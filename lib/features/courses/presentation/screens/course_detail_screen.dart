@@ -10,8 +10,6 @@ import 'package:pythagoras/features/courses/presentation/widgets/course_details/
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/request_enrollment/request_enrollment_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/request_enrollment/request_enrollment_state.dart';
-import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_cubit.dart';
-import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_state.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/apple_iap/apple_iap_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/apple_iap/apple_iap_state.dart';
 import 'package:pythagoras/features/courses/data/services/apple_iap_product_catalog.dart';
@@ -25,6 +23,7 @@ import 'package:pythagoras/core/widgets/no_internet_widget.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_tablet_landscape.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_tablet_shimmer.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/apple_iap_purchase_section.dart';
+import 'package:pythagoras/core/utils/easy_loading.dart';
 
 class CourseDetailScreen extends StatefulWidget {
   final int courseId;
@@ -46,11 +45,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     with WidgetsBindingObserver {
   late final CourseDetailsCubit _courseDetailsCubit;
   late final RequestEnrollmentCubit _requestEnrollmentCubit;
-  late final DirectRequestCubit _directRequestCubit;
   late final RemoteConfigCubit _remoteConfigCubit;
   late final AppleIapCubit _appleIapCubit;
   bool _isWaitingForWhatsApp = false;
-  String? _pendingApplePurchaseKey;
 
   @override
   void initState() {
@@ -58,7 +55,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     _courseDetailsCubit = sl<CourseDetailsCubit>()
       ..fetchCourseDetails(widget.courseId);
     _requestEnrollmentCubit = sl<RequestEnrollmentCubit>();
-    _directRequestCubit = sl<DirectRequestCubit>();
     _remoteConfigCubit = sl<RemoteConfigCubit>()..load();
     _appleIapCubit = sl<AppleIapCubit>();
     WidgetsBinding.instance.addObserver(this);
@@ -69,7 +65,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
     WidgetsBinding.instance.removeObserver(this);
     _courseDetailsCubit.close();
     _requestEnrollmentCubit.close();
-    _directRequestCubit.close();
     _remoteConfigCubit.close();
     _appleIapCubit.close();
     super.dispose();
@@ -92,7 +87,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
       providers: [
         BlocProvider.value(value: _courseDetailsCubit),
         BlocProvider.value(value: _requestEnrollmentCubit),
-        BlocProvider.value(value: _directRequestCubit),
         BlocProvider.value(value: _remoteConfigCubit),
         BlocProvider.value(value: _appleIapCubit),
       ],
@@ -154,40 +148,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
               }
             },
           ),
-          // ── iOS: direct enrollment flow ──────────────────────────────────
-          BlocListener<DirectRequestCubit, DirectRequestState>(
-            listener: (context, state) async {
-              if (state is DirectRequestLoading) {
-                EasyLoading.show(status: 'جاري التحميل...');
-              } else if (state is DirectRequestSuccess) {
-                EasyLoading.dismiss();
-                EasyLoading.showSuccess(state.message);
-                final purchaseKey = _pendingApplePurchaseKey;
-                if (purchaseKey != null) {
-                  _pendingApplePurchaseKey = null;
-                  await _appleIapCubit.completeConfirmedPurchase(purchaseKey);
-                }
-                if (!context.mounted) return;
-                // Refresh course details and courses list immediately after
-                // a successful iOS direct request — mirrors the same two
-                // calls Android makes when the app returns from WhatsApp
-                // (see didChangeAppLifecycleState).
-                _courseDetailsCubit.fetchCourseDetails(widget.courseId);
-                if (mounted) {
-                  context.read<CoursesListCubit>().fetchCourses();
-                }
-              } else if (state is DirectRequestError) {
-                EasyLoading.dismiss();
-                final hasApplePayment = _pendingApplePurchaseKey != null;
-                EasyLoading.showError(
-                  hasApplePayment
-                      ? 'تم الدفع عبر Apple، لكن طلب التفعيل لم يكتمل: ${state.message}. أعد محاولة التفعيل من داخل التطبيق دون شراء المنتج مرة أخرى.'
-                      : state.message,
-                  duration: const Duration(seconds: 6),
-                );
-              }
-            },
-          ),
           BlocListener<AppleIapCubit, AppleIapState>(
             listener: (context, state) {
               if (state.status == AppleIapStatus.loading &&
@@ -197,8 +157,8 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                 EasyLoading.show(status: 'جاري بدء عملية الشراء عبر Apple...');
               } else if (state.status == AppleIapStatus.pending) {
                 EasyLoading.show(status: 'جاري انتظار تأكيد Apple...');
-              } else if (state.status == AppleIapStatus.purchaseConfirmed) {
-                EasyLoading.dismiss();
+              } else if (state.status == AppleIapStatus.verifying) {
+                EasyLoading.show(status: 'جارٍ التحقق من عملية الشراء...');
               } else if (state.status == AppleIapStatus.restored) {
                 EasyLoading.dismiss();
                 EasyLoading.showInfo(
@@ -224,11 +184,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
               } else if (state.status == AppleIapStatus.cancelled) {
                 EasyLoading.dismiss();
                 EasyLoading.showInfo(state.message ?? 'تم إلغاء عملية الشراء');
-              } else if (state.status == AppleIapStatus.failure) {
-                EasyLoading.dismiss();
-                EasyLoading.showError(
-                  state.message ?? 'تعذر إتمام عملية Apple',
-                );
               } else if (state.status == AppleIapStatus.transactionConflict) {
                 EasyLoading.dismiss();
                 EasyLoading.showError(
@@ -240,34 +195,26 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                   state.message ?? 'لم يصل تأكيد من Apple؛ استخدم Restore.',
                 );
               } else if (state.status == AppleIapStatus.verificationRequired) {
+                final diagnosticText = state.verificationDiagnostic;
+                if (diagnosticText != null && diagnosticText.isNotEmpty) {
+                  showVerificationDiagnostic(context, diagnosticText);
+                  return;
+                }
                 EasyLoading.dismiss();
-                EasyLoading.showInfo(
-                  'المعاملة مستلمة، لكن تعذر التحقق من تفعيل الكورس.',
+                EasyLoading.showError(
+                  state.message ?? 'لم يتم تأكيد استحقاق المحتوى من الخادم.',
+                  duration: const Duration(seconds: 6),
                 );
-              }
-
-              if (state.status != AppleIapStatus.purchaseConfirmed ||
-                  state.transactionKey == null ||
-                  _pendingApplePurchaseKey != null) {
-                return;
-              }
-
-              final target = _appleIapCubit.targetFor(
-                state.activeProductId ?? '',
-              );
-              if (target == null || _pendingApplePurchaseKey != null) {
-                return;
-              }
-
-              _pendingApplePurchaseKey = state.transactionKey;
-              if (target.type == AppleIapProductType.course &&
-                  target.contentId == widget.courseId) {
-                _directRequestCubit.requestCourse(target.contentId);
-              } else if (target.type == AppleIapProductType.chapter &&
-                  target.parentContentId == widget.courseId) {
-                _directRequestCubit.requestChapter(target.contentId);
-              } else {
-                _pendingApplePurchaseKey = null;
+              } else if (state.status == AppleIapStatus.failure) {
+                final diagnosticText = state.verificationDiagnostic;
+                if (diagnosticText != null && diagnosticText.isNotEmpty) {
+                  showVerificationDiagnostic(context, diagnosticText);
+                  return;
+                }
+                EasyLoading.dismiss();
+                EasyLoading.showError(
+                  state.message ?? 'تعذر إتمام عملية Apple',
+                );
               }
             },
           ),

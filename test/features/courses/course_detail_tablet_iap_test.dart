@@ -382,8 +382,10 @@ void main() {
       await tester.pump();
       await tester.pump();
       await tester.pump();
-      expect(harness.repository.requestedChapterId, 245);
-      expect(harness.store.completed, hasLength(2));
+      expect(harness.repository.requestedCourseId, isNull);
+      expect(harness.repository.requestedChapterId, isNull);
+      expect(harness.store.completed, hasLength(1));
+      expect(harness.store.completed.single.status, PurchaseStatus.canceled);
 
       await tester.tap(find.text('استعادة المشتريات').first);
       await _pumpTabletFrames(tester);
@@ -392,7 +394,8 @@ void main() {
         _purchase('tablet.chapter.245', status: PurchaseStatus.restored),
       ]);
       await _pumpTabletFrames(tester);
-      expect(harness.store.completed, hasLength(3));
+      expect(harness.repository.requestedChapterId, isNull);
+      expect(harness.store.completed, hasLength(1));
 
       await _disposeTabletHarness(tester, harness);
     },

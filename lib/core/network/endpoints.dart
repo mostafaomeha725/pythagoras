@@ -39,6 +39,9 @@ class EndPoints {
   static String submitQuiz(int id) => 'api/quizzes/$id/submit';
   static const String requestCourse = 'api/request/course';
   static const String requestChapter = 'api/request/chapter';
+  static const String enrollCourse = 'api/enroll/course';
+  static const String enrollChapter = 'api/enroll/chapter';
+  static const String verifyApplePurchase = 'api/iap/apple/verify';
 
   /// iOS-only: direct enrollment — no WhatsApp redirect
   static const String requestCourseDirect = 'api/request/course/direct';

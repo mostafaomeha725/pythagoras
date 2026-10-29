@@ -44,6 +44,9 @@ import 'package:pythagoras/features/courses/domain/use_cases/request_course_use_
 import 'package:pythagoras/features/courses/domain/use_cases/request_chapter_use_case.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/request_course_direct_use_case.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/request_chapter_direct_use_case.dart';
+import 'package:pythagoras/features/courses/domain/use_cases/enroll_course_use_case.dart';
+import 'package:pythagoras/features/courses/domain/use_cases/enroll_chapter_use_case.dart';
+import 'package:pythagoras/features/courses/domain/use_cases/verify_apple_purchase_use_case.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_cubit.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/get_course_assignments_use_case.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/get_assignment_details_use_case.dart';
@@ -99,6 +102,7 @@ class ServiceLocator {
     sl.registerFactory(
       () => AppleIapCubit(
         service: sl<AppleIapService>(),
+        verifyApplePurchaseUseCase: sl<VerifyApplePurchaseUseCase>(),
         preferences: sl(),
         isRequestStatusEligible: false,
       ),
@@ -165,6 +169,9 @@ class ServiceLocator {
     sl.registerLazySingleton(() => RequestChapterUseCase(sl()));
     sl.registerLazySingleton(() => RequestCourseDirectUseCase(sl()));
     sl.registerLazySingleton(() => RequestChapterDirectUseCase(sl()));
+    sl.registerLazySingleton(() => EnrollCourseUseCase(sl()));
+    sl.registerLazySingleton(() => EnrollChapterUseCase(sl()));
+    sl.registerLazySingleton(() => VerifyApplePurchaseUseCase(sl()));
     sl.registerLazySingleton(() => GetCourseAssignmentsUseCase(sl()));
     sl.registerLazySingleton(() => GetAssignmentDetailsUseCase(sl()));
     sl.registerLazySingleton(() => SubmitAssignmentUseCase(sl()));

@@ -7,6 +7,7 @@ enum AppleIapStatus {
   ready,
   purchasing,
   pending,
+  verifying,
   cancelled,
   restored,
   restoreEmpty,
@@ -24,6 +25,7 @@ class AppleIapState extends Equatable {
   final String? activeProductId;
   final String? transactionKey;
   final String? message;
+  final String? verificationDiagnostic;
 
   const AppleIapState({
     this.status = AppleIapStatus.initial,
@@ -31,6 +33,7 @@ class AppleIapState extends Equatable {
     this.activeProductId,
     this.transactionKey,
     this.message,
+    this.verificationDiagnostic,
   });
 
   AppleIapState copyWith({
@@ -42,6 +45,8 @@ class AppleIapState extends Equatable {
     bool clearTransactionKey = false,
     String? message,
     bool clearMessage = false,
+    String? verificationDiagnostic,
+    bool clearVerificationDiagnostic = false,
   }) {
     return AppleIapState(
       status: status ?? this.status,
@@ -53,6 +58,9 @@ class AppleIapState extends Equatable {
           ? null
           : (transactionKey ?? this.transactionKey),
       message: clearMessage ? null : (message ?? this.message),
+      verificationDiagnostic: clearVerificationDiagnostic
+          ? null
+          : (verificationDiagnostic ?? this.verificationDiagnostic),
     );
   }
 
@@ -63,5 +71,6 @@ class AppleIapState extends Equatable {
     activeProductId,
     transactionKey,
     message,
+    verificationDiagnostic,
   ];
 }

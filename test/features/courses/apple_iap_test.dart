@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -14,6 +13,7 @@ import 'package:pythagoras/core/di/services_locator.dart';
 import 'package:pythagoras/features/courses/domain/repositories/courses_repository.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/request_chapter_direct_use_case.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/request_course_direct_use_case.dart';
+import 'package:pythagoras/features/courses/domain/use_cases/verify_apple_purchase_use_case.dart';
 import 'package:pythagoras/features/courses/data/services/apple_iap_service.dart'
     as apple_iap_service;
 import 'package:pythagoras/features/courses/data/services/apple_iap_product_catalog.dart';
@@ -23,6 +23,7 @@ import 'package:pythagoras/features/courses/presentation/cubit/apple_iap/apple_i
 import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_state.dart';
 import 'package:pythagoras/core/services/remote_config_service.dart';
+import 'package:pythagoras/features/courses/domain/entities/apple_purchase_verification_diagnostic.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/remote_config/remote_config_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/apple_iap_purchase_section.dart';
 import 'package:pythagoras/features/courses/data/models/course_model.dart';
@@ -119,6 +120,24 @@ class FakeDirectRequestRepository implements CoursesRepository {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class FakeVerifyApplePurchaseUseCase extends VerifyApplePurchaseUseCase {
+  FakeVerifyApplePurchaseUseCase() : super(FakeDirectRequestRepository());
+
+  final List<String> submittedTransactions = [];
+  ApplePurchaseVerificationDiagnostic response = const ApplePurchaseVerificationDiagnostic.http(
+    statusCode: 200,
+    responseBody: '{"message":"Verification response received"}',
+  );
+
+  @override
+  Future<ApplePurchaseVerificationDiagnostic> call(
+    String signedTransaction,
+  ) async {
+    submittedTransactions.add(signedTransaction);
+    return response;
+  }
+}
+
 class FakeRemoteConfigService extends RemoteConfigService {
   final StreamController<bool> updates = StreamController<bool>.broadcast(
     sync: true,
@@ -158,6 +177,7 @@ PurchaseDetails purchaseDetails(
   PurchaseStatus status, {
   String id = 'transaction-1',
   String productId = 'test.product.course',
+  String serverVerificationData = 'server-test-data',
   bool pendingCompletePurchase = true,
   IAPError? error,
 }) {
@@ -166,7 +186,7 @@ PurchaseDetails purchaseDetails(
     productID: productId,
     verificationData: PurchaseVerificationData(
       localVerificationData: 'local-test-data',
-      serverVerificationData: 'server-test-data',
+      serverVerificationData: serverVerificationData,
       source: 'test',
     ),
     transactionDate: status == PurchaseStatus.pending ? null : '1',
@@ -255,6 +275,7 @@ void main() {
   });
   late FakeAppleIapStore store;
   late AppleIapService service;
+  late FakeVerifyApplePurchaseUseCase verifyApplePurchaseUseCase;
   late AppleIapCubit cubit;
 
   setUp(() async {
@@ -268,8 +289,10 @@ void main() {
       productIds: {'test.product.course'},
       isIos: true,
     );
+    verifyApplePurchaseUseCase = FakeVerifyApplePurchaseUseCase();
     cubit = AppleIapCubit(
       service: service,
+      verifyApplePurchaseUseCase: verifyApplePurchaseUseCase,
       productIds: {'test.product.course'},
       isIos: true,
     );
@@ -451,7 +474,7 @@ void main() {
     await restore;
 
     expect(localStore.restoreCalls, 1);
-    expect(localCubit.state.status, AppleIapStatus.restored);
+    expect(localCubit.state.status, AppleIapStatus.verificationRequired);
 
     await localCubit.close();
     await localStore.close();
@@ -688,12 +711,12 @@ void main() {
     await restore;
 
     expect(localCubit.state.products, isEmpty);
-    expect(localCubit.state.status, AppleIapStatus.restored);
-    expect(localCubit.state.transactionKey, isNull);
+    expect(localCubit.state.status, AppleIapStatus.verificationRequired);
+    expect(localCubit.state.transactionKey, isNotNull);
     expect(localStore.loadProductsCalls, 0);
     expect(localStore.purchaseCalls, 0);
     expect(localStore.restoreCalls, 1);
-    expect(localStore.completedPurchases, hasLength(1));
+    expect(localStore.completedPurchases, isEmpty);
     await localCubit.close();
     await localStore.close();
   });
@@ -1389,8 +1412,8 @@ void main() {
     localStore.restoreGate!.complete();
     await tester.pump();
     await tester.pump();
-    expect(localCubit.state.status, AppleIapStatus.restored);
-    expect(localCubit.state.transactionKey, isNull);
+    expect(localCubit.state.status, AppleIapStatus.verificationRequired);
+    expect(localCubit.state.transactionKey, isNotNull);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.runAsync(() async {
@@ -1489,7 +1512,7 @@ void main() {
       expect(cubit.state.status, AppleIapStatus.ready);
       var confirmedEvents = 0;
       final subscription = cubit.stream.listen((state) {
-        if (state.status == AppleIapStatus.purchaseConfirmed) {
+        if (state.status == AppleIapStatus.verificationRequired) {
           confirmedEvents++;
         }
       });
@@ -1502,13 +1525,16 @@ void main() {
       final purchased = purchaseDetails(PurchaseStatus.purchased);
       store.purchaseController.add([purchased]);
       await settleStream();
-      expect(cubit.state.status, AppleIapStatus.purchaseConfirmed);
+      expect(cubit.state.status, AppleIapStatus.verificationRequired);
       expect(cubit.state.transactionKey, 'transaction-1');
       expect(store.completedPurchases, isEmpty);
 
       store.purchaseController.add([purchased]);
       await settleStream();
       expect(store.completedPurchases, isEmpty);
+      expect(cubit.purchaseNeedsReconciliation, isTrue);
+      await cubit.purchase('test.product.course');
+      expect(store.purchaseCalls, 0);
       expect(confirmedEvents, 1);
       await subscription.cancel();
     },
@@ -1543,20 +1569,19 @@ void main() {
   );
 
   test(
-    'confirmed purchase is completed only after the request succeeds',
+    'purchase stays incomplete until backend verification is available',
     () async {
       final purchased = purchaseDetails(PurchaseStatus.purchased);
       store.purchaseController.add([purchased]);
       await settleStream();
 
-      expect(cubit.state.status, AppleIapStatus.purchaseConfirmed);
+      expect(cubit.state.status, AppleIapStatus.verificationRequired);
+      expect(cubit.state.transactionKey, 'transaction-1');
       expect(store.completedPurchases, isEmpty);
 
-      await cubit.completeConfirmedPurchase('transaction-1');
-      expect(store.completedPurchases, [purchased]);
-
-      await cubit.completeConfirmedPurchase('transaction-1');
-      expect(store.completedPurchases, [purchased]);
+      store.purchaseController.add([purchased]);
+      await settleStream();
+      expect(store.completedPurchases, isEmpty);
     },
   );
 
@@ -1611,7 +1636,7 @@ void main() {
         preferences.getStringList('apple_iap_submitted_purchase_owners'),
         contains('101|apple-tx-previous-account'),
       );
-      expect(localStore.completedPurchases, hasLength(1));
+      expect(localStore.completedPurchases, isEmpty);
       await localCubit.close();
       await localStore.close();
     },
@@ -1683,7 +1708,7 @@ void main() {
     expect(localCubit.state.message, contains('حساب طالب آخر'));
     expect(localCubit.state.transactionKey, isNull);
     expect(localStore.purchaseCalls, 0);
-    expect(localStore.completedPurchases, hasLength(1));
+    expect(localStore.completedPurchases, isEmpty);
     await localCubit.close();
     await localStore.close();
   });
@@ -1773,7 +1798,7 @@ void main() {
 
       expect(localCubit.state.status, AppleIapStatus.transactionConflict);
       expect(localCubit.state.message, contains('حساب طالب آخر'));
-      expect(localStore.completeCalls, 1);
+      expect(localStore.completeCalls, 0);
       localStore.completeGate!.complete();
       await settleStream();
       await localCubit.close();
@@ -1805,18 +1830,17 @@ void main() {
     final purchased = purchaseDetails(PurchaseStatus.purchased);
     localStore.purchaseController.add([purchased]);
     await settleStream();
-    expect(localCubit.state.status, AppleIapStatus.purchaseConfirmed);
+    expect(localCubit.state.status, AppleIapStatus.verificationRequired);
     expect(
       preferences.getStringList('apple_iap_submitted_purchase_owners'),
       isNull,
     );
 
-    await localCubit.completeConfirmedPurchase('transaction-1');
-
     expect(
       preferences.getStringList('apple_iap_submitted_purchase_owners'),
-      contains('303|transaction-1'),
+      isNull,
     );
+    expect(localStore.completedPurchases, isEmpty);
     await localCubit.close();
     await localStore.close();
   });
@@ -1947,8 +1971,8 @@ void main() {
       ]);
       await settleStream();
 
-      expect(localCubit.state.status, AppleIapStatus.purchaseConfirmed);
-      expect(localCubit.purchaseNeedsReconciliation, isFalse);
+      expect(localCubit.state.status, AppleIapStatus.verificationRequired);
+      expect(localCubit.purchaseNeedsReconciliation, isTrue);
       expect(localStore.purchaseCalls, 1);
       expect(localStore.completedPurchases, isEmpty);
       await localCubit.close();
@@ -1976,6 +2000,115 @@ void main() {
     expect(store.completedPurchases, isEmpty);
   });
 
+  test(
+    'purchased event submits the exact StoreKit verification data',
+    () async {
+      const signedTransaction = 'actual-storekit-server-verification-data';
+      store.purchaseController.add([
+        purchaseDetails(
+          PurchaseStatus.purchased,
+          serverVerificationData: signedTransaction,
+        ),
+      ]);
+      await settleStream();
+
+      expect(verifyApplePurchaseUseCase.submittedTransactions, [
+        signedTransaction,
+      ]);
+      expect(cubit.state.status, AppleIapStatus.verificationRequired);
+      expect(cubit.state.transactionKey, isNot(contains(signedTransaction)));
+      expect(store.completedPurchases, isEmpty);
+    },
+  );
+
+  test(
+    'verification network failure never completes or grants the purchase',
+    () async {
+      verifyApplePurchaseUseCase.response =
+          const ApplePurchaseVerificationDiagnostic.networkError('offline');
+      store.purchaseController.add([purchaseDetails(PurchaseStatus.purchased)]);
+      await settleStream();
+
+      expect(cubit.state.status, AppleIapStatus.failure);
+      expect(cubit.purchaseNeedsReconciliation, isTrue);
+      expect(store.completedPurchases, isEmpty);
+    },
+  );
+
+  test('verification 404 and 422 responses never grant content', () async {
+    for (final statusCode in [404, 422]) {
+      verifyApplePurchaseUseCase.response = ApplePurchaseVerificationDiagnostic.http(
+        statusCode: statusCode,
+        responseBody: '{"message":"HTTP $statusCode"}',
+      );
+      store.purchaseController.add([
+        purchaseDetails(
+          PurchaseStatus.purchased,
+          id: 'verification-$statusCode',
+        ),
+      ]);
+      await settleStream();
+
+      expect(cubit.state.status, AppleIapStatus.verificationRequired);
+      expect(store.completedPurchases, isEmpty);
+    }
+  });
+
+  test('restore retries server verification after a network failure', () async {
+    verifyApplePurchaseUseCase.response =
+        const ApplePurchaseVerificationDiagnostic.networkError('offline');
+    store.purchaseController.add([
+      purchaseDetails(PurchaseStatus.purchased, id: 'retry-transaction'),
+    ]);
+    await settleStream();
+    expect(cubit.state.status, AppleIapStatus.failure);
+
+    verifyApplePurchaseUseCase.response = const ApplePurchaseVerificationDiagnostic.http(
+      statusCode: 200,
+      responseBody: '{"message":"accepted"}',
+    );
+    final restore = cubit.restorePurchases();
+    await settleStream();
+    store.purchaseController.add([
+      purchaseDetails(PurchaseStatus.restored, id: 'retry-transaction'),
+    ]);
+    await restore;
+
+    expect(verifyApplePurchaseUseCase.submittedTransactions, [
+      'server-test-data',
+      'server-test-data',
+    ]);
+    expect(cubit.state.status, AppleIapStatus.verificationRequired);
+    expect(store.completedPurchases, isEmpty);
+  });
+
+  test(
+    'fallback transaction key never contains Apple verification data',
+    () async {
+      const privateVerificationData = 'private-apple-verification-data';
+      final purchase = PurchaseDetails(
+        purchaseID: null,
+        productID: 'test.product.course',
+        verificationData: PurchaseVerificationData(
+          localVerificationData: 'local-test-data',
+          serverVerificationData: privateVerificationData,
+          source: 'test',
+        ),
+        transactionDate: '1',
+        status: PurchaseStatus.purchased,
+      )..pendingCompletePurchase = true;
+
+      store.purchaseController.add([purchase]);
+      await settleStream();
+
+      expect(cubit.state.status, AppleIapStatus.verificationRequired);
+      expect(
+        cubit.state.transactionKey,
+        isNot(contains(privateVerificationData)),
+      );
+    },
+  );
+
   test('restored purchases are completed without creating a request', () async {
     final restore = cubit.restorePurchases();
     expect(store.restoreSawPurchaseListener, isTrue);
@@ -1985,14 +2118,12 @@ void main() {
     final restored = purchaseDetails(PurchaseStatus.restored);
     store.purchaseController.add([restored]);
     await restore;
-    expect(cubit.state.status, AppleIapStatus.restored);
-    expect(cubit.state.status, isNot(AppleIapStatus.purchaseConfirmed));
-    expect(cubit.state.transactionKey, isNull);
-    expect(store.completedPurchases, hasLength(1));
-    expect(
-      cubit.state.message,
-      'تمت استعادة المشتريات دون إنشاء طلب تفعيل جديد',
-    );
+    expect(cubit.state.status, AppleIapStatus.verificationRequired);
+    expect(cubit.state.transactionKey, isNotNull);
+    expect(verifyApplePurchaseUseCase.submittedTransactions, [
+      'server-test-data',
+    ]);
+    expect(store.completedPurchases, isEmpty);
   });
 
   test('original student can restore their recorded transaction', () async {
@@ -2027,10 +2158,10 @@ void main() {
     ]);
     await restore;
 
-    expect(localCubit.state.status, AppleIapStatus.restored);
-    expect(localCubit.state.transactionKey, isNull);
+    expect(localCubit.state.status, AppleIapStatus.verificationRequired);
+    expect(localCubit.state.transactionKey, isNotNull);
     expect(localStore.restoreCalls, 1);
-    expect(localStore.completedPurchases, hasLength(1));
+    expect(localStore.completedPurchases, isEmpty);
     expect(
       preferences.getStringList('apple_iap_submitted_purchase_owners'),
       contains('101|apple-tx-student-a'),
@@ -2050,8 +2181,8 @@ void main() {
       store.purchaseController.add([purchaseDetails(PurchaseStatus.restored)]);
       await restore;
 
-      expect(cubit.state.status, AppleIapStatus.restored);
-      expect(store.completedPurchases, hasLength(1));
+      expect(cubit.state.status, AppleIapStatus.verificationRequired);
+      expect(store.completedPurchases, isEmpty);
     },
   );
 
@@ -2078,8 +2209,8 @@ void main() {
     ]);
     await restore;
 
-    expect(localCubit.state.status, AppleIapStatus.failure);
-    expect(localCubit.state.message, contains('StoreKit completion failed'));
+    expect(localCubit.state.status, AppleIapStatus.verificationRequired);
+    expect(localCubit.state.message, contains('لم يتم تسجيل المحتوى'));
     expect(localCubit.state.status, isNot(AppleIapStatus.restored));
     expect(localStore.completedPurchases, isEmpty);
     await localCubit.close();
@@ -2225,7 +2356,7 @@ void main() {
       expect(localStore.restoreCalls, 1);
 
       await restore;
-      expect(localCubit.state.status, AppleIapStatus.restored);
+      expect(localCubit.state.status, AppleIapStatus.verificationRequired);
       localStore.restoreGate!.complete();
       await localCubit.close();
       await localStore.close();
@@ -2275,47 +2406,41 @@ void main() {
   });
 
   test(
-    'restore is blocked while a purchased transaction awaits the backend',
+    'restore retries a purchased transaction awaiting backend verification',
     () async {
       final purchased = purchaseDetails(PurchaseStatus.purchased);
       store.purchaseController.add([purchased]);
       await settleStream();
-      expect(cubit.state.status, AppleIapStatus.purchaseConfirmed);
+      expect(cubit.state.status, AppleIapStatus.verificationRequired);
 
-      await cubit.restorePurchases();
+      final restore = cubit.restorePurchases();
+      await settleStream();
+      expect(store.restoreCalls, 1);
+      store.purchaseController.add([
+        purchaseDetails(PurchaseStatus.restored, id: 'transaction-1'),
+      ]);
+      await restore;
 
-      expect(store.restoreCalls, 0);
-      expect(cubit.state.status, AppleIapStatus.purchaseConfirmed);
+      expect(cubit.state.status, AppleIapStatus.verificationRequired);
       expect(store.completedPurchases, isEmpty);
     },
   );
 
-  test(
-    'duplicate restored callbacks complete a transaction only once',
-    () async {
-      store.completeGate = Completer<void>();
-      final restore = cubit.restorePurchases();
-      await settleStream();
-      final restored = purchaseDetails(PurchaseStatus.restored);
-      store.purchaseController.add([restored]);
-      await settleStream();
-      store.purchaseController.add([purchaseDetails(PurchaseStatus.restored)]);
-      await settleStream();
+  test('duplicate restored callbacks remain uncompleted', () async {
+    final restore = cubit.restorePurchases();
+    await settleStream();
+    final restored = purchaseDetails(PurchaseStatus.restored);
+    store.purchaseController.add([restored]);
+    await settleStream();
+    store.purchaseController.add([purchaseDetails(PurchaseStatus.restored)]);
+    await settleStream();
 
-      expect(store.completeCalls, 1);
-      var restoreFinished = false;
-      restore.then((_) => restoreFinished = true);
-      await settleStream();
-      expect(restoreFinished, isFalse);
+    await restore;
 
-      store.completeGate!.complete();
-
-      await restore;
-
-      expect(cubit.state.status, AppleIapStatus.restored);
-      expect(store.completedPurchases, [restored]);
-    },
-  );
+    expect(cubit.state.status, AppleIapStatus.verificationRequired);
+    expect(store.completeCalls, 0);
+    expect(store.completedPurchases, isEmpty);
+  });
 
   test('restore processes every transaction in a batch', () async {
     final restore = cubit.restorePurchases();
@@ -2329,7 +2454,7 @@ void main() {
 
     await restore;
 
-    expect(store.completedPurchases, [first, second]);
+    expect(store.completedPurchases, isEmpty);
   });
 
   test(
@@ -2351,7 +2476,7 @@ void main() {
       store.purchaseController.add([second]);
       await settleStream();
 
-      expect(store.completedPurchases, [first, second]);
+      expect(store.completedPurchases, isEmpty);
     },
   );
 
@@ -2368,7 +2493,7 @@ void main() {
     store.restoreGate!.complete();
     await Future.wait([firstRestore, secondRestore]);
 
-    expect(store.completedPurchases, hasLength(1));
+    expect(store.completedPurchases, isEmpty);
   });
 
   test(
@@ -2385,7 +2510,7 @@ void main() {
 
       await restore;
 
-      expect(cubit.state.status, AppleIapStatus.restored);
+      expect(cubit.state.status, AppleIapStatus.verificationRequired);
       expect(store.completedPurchases, isEmpty);
     },
   );

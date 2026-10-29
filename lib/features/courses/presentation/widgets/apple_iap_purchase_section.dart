@@ -104,6 +104,7 @@ class AppleIapPurchaseSection extends StatelessWidget {
                 state.status == AppleIapStatus.loading ||
                 state.status == AppleIapStatus.purchasing ||
                 state.status == AppleIapStatus.pending ||
+                state.status == AppleIapStatus.verifying ||
                 state.status == AppleIapStatus.purchaseConfirmed;
             return Padding(
               padding: tabletLandscape
