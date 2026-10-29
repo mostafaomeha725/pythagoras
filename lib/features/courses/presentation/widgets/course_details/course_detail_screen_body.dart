@@ -50,6 +50,7 @@ class CourseDetailScreenBody extends StatelessWidget {
               index: entry.key + 1,
               isEnrolled: course.isEnrolled,
               course: course,
+              showRestoreButton: false,
             );
           }),
         ],

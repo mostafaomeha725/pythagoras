@@ -176,7 +176,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                   }
                 }
                 final successMessage = state.alreadyEnrolled
-                    ? 'تم تأكيد الشراء، والمحتوى متاح بالفعل'
+                    ? 'المحتوى متاح بالفعل'
                     : restoredTarget?.type == AppleIapProductType.chapter
                     ? 'تم شراء الحصة وتفعيلها بنجاح'
                     : 'تم شراء الكورس وتفعيله بنجاح';
@@ -292,6 +292,10 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                                       ?.trim()
                                       .toLowerCase() ==
                                   'pending',
+                              showRestoreButton:
+                                  remoteConfigState
+                                      .courseLessonRequestsEnabled ||
+                                  updatedCourse.isEnrolled,
                             ),
                             BlocBuilder<AppleIapCubit, AppleIapState>(
                               builder: (context, appleIapState) {

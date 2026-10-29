@@ -802,6 +802,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
       );
       return false;
     }
+    final verificationStatusCode = result.statusCode!;
 
     if (enrollCourseUseCase == null || enrollChapterUseCase == null) {
       emit(
@@ -809,9 +810,9 @@ class AppleIapCubit extends Cubit<AppleIapState> {
           status: AppleIapStatus.verificationRequired,
           activeProductId: purchase.productID,
           transactionKey: purchaseKey,
-          verificationStatusCode: 200,
+          verificationStatusCode: verificationStatusCode,
           message:
-              'تم التحقق من المعاملة (HTTP 200)، لكن مسار التسجيل غير مهيأ. لم يتم منح المحتوى.',
+              'تم التحقق من المعاملة (HTTP $verificationStatusCode)، لكن مسار التسجيل غير مهيأ. لم يتم منح المحتوى.',
         ),
       );
       return false;
@@ -825,7 +826,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
           status: AppleIapStatus.verificationRequired,
           activeProductId: purchase.productID,
           transactionKey: purchaseKey,
-          verificationStatusCode: 200,
+          verificationStatusCode: verificationStatusCode,
           message:
               'تم التحقق من المعاملة، لكن ربط المنتج بالمحتوى غير صالح. لم يتم التسجيل.',
         ),
@@ -839,7 +840,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
           status: AppleIapStatus.verificationRequired,
           activeProductId: purchase.productID,
           transactionKey: purchaseKey,
-          verificationStatusCode: 200,
+          verificationStatusCode: verificationStatusCode,
           message:
               'تم التحقق من المعاملة، لكن تعذر تحديد الحساب المرتبط بها. لم يتم التسجيل؛ أعد Restore بعد تسجيل الدخول.',
         ),
@@ -862,6 +863,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
         purchaseKey: purchaseKey,
         productId: purchase.productID,
         isRestored: isRestored,
+        verificationStatusCode: verificationStatusCode,
       );
     }
 
@@ -881,7 +883,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
           status: AppleIapStatus.failure,
           activeProductId: purchase.productID,
           transactionKey: purchaseKey,
-          verificationStatusCode: 200,
+          verificationStatusCode: verificationStatusCode,
           message:
               'تم التحقق من المعاملة، لكن تعذر حفظ حالة الاستحقاق. لم يتم التسجيل أو إكمال معاملة Apple؛ أعد Restore.',
         ),
@@ -894,6 +896,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
       purchase: purchase,
       purchaseKey: purchaseKey,
       isRestored: isRestored,
+      verificationStatusCode: verificationStatusCode,
     );
   }
 
@@ -907,6 +910,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
     required String purchaseKey,
     required String productId,
     required bool isRestored,
+    required int verificationStatusCode,
   }) async {
     var completed = true;
     try {
@@ -930,7 +934,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
             : AppleIapStatus.purchaseConfirmed,
         activeProductId: productId,
         transactionKey: purchaseKey,
-        verificationStatusCode: 200,
+        verificationStatusCode: verificationStatusCode,
         message: completed
             ? 'تم تأكيد الشراء، والمحتوى متاح بالفعل'
             : 'تم تأكيد الشراء والمحتوى متاح، لكن تعذر تأكيد معاملة Apple. أعد Restore للتسوية.',
@@ -945,6 +949,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
     required PurchaseDetails purchase,
     required String purchaseKey,
     required bool isRestored,
+    required int verificationStatusCode,
   }) async {
     if (isClosed || !_enrollmentKeysInFlight.add(purchaseKey)) return false;
     try {
@@ -974,7 +979,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
             status: AppleIapStatus.failure,
             activeProductId: record.productId,
             transactionKey: purchaseKey,
-            verificationStatusCode: 200,
+            verificationStatusCode: verificationStatusCode,
             message:
                 'تم التحقق من الشراء، لكن تعذر تسجيل المحتوى. لم يتم إكمال معاملة Apple؛ أعد Restore لإعادة التسجيل دون شراء جديد.',
           ),
@@ -991,7 +996,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
             status: AppleIapStatus.failure,
             activeProductId: record.productId,
             transactionKey: purchaseKey,
-            verificationStatusCode: 200,
+            verificationStatusCode: verificationStatusCode,
             message:
                 'تم التحقق من الشراء، لكن تعذر تسجيل المحتوى. لم يتم إكمال معاملة Apple؛ أعد Restore لإعادة التسجيل دون شراء جديد.',
           ),
@@ -1009,7 +1014,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
             status: AppleIapStatus.failure,
             activeProductId: record.productId,
             transactionKey: purchaseKey,
-            verificationStatusCode: 200,
+            verificationStatusCode: verificationStatusCode,
             message:
                 'تم التسجيل، لكن تعذر حفظ حالة المعاملة. لم تكتمل معاملة Apple؛ أعد Restore للتسوية.',
           ),
@@ -1042,7 +1047,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
               : AppleIapStatus.purchaseConfirmed,
           activeProductId: record.productId,
           transactionKey: purchaseKey,
-          verificationStatusCode: 200,
+          verificationStatusCode: verificationStatusCode,
           message: completed
               ? enrollmentResult.message
               : 'تم تسجيل المحتوى، لكن تعذر تأكيد معاملة Apple. أعد Restore للتسوية دون شراء جديد.',

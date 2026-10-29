@@ -8,6 +8,7 @@ import 'package:pythagoras/features/courses/presentation/widgets/course_details/
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_info_card.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_tablet_action_button.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_tablet_top_bar.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/remote_config/remote_config_cubit.dart';
 
 /// Dedicated Tablet Landscape layout for [CourseDetailScreen].
 /// Features a two-column card layout:
@@ -26,6 +27,14 @@ class CourseDetailTabletLandscape extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final requestsEnabled = context
+        .watch<RemoteConfigCubit>()
+        .state
+        .courseLessonRequestsEnabled;
+    final moveRestoreToRequestSlot =
+        Theme.of(context).platform == TargetPlatform.iOS &&
+        !course.isEnrolled &&
+        !requestsEnabled;
     const horizontalPadding = 20.0;
     final columnWidth =
         (constraints.maxWidth - horizontalPadding * 2 - 20.0) / 2;
@@ -97,13 +106,31 @@ class CourseDetailTabletLandscape extends StatelessWidget {
                 hasPendingRequest:
                     course.requestStatus?.trim().toLowerCase() == 'pending',
                 tabletLandscape: true,
+                showRestoreButton: !moveRestoreToRequestSlot,
                 onAuthenticated: () {
                   context.read<CourseDetailsCubit>().fetchCourseDetails(
                     course.id,
                   );
                 },
               ),
-              CourseDetailTabletActionButton(course: course),
+              if (moveRestoreToRequestSlot)
+                AppleIapPurchaseSection(
+                  key: const ValueKey('course-detail-restore-action-slot'),
+                  type: AppleIapProductType.course,
+                  contentId: course.id,
+                  appleProductId: course.appleProductId,
+                  isRequestStatusEligible:
+                      course.requestStatus?.trim().toLowerCase() ==
+                      'not_requested',
+                  isEnrolled: course.isEnrolled,
+                  hasPendingRequest:
+                      course.requestStatus?.trim().toLowerCase() == 'pending',
+                  tabletLandscape: true,
+                  showPurchaseButton: false,
+                  showRestoreButton: true,
+                )
+              else
+                CourseDetailTabletActionButton(course: course),
             ],
           ),
         ),

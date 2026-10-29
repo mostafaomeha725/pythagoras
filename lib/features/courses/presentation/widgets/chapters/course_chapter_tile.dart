@@ -11,6 +11,7 @@ class CourseChapterTile extends StatefulWidget {
   final int index;
   final bool isEnrolled;
   final bool showActionButtons;
+  final bool showRestoreButton;
   final bool showLessonStatuses;
   final String? subtitle;
   final Color? backgroundColor;
@@ -28,6 +29,7 @@ class CourseChapterTile extends StatefulWidget {
     required this.index,
     required this.isEnrolled,
     this.showActionButtons = true,
+    this.showRestoreButton = true,
     this.showLessonStatuses = false,
     this.subtitle,
     this.backgroundColor,
@@ -118,6 +120,7 @@ class _CourseChapterTileState extends State<CourseChapterTile> {
               chapter: widget.chapter,
               isEnrolled: widget.isEnrolled,
               showActionButtons: widget.showActionButtons,
+              showRestoreButton: widget.showRestoreButton,
               showLessonStatuses: widget.showLessonStatuses,
               course: widget.course,
               selectedLessonId: widget.selectedLessonId,

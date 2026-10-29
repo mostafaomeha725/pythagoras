@@ -23,6 +23,8 @@ class AppleIapPurchaseSection extends StatelessWidget {
   final bool isEnrolled;
   final bool hasPendingRequest;
   final bool tabletLandscape;
+  final bool showPurchaseButton;
+  final bool showRestoreButton;
 
   const AppleIapPurchaseSection({
     super.key,
@@ -35,6 +37,8 @@ class AppleIapPurchaseSection extends StatelessWidget {
     this.isEnrolled = false,
     this.hasPendingRequest = false,
     this.tabletLandscape = false,
+    this.showPurchaseButton = true,
+    this.showRestoreButton = true,
   });
 
   @override
@@ -69,7 +73,10 @@ class AppleIapPurchaseSection extends StatelessWidget {
             );
 
             final purchaseEligible =
-                isRequestStatusEligible && !isEnrolled && !hasPendingRequest;
+                showPurchaseButton &&
+                isRequestStatusEligible &&
+                !isEnrolled &&
+                !hasPendingRequest;
             final blocksCurrentProduct =
                 products.any(
                   (product) => product.id == state.activeProductId,
@@ -157,18 +164,19 @@ class AppleIapPurchaseSection extends StatelessWidget {
                           : appleIapActionSpacing.h,
                     ),
                   ],
-                  AppButton(
-                    text: 'استعادة المشتريات',
-                    onPressed: isBusy
-                        ? null
-                        : () => unawaited(_restore(context)),
-                    radius: tabletLandscape ? 12 : 12.r,
-                    height: tabletLandscape ? 42 : 42.h,
-                    textSize: tabletLandscape ? 13 : 13.sp,
-                    color: Colors.transparent,
-                    textColor: Theme.of(context).colorScheme.primary,
-                    borderColor: Theme.of(context).colorScheme.primary,
-                  ),
+                  if (showRestoreButton)
+                    AppButton(
+                      text: 'استعادة المشتريات',
+                      onPressed: isBusy
+                          ? null
+                          : () => unawaited(_restore(context)),
+                      radius: tabletLandscape ? 12 : 12.r,
+                      height: tabletLandscape ? 42 : 42.h,
+                      textSize: tabletLandscape ? 13 : 13.sp,
+                      color: Colors.transparent,
+                      textColor: Theme.of(context).colorScheme.primary,
+                      borderColor: Theme.of(context).colorScheme.primary,
+                    ),
                 ],
               ),
             );

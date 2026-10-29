@@ -526,7 +526,7 @@ void main() {
       await tester.tap(find.text('Chapter 245'));
       await _pumpTabletFrames(tester);
       expect(find.text(r'شراء عبر Apple - $0.99'), findsOneWidget);
-      expect(find.text('استعادة المشتريات'), findsNWidgets(2));
+      expect(find.text('استعادة المشتريات'), findsOneWidget);
 
       final chapterBuyButton = find.descendant(
         of: find.byType(CourseChapterTile),
@@ -624,6 +624,11 @@ void main() {
           requestVisibleWhenDisabled: false,
         ),
         (
+          size: const Size(800, 1180),
+          platform: TargetPlatform.iOS,
+          requestVisibleWhenDisabled: false,
+        ),
+        (
           size: const Size(390, 844),
           platform: TargetPlatform.android,
           requestVisibleWhenDisabled: true,
@@ -640,9 +645,24 @@ void main() {
 
         if (scenario.requestVisibleWhenDisabled) {
           expect(find.text('طلب الدورة'), findsOneWidget);
+          expect(find.text('استعادة المشتريات'), findsNothing);
+          expect(
+            find.byKey(const ValueKey('course-detail-restore-action-slot')),
+            findsNothing,
+          );
         } else {
           expect(find.text('طلب الدورة'), findsNothing);
           expect(find.textContaining('شراء عبر Apple -'), findsOneWidget);
+          expect(find.text('استعادة المشتريات'), findsOneWidget);
+          expect(
+            find.descendant(
+              of: find.byKey(
+                const ValueKey('course-detail-restore-action-slot'),
+              ),
+              matching: find.text('استعادة المشتريات'),
+            ),
+            findsOneWidget,
+          );
         }
 
         final chapterTitle = find.text('Chapter 245');
@@ -660,15 +680,37 @@ void main() {
         await _pumpTabletFrames(tester);
         expect(find.text('طلب الدورة'), findsOneWidget);
         expect(find.textContaining('طلب الحصة'), findsOneWidget);
+        if (scenario.platform == TargetPlatform.iOS) {
+          expect(find.text('استعادة المشتريات'), findsOneWidget);
+          expect(
+            find.byKey(const ValueKey('course-detail-restore-action-slot')),
+            findsNothing,
+          );
+        }
 
         harness.remoteConfig.setRequestsEnabled(false);
         await _pumpTabletFrames(tester);
         if (scenario.requestVisibleWhenDisabled) {
           expect(find.text('طلب الدورة'), findsOneWidget);
           expect(find.textContaining('طلب الحصة'), findsOneWidget);
+          expect(find.text('استعادة المشتريات'), findsNothing);
+          expect(
+            find.byKey(const ValueKey('course-detail-restore-action-slot')),
+            findsNothing,
+          );
         } else {
           expect(find.text('طلب الدورة'), findsNothing);
           expect(find.textContaining('طلب الحصة'), findsNothing);
+          expect(find.text('استعادة المشتريات'), findsOneWidget);
+          expect(
+            find.descendant(
+              of: find.byKey(
+                const ValueKey('course-detail-restore-action-slot'),
+              ),
+              matching: find.text('استعادة المشتريات'),
+            ),
+            findsOneWidget,
+          );
         }
 
         await _disposeTabletHarness(tester, harness);

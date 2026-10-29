@@ -427,6 +427,28 @@ void main() {
     await harness.close();
   });
 
+  test('HTTP 201 verification proceeds to course enrollment', () async {
+    final harness = await _enrollmentHarness(
+      productId: 'course.product.36',
+      target: const AppleIapProductTarget(
+        type: AppleIapProductType.course,
+        contentId: 36,
+      ),
+    );
+    harness.verify.response = const ApplePurchaseVerificationResult.http(201);
+
+    harness.store.purchaseController.add([
+      purchaseDetails(PurchaseStatus.purchased, productId: 'course.product.36'),
+    ]);
+    await settleStream();
+
+    expect(harness.repository.enrolledCourseIds, [36]);
+    expect(harness.cubit.state.status, AppleIapStatus.purchaseConfirmed);
+    expect(harness.cubit.state.verificationStatusCode, 201);
+    expect(harness.store.completedPurchases, hasLength(1));
+    await harness.close();
+  });
+
   test('verified chapter purchase enrolls its mapped chapter ID', () async {
     final harness = await _enrollmentHarness(
       productId: 'chapter.product.245',
@@ -2344,8 +2366,8 @@ void main() {
     },
   );
 
-  test('all non-200 verification responses never grant content', () async {
-    for (final statusCode in [201, 204, 404, 422]) {
+  test('non-success verification responses never grant content', () async {
+    for (final statusCode in [204, 404, 422]) {
       verifyApplePurchaseUseCase.response =
           ApplePurchaseVerificationResult.http(statusCode);
       store.purchaseController.add([

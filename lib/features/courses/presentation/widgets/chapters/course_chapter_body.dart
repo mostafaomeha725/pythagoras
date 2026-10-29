@@ -24,6 +24,7 @@ class CourseChapterBody extends StatelessWidget {
   final CourseChapter chapter;
   final bool isEnrolled;
   final bool showActionButtons;
+  final bool showRestoreButton;
   final bool showLessonStatuses;
   final CourseDetail? course;
   final String? selectedLessonId;
@@ -35,6 +36,7 @@ class CourseChapterBody extends StatelessWidget {
     required this.chapter,
     required this.isEnrolled,
     this.showActionButtons = true,
+    this.showRestoreButton = true,
     this.showLessonStatuses = false,
     this.course,
     this.selectedLessonId,
@@ -108,6 +110,7 @@ class CourseChapterBody extends StatelessWidget {
                 isEnrolled: chapterIsEnrolled,
                 hasPendingRequest: requestStatus == 'pending',
                 tabletLandscape: tabletLandscape,
+                showRestoreButton: showRestoreButton,
                 onPurchase: (productId) async {
                   await context.read<AppleIapCubit>().purchase(productId);
                 },

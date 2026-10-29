@@ -15,6 +15,8 @@ import 'package:pythagoras/features/courses/domain/entities/course_detail.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/remote_config/remote_config_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/apple_iap_action_spacing.dart';
+import 'package:pythagoras/features/courses/data/services/apple_iap_product_catalog.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/apple_iap_purchase_section.dart';
 
 class CourseDetailBottomButton extends StatelessWidget {
   final CourseDetail course;
@@ -33,6 +35,23 @@ class CourseDetailBottomButton extends StatelessWidget {
         .state
         .courseLessonRequestsEnabled;
     if (!course.isEnrolled && !requestsEnabled) {
+      if (Theme.of(context).platform == TargetPlatform.iOS) {
+        return SafeArea(
+          top: false,
+          child: AppleIapPurchaseSection(
+            key: const ValueKey('course-detail-restore-action-slot'),
+            type: AppleIapProductType.course,
+            contentId: course.id,
+            appleProductId: course.appleProductId,
+            isRequestStatusEligible:
+                course.requestStatus?.trim().toLowerCase() == 'not_requested',
+            hasPendingRequest:
+                course.requestStatus?.trim().toLowerCase() == 'pending',
+            showPurchaseButton: false,
+            showRestoreButton: true,
+          ),
+        );
+      }
       return const SizedBox.shrink();
     }
     final isPending = course.requestStatus?.trim().toLowerCase() == 'pending';

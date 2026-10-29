@@ -10,10 +10,7 @@ import 'package:pythagoras/features/courses/presentation/widgets/chapters/course
 class CourseDetailCurriculumCard extends StatelessWidget {
   final CourseDetail course;
 
-  const CourseDetailCurriculumCard({
-    super.key,
-    required this.course,
-  });
+  const CourseDetailCurriculumCard({super.key, required this.course});
 
   @override
   Widget build(BuildContext context) {
@@ -60,6 +57,7 @@ class CourseDetailCurriculumCard extends StatelessWidget {
               isEnrolled: course.isEnrolled,
               course: course,
               tabletLandscape: true,
+              showRestoreButton: false,
             );
           }),
         ],

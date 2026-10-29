@@ -9,5 +9,5 @@ class ApplePurchaseVerificationResult {
     : statusCode = null;
 
   bool get isHttpResponse => statusCode != null;
-  bool get isVerified => statusCode == 200;
+  bool get isVerified => statusCode == 200 || statusCode == 201;
 }
