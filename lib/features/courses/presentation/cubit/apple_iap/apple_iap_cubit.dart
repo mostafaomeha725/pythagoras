@@ -607,15 +607,22 @@ class AppleIapCubit extends Cubit<AppleIapState> {
         }
         _pendingPurchases[purchaseKey] = purchase;
         _unresolvedProductId = purchase.productID;
-        emit(
-          state.copyWith(
-            status: AppleIapStatus.verificationRequired,
-            activeProductId: purchase.productID,
-            transactionKey: purchaseKey,
-            message:
-                'وصلت معاملة لمنتج غير موجود في المحتوى المفتوح. لم يتم التحقق أو التسجيل؛ افتح المحتوى المرتبط بالمنتج ثم أعد Restore.',
-          ),
-        );
+        final isCurrentOperation =
+            _restoreCompleter != null ||
+            (state.activeProductId == purchase.productID &&
+                (state.status == AppleIapStatus.purchasing ||
+                    state.status == AppleIapStatus.pending));
+        if (isCurrentOperation) {
+          emit(
+            state.copyWith(
+              status: AppleIapStatus.verificationRequired,
+              activeProductId: purchase.productID,
+              transactionKey: purchaseKey,
+              message:
+                  'وصلت معاملة لمنتج غير موجود في المحتوى المفتوح. لم يتم التحقق أو التسجيل؛ افتح المحتوى المرتبط بالمنتج ثم أعد Restore.',
+            ),
+          );
+        }
         continue;
       }
 

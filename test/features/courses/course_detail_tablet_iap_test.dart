@@ -527,6 +527,13 @@ void main() {
       await _pumpTabletFrames(tester);
       expect(find.text(r'شراء عبر Apple - $0.99'), findsOneWidget);
       expect(find.text('استعادة المشتريات'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(CourseChapterTile).first,
+          matching: find.text('استعادة المشتريات'),
+        ),
+        findsOneWidget,
+      );
 
       final chapterBuyButton = find.descendant(
         of: find.byType(CourseChapterTile),
@@ -670,6 +677,16 @@ void main() {
         await tester.pump();
         await tester.tap(chapterTitle);
         await _pumpTabletFrames(tester);
+        if (scenario.platform == TargetPlatform.iOS) {
+          expect(find.text('استعادة المشتريات'), findsOneWidget);
+          expect(
+            find.descendant(
+              of: find.byType(CourseChapterTile).first,
+              matching: find.text('استعادة المشتريات'),
+            ),
+            findsOneWidget,
+          );
+        }
         if (scenario.requestVisibleWhenDisabled) {
           expect(find.textContaining('طلب الحصة'), findsOneWidget);
         } else {
@@ -682,6 +699,13 @@ void main() {
         expect(find.textContaining('طلب الحصة'), findsOneWidget);
         if (scenario.platform == TargetPlatform.iOS) {
           expect(find.text('استعادة المشتريات'), findsOneWidget);
+          expect(
+            find.descendant(
+              of: find.byType(CourseChapterTile).first,
+              matching: find.text('استعادة المشتريات'),
+            ),
+            findsOneWidget,
+          );
           expect(
             find.byKey(const ValueKey('course-detail-restore-action-slot')),
             findsNothing,
@@ -704,12 +728,14 @@ void main() {
           expect(find.text('استعادة المشتريات'), findsOneWidget);
           expect(
             find.descendant(
-              of: find.byKey(
-                const ValueKey('course-detail-restore-action-slot'),
-              ),
+              of: find.byType(CourseChapterTile).first,
               matching: find.text('استعادة المشتريات'),
             ),
             findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('course-detail-restore-action-slot')),
+            findsNothing,
           );
         }
 

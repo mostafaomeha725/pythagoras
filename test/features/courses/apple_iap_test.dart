@@ -29,6 +29,7 @@ import 'package:pythagoras/features/courses/presentation/cubit/direct_request/di
 import 'package:pythagoras/core/services/remote_config_service.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/remote_config/remote_config_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/apple_iap_purchase_section.dart';
+import 'package:pythagoras/features/courses/presentation/utils/apple_iap_success_message.dart';
 import 'package:pythagoras/features/courses/data/models/course_model.dart';
 import 'package:pythagoras/features/courses/data/models/course_chapter_model.dart';
 import 'package:pythagoras/features/courses/data/models/course_detail_model.dart';
@@ -402,6 +403,47 @@ void main() {
   tearDown(() async {
     await cubit.close();
     await store.close();
+  });
+
+  test(
+    'new course purchase message is retained for already-enrolled users',
+    () {
+      expect(
+        appleIapSuccessMessage(
+          isRestore: false,
+          alreadyEnrolled: true,
+          productType: AppleIapProductType.course,
+        ),
+        'تم شراء الكورس وتفعيله بنجاح',
+      );
+    },
+  );
+
+  test(
+    'new chapter purchase message is retained for already-enrolled users',
+    () {
+      expect(
+        appleIapSuccessMessage(
+          isRestore: false,
+          alreadyEnrolled: true,
+          productType: AppleIapProductType.chapter,
+        ),
+        'تم شراء الحصة وتفعيلها بنجاح',
+      );
+    },
+  );
+
+  test('Restore message never claims a new purchase', () {
+    for (final alreadyEnrolled in [false, true]) {
+      final message = appleIapSuccessMessage(
+        isRestore: true,
+        alreadyEnrolled: alreadyEnrolled,
+        productType: AppleIapProductType.course,
+      );
+
+      expect(message, contains('استعادة المشتريات'));
+      expect(message, isNot(contains('تم شراء')));
+    }
   });
 
   test('verified course purchase enrolls its mapped course ID', () async {
@@ -2311,7 +2353,7 @@ void main() {
     },
   );
 
-  test('unknown products remain unresolved and cannot grant access', () async {
+  test('stale unknown product is silent until a manual Restore', () async {
     final unknown = PurchaseDetails(
       purchaseID: 'unknown-transaction',
       productID: 'unknown.product',
@@ -2324,11 +2366,37 @@ void main() {
       status: PurchaseStatus.purchased,
     );
 
+    var unresolvedNotifications = 0;
+    final subscription = cubit.stream.listen((state) {
+      if (state.status == AppleIapStatus.verificationRequired) {
+        unresolvedNotifications++;
+      }
+    });
+    store.purchaseController.add([unknown]);
     store.purchaseController.add([unknown]);
     await settleStream();
 
-    expect(cubit.state.status, AppleIapStatus.verificationRequired);
+    expect(cubit.state.status, AppleIapStatus.ready);
+    expect(cubit.state.message, isNull);
+    expect(cubit.purchaseNeedsReconciliation, isTrue);
+    expect(unresolvedNotifications, 0);
     expect(store.completedPurchases, isEmpty);
+
+    final restore = cubit.restorePurchases();
+    await settleStream();
+    final restored = purchaseDetails(
+      PurchaseStatus.restored,
+      id: 'unknown-transaction',
+      productId: 'unknown.product',
+    );
+    store.purchaseController.add([restored, restored]);
+    await restore;
+
+    expect(cubit.state.status, AppleIapStatus.verificationRequired);
+    expect(cubit.state.message, contains('منتج غير موجود'));
+    expect(unresolvedNotifications, 1);
+    expect(store.completedPurchases, isEmpty);
+    await subscription.cancel();
   });
 
   test(

@@ -21,6 +21,7 @@ class CourseChapterTile extends StatefulWidget {
   final CourseDetail? course;
   final String? selectedLessonId;
   final Function(CourseLesson)? onLessonTap;
+  final void Function(int chapterId, bool isExpanded)? onExpansionChanged;
   final bool tabletLandscape;
 
   const CourseChapterTile({
@@ -39,6 +40,7 @@ class CourseChapterTile extends StatefulWidget {
     this.course,
     this.selectedLessonId,
     this.onLessonTap,
+    this.onExpansionChanged,
     this.tabletLandscape = false,
   });
 
@@ -109,7 +111,11 @@ class _CourseChapterTileState extends State<CourseChapterTile> {
                   widget.chapter.videos.every(
                     (v) => v.status == CourseLessonStatus.completed,
                   ),
-              onTap: () => setState(() => _isExpanded = !_isExpanded),
+              onTap: () {
+                final isExpanded = !_isExpanded;
+                setState(() => _isExpanded = isExpanded);
+                widget.onExpansionChanged?.call(widget.chapter.id, isExpanded);
+              },
               tabletLandscape: widget.tabletLandscape,
             ),
           ),
