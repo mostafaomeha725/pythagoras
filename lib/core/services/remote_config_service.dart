@@ -3,9 +3,12 @@ import 'package:flutter/foundation.dart';
 
 class RemoteConfigService {
   static const String iosIapEnabledKey = 'ios_iap_enabled';
+  static const String courseLessonRequestsEnabledKey =
+      'enable_course_lesson_requests';
 
   final FirebaseRemoteConfig? _remoteConfig;
   bool _iosIapEnabled = false;
+  bool _courseLessonRequestsEnabled = true;
   Future<void>? _initialization;
   final bool _isIos;
 
@@ -16,6 +19,8 @@ class RemoteConfigService {
           : null;
 
   bool get iosIapEnabled => _iosIapEnabled;
+  bool get courseLessonRequestsEnabled =>
+      _isIos ? _courseLessonRequestsEnabled : true;
 
   Stream<bool> get iosIapEnabledChanges {
     final remoteConfig = _remoteConfig;
@@ -32,18 +37,39 @@ class RemoteConfigService {
     });
   }
 
+  Stream<bool> get courseLessonRequestsEnabledChanges {
+    final remoteConfig = _remoteConfig;
+    if (remoteConfig == null) return const Stream<bool>.empty();
+
+    return remoteConfig.onConfigUpdated.asyncMap((_) async {
+      try {
+        await remoteConfig.activate();
+        _courseLessonRequestsEnabled = remoteConfig.getBool(
+          courseLessonRequestsEnabledKey,
+        );
+      } catch (_) {
+        // Keep the last activated value when a config refresh fails.
+      }
+      return courseLessonRequestsEnabled;
+    });
+  }
+
   Future<void> initialize() => _initialization ??= _initialize();
 
   Future<void> _initialize() async {
     if (!_isIos) return;
 
     _iosIapEnabled = false;
+    _courseLessonRequestsEnabled = true;
 
     try {
       final remoteConfig = _remoteConfig;
       if (remoteConfig == null) return;
 
-      await remoteConfig.setDefaults({iosIapEnabledKey: false});
+      await remoteConfig.setDefaults({
+        iosIapEnabledKey: false,
+        courseLessonRequestsEnabledKey: true,
+      });
       await remoteConfig.setConfigSettings(
         RemoteConfigSettings(
           fetchTimeout: const Duration(seconds: 5),
@@ -52,9 +78,13 @@ class RemoteConfigService {
       );
       await remoteConfig.fetchAndActivate();
       _iosIapEnabled = remoteConfig.getBool(iosIapEnabledKey);
+      _courseLessonRequestsEnabled = remoteConfig.getBool(
+        courseLessonRequestsEnabledKey,
+      );
       debugPrint('[IAP][RemoteConfig] $iosIapEnabledKey=$_iosIapEnabled');
     } catch (_) {
       _iosIapEnabled = false;
+      _courseLessonRequestsEnabled = true;
       debugPrint('[IAP][RemoteConfig] initialization failed; enabled=false');
     }
   }

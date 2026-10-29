@@ -65,10 +65,11 @@ void main() {
       };
 
       try {
-        await networkService.postSensitiveData(
+        final result = await networkService.postSensitiveData(
           endPoint: 'api/iap/apple/verify',
           data: {'signedTransaction': signedTransaction},
         );
+        expect(result.statusCode, 200);
       } finally {
         debugPrint = originalDebugPrint;
       }
@@ -80,19 +81,19 @@ void main() {
     },
   );
 
-  test('verification 404 and 422 responses are returned as diagnostics', () async {
+  test('verification preserves each HTTP status without logging the body', () async {
     final adapter = _CapturingAdapter();
     final networkService = NetworkService(Dio()..httpClientAdapter = adapter);
 
-    for (final statusCode in [404, 422]) {
+    for (final statusCode in [200, 201, 204, 401, 403, 404, 422, 500]) {
       adapter.responseStatusCode = statusCode;
       final result = await networkService.postSensitiveData(
         endPoint: 'api/iap/apple/verify',
         data: const {'signedTransaction': 'actual-proof'},
       );
 
-      expect(result.isHttpResponse, isTrue);
       expect(result.statusCode, statusCode);
+      expect(result.isHttpResponse, isTrue);
     }
   });
 }

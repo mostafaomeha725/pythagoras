@@ -17,6 +17,8 @@ import 'package:pythagoras/features/courses/data/services/apple_iap_service.dart
 import 'package:pythagoras/features/courses/data/services/apple_iap_store.dart';
 import 'package:pythagoras/features/courses/domain/entities/course.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_detail.dart';
+import 'package:pythagoras/features/courses/domain/entities/apple_purchase_verification_result.dart';
+import 'package:pythagoras/features/courses/domain/entities/enrollment_result.dart';
 import 'package:pythagoras/features/courses/domain/repositories/courses_repository.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/get_course_curriculum_use_case.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/get_courses_use_case.dart';
@@ -24,6 +26,9 @@ import 'package:pythagoras/features/courses/domain/use_cases/request_chapter_dir
 import 'package:pythagoras/features/courses/domain/use_cases/request_chapter_use_case.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/request_course_direct_use_case.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/request_course_use_case.dart';
+import 'package:pythagoras/features/courses/domain/use_cases/verify_apple_purchase_use_case.dart';
+import 'package:pythagoras/features/courses/domain/use_cases/enroll_course_use_case.dart';
+import 'package:pythagoras/features/courses/domain/use_cases/enroll_chapter_use_case.dart';
 import 'package:pythagoras/features/courses/data/models/course_detail_model.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/apple_iap/apple_iap_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/course_details/course_details_cubit.dart';
@@ -85,9 +90,17 @@ class _TabletRemoteConfig extends RemoteConfigService {
   final StreamController<bool> changes = StreamController<bool>.broadcast(
     sync: true,
   );
+  final StreamController<bool> requestChanges =
+      StreamController<bool>.broadcast(sync: true);
   bool enabled;
+  bool requestsEnabled;
+  final bool isIosPlatform;
 
-  _TabletRemoteConfig({required this.enabled}) : super(isIos: false);
+  _TabletRemoteConfig({
+    required this.enabled,
+    required this.requestsEnabled,
+    required this.isIosPlatform,
+  }) : super(isIos: false);
 
   @override
   bool get iosIapEnabled => enabled;
@@ -96,18 +109,35 @@ class _TabletRemoteConfig extends RemoteConfigService {
   Stream<bool> get iosIapEnabledChanges => changes.stream;
 
   @override
+  bool get courseLessonRequestsEnabled =>
+      isIosPlatform ? requestsEnabled : true;
+
+  @override
+  Stream<bool> get courseLessonRequestsEnabledChanges => requestChanges.stream;
+
+  @override
   Future<void> initialize() async {}
 
   void setEnabled(bool value) {
     enabled = value;
     changes.add(value);
   }
+
+  void setRequestsEnabled(bool value) {
+    requestsEnabled = value;
+    requestChanges.add(courseLessonRequestsEnabled);
+  }
 }
 
 class _TabletCoursesRepository implements CoursesRepository {
-  final CourseDetail course;
+  CourseDetail course;
   int? requestedCourseId;
   int? requestedChapterId;
+  int curriculumCalls = 0;
+  final List<int> enrolledCourseIds = [];
+  final List<int> enrolledChapterIds = [];
+  ApplePurchaseVerificationResult verificationResult =
+      const ApplePurchaseVerificationResult.http(200);
 
   _TabletCoursesRepository(this.course);
 
@@ -115,7 +145,10 @@ class _TabletCoursesRepository implements CoursesRepository {
   Future<Either<Failure, CourseDetail>> getCourseCurriculum(
     int courseId, {
     bool fromCache = false,
-  }) async => Right(course);
+  }) async {
+    curriculumCalls++;
+    return Right(course);
+  }
 
   @override
   Future<Either<Failure, List<Course>>> getCourses({
@@ -135,6 +168,37 @@ class _TabletCoursesRepository implements CoursesRepository {
     requestedChapterId = chapterId;
     return const Right('تم استلام الطلب');
   }
+
+  @override
+  Future<Either<Failure, EnrollmentResult>> enrollCourse(int courseId) async {
+    enrolledCourseIds.add(courseId);
+    course = course.copyWith(isEnrolled: true);
+    return const Right(
+      EnrollmentResult(message: 'تم التسجيل', alreadyEnrolled: false),
+    );
+  }
+
+  @override
+  Future<Either<Failure, EnrollmentResult>> enrollChapter(int chapterId) async {
+    enrolledChapterIds.add(chapterId);
+    course = course.copyWith(
+      chapters: [
+        for (final chapter in course.chapters)
+          if (chapter.id == chapterId)
+            chapter.copyWith(isEnrolled: true)
+          else
+            chapter,
+      ],
+    );
+    return const Right(
+      EnrollmentResult(message: 'تم التسجيل', alreadyEnrolled: false),
+    );
+  }
+
+  @override
+  Future<ApplePurchaseVerificationResult> verifyApplePurchase(
+    String signedTransaction,
+  ) async => verificationResult;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -187,6 +251,8 @@ Future<_TabletHarness> _pumpCourseDetailScreen(
   WidgetTester tester, {
   required Size size,
   bool remoteConfigEnabled = true,
+  bool courseLessonRequestsEnabled = true,
+  TargetPlatform platform = TargetPlatform.iOS,
   bool authenticated = true,
   String? courseProductId = 'tablet.course.21',
   String? chapterProductId = 'tablet.chapter.245',
@@ -194,6 +260,7 @@ Future<_TabletHarness> _pumpCourseDetailScreen(
   String chapterRequestStatus = 'not_requested',
   bool courseEnrolled = false,
   bool chapterEnrolled = false,
+  bool configureVerifiedIap = false,
   List<ProductDetails>? storeProducts,
 }) async {
   SharedPreferences.setMockInitialValues({
@@ -246,7 +313,11 @@ Future<_TabletHarness> _pumpCourseDetailScreen(
           ],
       notFoundIDs: const [],
     );
-  final remoteConfig = _TabletRemoteConfig(enabled: remoteConfigEnabled);
+  final remoteConfig = _TabletRemoteConfig(
+    enabled: remoteConfigEnabled,
+    requestsEnabled: courseLessonRequestsEnabled,
+    isIosPlatform: platform == TargetPlatform.iOS,
+  );
   final service = AppleIapService(
     store: store,
     isIos: true,
@@ -262,12 +333,16 @@ Future<_TabletHarness> _pumpCourseDetailScreen(
     () => RequestEnrollmentCubit(
       RequestCourseUseCase(repository),
       RequestChapterUseCase(repository),
+      isCourseLessonRequestsEnabled: () =>
+          remoteConfig.courseLessonRequestsEnabled,
     ),
   );
   sl.registerFactory(
     () => DirectRequestCubit(
       requestCourseDirectUseCase: RequestCourseDirectUseCase(repository),
       requestChapterDirectUseCase: RequestChapterDirectUseCase(repository),
+      isCourseLessonRequestsEnabled: () =>
+          remoteConfig.courseLessonRequestsEnabled,
     ),
   );
   sl.registerFactory(
@@ -276,6 +351,15 @@ Future<_TabletHarness> _pumpCourseDetailScreen(
   sl.registerFactory(
     () => AppleIapCubit(
       service: service,
+      verifyApplePurchaseUseCase: configureVerifiedIap
+          ? VerifyApplePurchaseUseCase(repository)
+          : null,
+      enrollCourseUseCase: configureVerifiedIap
+          ? EnrollCourseUseCase(repository)
+          : null,
+      enrollChapterUseCase: configureVerifiedIap
+          ? EnrollChapterUseCase(repository)
+          : null,
       preferences: sharedPreferences,
       isIos: true,
     ),
@@ -287,7 +371,7 @@ Future<_TabletHarness> _pumpCourseDetailScreen(
     ScreenUtilInit(
       designSize: const Size(390, 844),
       builder: (context, child) => MaterialApp(
-        theme: ThemeData(platform: TargetPlatform.iOS),
+        theme: ThemeData(platform: platform),
         builder: EasyLoading.init(),
         home: BlocProvider<CoursesListCubit>.value(
           value: coursesListCubit,
@@ -328,6 +412,7 @@ Future<void> _disposeTabletHarness(
     await harness.coursesListCubit.close();
     await harness.store.close();
     await harness.remoteConfig.changes.close();
+    await harness.remoteConfig.requestChanges.close();
     await sl.reset();
   });
   tester.view.resetPhysicalSize();
@@ -336,6 +421,82 @@ Future<void> _disposeTabletHarness(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets(
+    'verified course enrollment refreshes details and shows success',
+    (tester) async {
+      final harness = await _pumpCourseDetailScreen(
+        tester,
+        size: const Size(390, 844),
+        configureVerifiedIap: true,
+      );
+
+      await tester.tap(find.textContaining('شراء عبر Apple -').first);
+      await tester.pump();
+      harness.store.purchases.add([_purchase('tablet.course.21')]);
+      await _pumpTabletFrames(tester);
+
+      expect(harness.repository.enrolledCourseIds, [21]);
+      expect(harness.repository.curriculumCalls, 2);
+      expect(harness.repository.course.isEnrolled, isTrue);
+      expect(EasyLoading.isShow, isTrue);
+      expect(find.textContaining('شراء عبر Apple -'), findsNothing);
+
+      await _disposeTabletHarness(tester, harness);
+    },
+  );
+
+  testWidgets(
+    'verified chapter enrollment refreshes details and shows success',
+    (tester) async {
+      final harness = await _pumpCourseDetailScreen(
+        tester,
+        size: const Size(390, 844),
+        configureVerifiedIap: true,
+      );
+      await tester.tap(find.text('Chapter 245'));
+      await _pumpTabletFrames(tester);
+      final chapterPurchaseButton = find.descendant(
+        of: find.byType(CourseChapterTile).first,
+        matching: find.textContaining('شراء عبر Apple -'),
+      );
+
+      await tester.tap(chapterPurchaseButton);
+      await tester.pump();
+      harness.store.purchases.add([_purchase('tablet.chapter.245')]);
+      await _pumpTabletFrames(tester);
+
+      expect(harness.repository.enrolledChapterIds, [245]);
+      expect(harness.repository.curriculumCalls, 2);
+      expect(harness.repository.course.chapters.single.isEnrolled, isTrue);
+      expect(EasyLoading.isShow, isTrue);
+
+      await _disposeTabletHarness(tester, harness);
+    },
+  );
+
+  testWidgets(
+    'verification failure dismisses loading without enrollment success',
+    (tester) async {
+      final harness = await _pumpCourseDetailScreen(
+        tester,
+        size: const Size(390, 844),
+        configureVerifiedIap: true,
+      );
+      harness.repository.verificationResult =
+          const ApplePurchaseVerificationResult.http(422);
+
+      await tester.tap(find.textContaining('شراء عبر Apple -').first);
+      await tester.pump();
+      harness.store.purchases.add([_purchase('tablet.course.21')]);
+      await _pumpTabletFrames(tester);
+
+      expect(harness.repository.enrolledCourseIds, isEmpty);
+      expect(EasyLoading.isShow, isFalse);
+
+      await _disposeTabletHarness(tester, harness);
+    },
+  );
 
   testWidgets(
     'tablet landscape keeps its layout and supports course and chapter IAP',
@@ -442,6 +603,78 @@ void main() {
 
     await _disposeTabletHarness(tester, harness);
   });
+
+  testWidgets(
+    'course lesson request flag applies on iPhone and iPad but not Android',
+    (tester) async {
+      final scenarios = [
+        (
+          size: const Size(390, 844),
+          platform: TargetPlatform.iOS,
+          requestVisibleWhenDisabled: false,
+        ),
+        (
+          size: const Size(1024, 768),
+          platform: TargetPlatform.iOS,
+          requestVisibleWhenDisabled: false,
+        ),
+        (
+          size: const Size(600, 768),
+          platform: TargetPlatform.iOS,
+          requestVisibleWhenDisabled: false,
+        ),
+        (
+          size: const Size(390, 844),
+          platform: TargetPlatform.android,
+          requestVisibleWhenDisabled: true,
+        ),
+      ];
+
+      for (final scenario in scenarios) {
+        final harness = await _pumpCourseDetailScreen(
+          tester,
+          size: scenario.size,
+          courseLessonRequestsEnabled: false,
+          platform: scenario.platform,
+        );
+
+        if (scenario.requestVisibleWhenDisabled) {
+          expect(find.text('طلب الدورة'), findsOneWidget);
+        } else {
+          expect(find.text('طلب الدورة'), findsNothing);
+          expect(find.textContaining('شراء عبر Apple -'), findsOneWidget);
+        }
+
+        final chapterTitle = find.text('Chapter 245');
+        await tester.ensureVisible(chapterTitle);
+        await tester.pump();
+        await tester.tap(chapterTitle);
+        await _pumpTabletFrames(tester);
+        if (scenario.requestVisibleWhenDisabled) {
+          expect(find.textContaining('طلب الحصة'), findsOneWidget);
+        } else {
+          expect(find.textContaining('طلب الحصة'), findsNothing);
+        }
+
+        harness.remoteConfig.setRequestsEnabled(true);
+        await _pumpTabletFrames(tester);
+        expect(find.text('طلب الدورة'), findsOneWidget);
+        expect(find.textContaining('طلب الحصة'), findsOneWidget);
+
+        harness.remoteConfig.setRequestsEnabled(false);
+        await _pumpTabletFrames(tester);
+        if (scenario.requestVisibleWhenDisabled) {
+          expect(find.text('طلب الدورة'), findsOneWidget);
+          expect(find.textContaining('طلب الحصة'), findsOneWidget);
+        } else {
+          expect(find.text('طلب الدورة'), findsNothing);
+          expect(find.textContaining('طلب الحصة'), findsNothing);
+        }
+
+        await _disposeTabletHarness(tester, harness);
+      }
+    },
+  );
 
   testWidgets(
     'tablet hides purchase for missing, unavailable, or pending course',

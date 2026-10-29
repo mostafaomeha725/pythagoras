@@ -103,6 +103,8 @@ class ServiceLocator {
       () => AppleIapCubit(
         service: sl<AppleIapService>(),
         verifyApplePurchaseUseCase: sl<VerifyApplePurchaseUseCase>(),
+        enrollCourseUseCase: sl<EnrollCourseUseCase>(),
+        enrollChapterUseCase: sl<EnrollChapterUseCase>(),
         preferences: sl(),
         isRequestStatusEligible: false,
       ),
@@ -190,11 +192,20 @@ class ServiceLocator {
     sl.registerFactory(() => ChapterVideosCubit(repository: sl()));
     sl.registerFactory(() => CompleteVideoCubit(repository: sl()));
     sl.registerFactory(() => CompleteLessonCubit(repository: sl()));
-    sl.registerFactory(() => RequestEnrollmentCubit(sl(), sl()));
+    sl.registerFactory(
+      () => RequestEnrollmentCubit(
+        sl(),
+        sl(),
+        isCourseLessonRequestsEnabled: () =>
+            sl<RemoteConfigService>().courseLessonRequestsEnabled,
+      ),
+    );
     sl.registerFactory(
       () => DirectRequestCubit(
         requestCourseDirectUseCase: sl(),
         requestChapterDirectUseCase: sl(),
+        isCourseLessonRequestsEnabled: () =>
+            sl<RemoteConfigService>().courseLessonRequestsEnabled,
       ),
     );
     sl.registerFactory(

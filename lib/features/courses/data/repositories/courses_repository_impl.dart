@@ -32,6 +32,7 @@ import 'package:pythagoras/features/courses/domain/entities/quiz_attempt.dart';
 import 'package:pythagoras/features/courses/domain/entities/answer_submitted.dart';
 import 'package:pythagoras/features/courses/domain/entities/quiz_result.dart';
 import 'package:pythagoras/features/courses/domain/entities/live_session.dart';
+import 'package:pythagoras/features/courses/domain/entities/enrollment_result.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_resource.dart';
 import 'package:pythagoras/features/courses/data/models/course_resource_model.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_review.dart';
@@ -39,8 +40,7 @@ import 'package:pythagoras/features/courses/domain/entities/course_reviews_data.
 import 'package:pythagoras/features/courses/data/models/course_review_model.dart';
 import 'package:pythagoras/features/courses/data/models/course_reviews_data_model.dart';
 import 'package:pythagoras/features/courses/domain/repositories/courses_repository.dart';
-import 'package:pythagoras/features/courses/domain/entities/apple_purchase_verification_diagnostic.dart';
-import 'package:pythagoras/features/courses/data/services/apple_purchase_response_sanitizer.dart';
+import 'package:pythagoras/features/courses/domain/entities/apple_purchase_verification_result.dart';
 
 class CoursesRepositoryImpl implements CoursesRepository {
   final NetworkService networkService;
@@ -330,7 +330,7 @@ class CoursesRepositoryImpl implements CoursesRepository {
   }
 
   @override
-  Future<Either<Failure, String>> enrollCourse(int courseId) {
+  Future<Either<Failure, EnrollmentResult>> enrollCourse(int courseId) {
     return _enrollContent(
       endPoint: EndPoints.enrollCourse,
       idField: 'courseId',
@@ -340,7 +340,7 @@ class CoursesRepositoryImpl implements CoursesRepository {
   }
 
   @override
-  Future<Either<Failure, String>> enrollChapter(int chapterId) {
+  Future<Either<Failure, EnrollmentResult>> enrollChapter(int chapterId) {
     return _enrollContent(
       endPoint: EndPoints.enrollChapter,
       idField: 'chapterId',
@@ -350,7 +350,7 @@ class CoursesRepositoryImpl implements CoursesRepository {
   }
 
   @override
-  Future<ApplePurchaseVerificationDiagnostic> verifyApplePurchase(
+  Future<ApplePurchaseVerificationResult> verifyApplePurchase(
     String signedTransaction,
   ) async {
     try {
@@ -358,28 +358,20 @@ class CoursesRepositoryImpl implements CoursesRepository {
         endPoint: EndPoints.verifyApplePurchase,
         data: {'signedTransaction': signedTransaction},
       );
-
       if (response.isHttpResponse) {
-        return ApplePurchaseVerificationDiagnostic.http(
-          statusCode: response.statusCode!,
-          responseBody: ApplePurchaseResponseSanitizer.sanitizeBody(
-            response.responseBody ?? '',
-          ),
-        );
+        return ApplePurchaseVerificationResult.http(response.statusCode);
       }
-      return ApplePurchaseVerificationDiagnostic.networkError(
-        ApplePurchaseResponseSanitizer.sanitizeText(
-          response.networkError ?? 'تعذر الاتصال بخدمة التحقق',
-        ),
+      return ApplePurchaseVerificationResult.networkError(
+        response.networkError ?? 'تعذر الاتصال بخدمة التحقق',
       );
     } catch (_) {
-      return const ApplePurchaseVerificationDiagnostic.networkError(
+      return const ApplePurchaseVerificationResult.networkError(
         'تعذر الاتصال بخدمة التحقق',
       );
     }
   }
 
-  Future<Either<Failure, String>> _enrollContent({
+  Future<Either<Failure, EnrollmentResult>> _enrollContent({
     required String endPoint,
     required String idField,
     required int contentId,
@@ -396,9 +388,12 @@ class CoursesRepositoryImpl implements CoursesRepository {
             (data['enrolled'] == true || data['alreadyEnrolled'] == true)) {
           final message = data['message']?.toString();
           return Right(
-            message != null && message.isNotEmpty
-                ? message
-                : 'تم تأكيد تسجيل المحتوى',
+            EnrollmentResult(
+              message: message != null && message.isNotEmpty
+                  ? message
+                  : 'تم تأكيد تسجيل المحتوى',
+              alreadyEnrolled: data['alreadyEnrolled'] == true,
+            ),
           );
         }
 

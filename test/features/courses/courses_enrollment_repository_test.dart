@@ -18,10 +18,7 @@ class _FakeNetworkService extends NetworkService {
   Either<Failure, dynamic> response = const Right(<String, dynamic>{});
   String? sensitiveEndpoint;
   Map<String, dynamic>? sensitiveBody;
-  SensitiveHttpResult sensitiveResponse = const SensitiveHttpResult.http(
-    statusCode: 200,
-    responseBody: '{"message":"received"}',
-  );
+  SensitiveHttpResult sensitiveResponse = const SensitiveHttpResult.http(200);
 
   @override
   Future<Either<Failure, dynamic>> postData({
@@ -96,6 +93,10 @@ void main() {
     expect(networkService.requestedEndpoint, EndPoints.enrollCourse);
     expect(networkService.requestedBody, {'courseId': 31});
     expect(result.isRight(), isTrue);
+    expect(
+      result.fold((_) => null, (value) => value)?.alreadyEnrolled,
+      isFalse,
+    );
   });
 
   test(
@@ -113,6 +114,10 @@ void main() {
       expect(networkService.requestedEndpoint, EndPoints.enrollChapter);
       expect(networkService.requestedBody, {'chapterId': 250});
       expect(result.isRight(), isTrue);
+      expect(
+        result.fold((_) => null, (value) => value)?.alreadyEnrolled,
+        isTrue,
+      );
     },
   );
 
@@ -143,10 +148,7 @@ void main() {
 
   test('Apple verification receives the unchanged StoreKit value', () async {
     const signedTransaction = 'actual-storekit-proof';
-    networkService.sensitiveResponse = const SensitiveHttpResult.http(
-      statusCode: 200,
-      responseBody: '{"message":"received"}',
-    );
+    networkService.sensitiveResponse = const SensitiveHttpResult.http(200);
 
     final result = await repository.verifyApplePurchase(signedTransaction);
 
@@ -154,48 +156,19 @@ void main() {
     expect(networkService.sensitiveBody, {
       'signedTransaction': signedTransaction,
     });
-    expect(result.isHttpResponse, isTrue);
     expect(result.statusCode, 200);
+    expect(result.isVerified, isTrue);
   });
 
-  test(
-    'Apple verification 404 and 422 responses are captured as diagnostics',
-    () async {
-      for (final statusCode in [404, 422]) {
-        networkService.sensitiveResponse = SensitiveHttpResult.http(
-          statusCode: statusCode,
-          responseBody: '{"message":"HTTP $statusCode"}',
-        );
+  test('Apple verification 404 and 422 responses remain failures', () async {
+    for (final statusCode in [404, 422]) {
+      networkService.sensitiveResponse = SensitiveHttpResult.http(statusCode);
 
-        final result = await repository.verifyApplePurchase('actual-proof');
+      final result = await repository.verifyApplePurchase('actual-proof');
 
-        expect(result.isHttpResponse, isTrue);
-        expect(result.statusCode, statusCode);
-        expect(networkService.requestedEndpoint, isNull);
-      }
-    },
-  );
-
-  test(
-    'Apple verification response redacts sensitive values before display',
-    () async {
-      networkService.sensitiveResponse = const SensitiveHttpResult.http(
-        statusCode: 422,
-        responseBody:
-            '{"message":"verification rejected","signedTransaction":"private-jws",'
-            '"Authorization":"Bearer private-token","email":"student@example.com",'
-            '"accountId":123}',
-      );
-
-      final result = await repository.verifyApplePurchase('submitted-proof');
-      final responseBody = result.responseBody!;
-
-      expect(responseBody, contains('verification rejected'));
-      expect(responseBody, contains('[REDACTED]'));
-      expect(responseBody, isNot(contains('private-jws')));
-      expect(responseBody, isNot(contains('private-token')));
-      expect(responseBody, isNot(contains('student@example.com')));
-      expect(responseBody, isNot(contains('123')));
-    },
-  );
+      expect(result.statusCode, statusCode);
+      expect(result.isVerified, statusCode == 200);
+      expect(networkService.requestedEndpoint, isNull);
+    }
+  });
 }

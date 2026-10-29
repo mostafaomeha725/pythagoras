@@ -19,17 +19,11 @@ import 'connectivity_interceptor.dart';
 
 class SensitiveHttpResult {
   final int? statusCode;
-  final String? responseBody;
   final String? networkError;
 
-  const SensitiveHttpResult.http({
-    required this.statusCode,
-    required this.responseBody,
-  }) : networkError = null;
+  const SensitiveHttpResult.http(this.statusCode) : networkError = null;
 
-  const SensitiveHttpResult.networkError(this.networkError)
-    : statusCode = null,
-      responseBody = null;
+  const SensitiveHttpResult.networkError(this.networkError) : statusCode = null;
 
   bool get isHttpResponse => statusCode != null;
 }
@@ -161,34 +155,34 @@ class NetworkService {
           validateStatus: (_) => true,
         ),
       );
-      return SensitiveHttpResult.http(
-        statusCode: response.statusCode ?? 0,
-        responseBody: response.data?.toString() ?? '',
-      );
+      return SensitiveHttpResult.http(response.statusCode);
     } on SocketException {
       return const SensitiveHttpResult.networkError(
         AppStrings.noInternetConnection,
       );
     } on FormatException {
       return const SensitiveHttpResult.networkError(
-        'تعذر قراءة استجابة الخادم',
+        'تعذر قراءة استجابة التحقق',
       );
     } on DioException catch (error) {
       final response = error.response;
-      if (response != null) {
-        return SensitiveHttpResult.http(
-          statusCode: response.statusCode ?? 0,
-          responseBody: response.data?.toString() ?? '',
+      if (response?.statusCode != null) {
+        return SensitiveHttpResult.http(response!.statusCode);
+      }
+      if (error.type == DioExceptionType.connectionTimeout ||
+          error.type == DioExceptionType.sendTimeout ||
+          error.type == DioExceptionType.receiveTimeout) {
+        return const SensitiveHttpResult.networkError(
+          'انتهت مهلة الاتصال بخدمة التحقق',
         );
       }
-      return handleDioExceoptions(error).fold(
-        (failure) => SensitiveHttpResult.networkError(failure.message),
-        (_) => const SensitiveHttpResult.networkError(
-          AppStrings.noInternetConnection,
-        ),
+      return const SensitiveHttpResult.networkError(
+        AppStrings.noInternetConnection,
       );
-    } catch (error) {
-      return SensitiveHttpResult.networkError(error.toString());
+    } catch (_) {
+      return const SensitiveHttpResult.networkError(
+        'تعذر الاتصال بخدمة التحقق',
+      );
     }
   }
 

@@ -5,12 +5,17 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:dartz/dartz.dart';
 import 'package:pythagoras/core/enums/app_enums.dart';
-import 'package:pythagoras/features/courses/domain/entities/apple_purchase_verification_diagnostic.dart';
+import 'package:pythagoras/core/error/failure.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pythagoras/features/courses/data/services/apple_iap_product_catalog.dart';
 import 'package:pythagoras/features/courses/data/services/apple_iap_service.dart';
+import 'package:pythagoras/features/courses/domain/use_cases/enroll_chapter_use_case.dart';
+import 'package:pythagoras/features/courses/domain/use_cases/enroll_course_use_case.dart';
 import 'package:pythagoras/features/courses/domain/use_cases/verify_apple_purchase_use_case.dart';
+import 'package:pythagoras/features/courses/domain/entities/enrollment_result.dart';
+import 'package:pythagoras/features/courses/domain/entities/apple_purchase_verification_result.dart';
 
 import 'apple_iap_state.dart';
 
@@ -18,8 +23,12 @@ class AppleIapCubit extends Cubit<AppleIapState> {
   static const _submittedPurchaseKeysKey = 'apple_iap_submitted_purchase_keys';
   static const _submittedPurchaseOwnersKey =
       'apple_iap_submitted_purchase_owners';
+  static const _pendingEnrollmentRecordsKey =
+      'apple_iap_pending_enrollment_records';
   final AppleIapService service;
   final VerifyApplePurchaseUseCase? verifyApplePurchaseUseCase;
+  final EnrollCourseUseCase? enrollCourseUseCase;
+  final EnrollChapterUseCase? enrollChapterUseCase;
   final Map<String, AppleIapProductTarget> _productTargets;
   final bool _isIos;
   final SharedPreferences? _preferences;
@@ -28,8 +37,11 @@ class AppleIapCubit extends Cubit<AppleIapState> {
   StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
   Timer? _purchaseResponseTimer;
   final Set<String> _processedTerminalPurchaseKeys = <String>{};
+  final Set<String> _successfulTerminalPurchaseKeys = <String>{};
+  final Set<String> _enrollmentKeysInFlight = <String>{};
   final Map<String, PurchaseDetails> _pendingPurchases = {};
-  final Map<String, String> _diagnosticSignedTransactions = {};
+  late final Map<String, _PendingAppleEnrollment> _pendingEnrollmentRecords =
+      _readPendingEnrollmentRecords();
   final Set<int> _eligibleChapterIds = <int>{};
   final Set<String> _conflictingProductIds = <String>{};
   String? _unresolvedProductId;
@@ -48,6 +60,8 @@ class AppleIapCubit extends Cubit<AppleIapState> {
   AppleIapCubit({
     required this.service,
     this.verifyApplePurchaseUseCase,
+    this.enrollCourseUseCase,
+    this.enrollChapterUseCase,
     Set<String>? productIds,
     Map<String, AppleIapProductTarget>? productTargets,
     bool? isIos,
@@ -79,11 +93,6 @@ class AppleIapCubit extends Cubit<AppleIapState> {
 
   AppleIapProductTarget? targetFor(String productId) =>
       _productTargets[productId];
-
-  String? takeDiagnosticSignedTransaction(String? transactionKey) {
-    if (transactionKey == null) return null;
-    return _diagnosticSignedTransactions.remove(transactionKey);
-  }
 
   bool isProductConfigurationConflict(String? productId) =>
       productId != null && _conflictingProductIds.contains(productId.trim());
@@ -463,6 +472,58 @@ class AppleIapCubit extends Cubit<AppleIapState> {
     }
   }
 
+  Map<String, _PendingAppleEnrollment> _readPendingEnrollmentRecords() {
+    final records = <String, _PendingAppleEnrollment>{};
+    for (final serialized
+        in _preferences?.getStringList(_pendingEnrollmentRecordsKey) ??
+            const <String>[]) {
+      try {
+        final decoded = jsonDecode(serialized);
+        if (decoded is! Map<String, dynamic>) continue;
+        final record = _PendingAppleEnrollment.fromJson(decoded);
+        if (record != null) records[record.transactionKey] = record;
+      } catch (_) {
+        // Corrupt local metadata is ignored and never grants access.
+      }
+    }
+    return records;
+  }
+
+  Future<bool> _persistPendingEnrollmentRecords() async {
+    final preferences = _preferences;
+    if (preferences == null) return false;
+    try {
+      return await preferences.setStringList(
+        _pendingEnrollmentRecordsKey,
+        _pendingEnrollmentRecords.values
+            .map((record) => jsonEncode(record.toJson()))
+            .toList(growable: false),
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> _persistSubmittedPurchaseOwnership() async {
+    final preferences = _preferences;
+    if (preferences == null) return false;
+    try {
+      final keysSaved = await preferences.setStringList(
+        _submittedPurchaseKeysKey,
+        _submittedPurchaseKeys.toList(growable: false),
+      );
+      final ownersSaved = await preferences.setStringList(
+        _submittedPurchaseOwnersKey,
+        _submittedPurchaseOwners.entries
+            .map((entry) => '${entry.value}|${entry.key}')
+            .toList(growable: false),
+      );
+      return keysSaved && ownersSaved;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Map<String, int> _readSubmittedPurchaseOwners() {
     final owners = <String, int>{};
     for (final record
@@ -505,17 +566,22 @@ class AppleIapCubit extends Cubit<AppleIapState> {
 
   Future<void> _handlePurchases(List<PurchaseDetails> purchases) async {
     var restoreFailed = false;
+    var sawRestoreResult = false;
     for (final purchase in purchases) {
       if (isClosed) return;
-      if (!productIds.contains(purchase.productID)) continue;
 
       final purchaseKey = _purchaseKey(purchase);
       final terminalPurchaseKey = '${purchase.status}:$purchaseKey';
       if (_processedTerminalPurchaseKeys.contains(terminalPurchaseKey)) {
-        if (purchase.status == PurchaseStatus.restored) {
+        if (purchase.status == PurchaseStatus.restored &&
+            !_successfulTerminalPurchaseKeys.contains(terminalPurchaseKey)) {
           restoreFailed = true;
+          sawRestoreResult = true;
         }
         continue;
+      }
+      if (purchase.status != PurchaseStatus.pending && _restoreFuture != null) {
+        sawRestoreResult = true;
       }
       if (purchase.status != PurchaseStatus.pending) {
         _purchaseResponseTimer?.cancel();
@@ -529,6 +595,30 @@ class AppleIapCubit extends Cubit<AppleIapState> {
         'previouslySubmitted=${_submittedPurchaseKeys.contains(purchaseKey)}',
       );
 
+      final savedEnrollment = _pendingEnrollmentRecords[purchaseKey];
+      if ((purchase.status == PurchaseStatus.purchased ||
+              purchase.status == PurchaseStatus.restored) &&
+          !productIds.contains(purchase.productID) &&
+          (savedEnrollment == null ||
+              savedEnrollment.productId != purchase.productID)) {
+        _processedTerminalPurchaseKeys.add(terminalPurchaseKey);
+        if (purchase.status == PurchaseStatus.restored) {
+          restoreFailed = true;
+        }
+        _pendingPurchases[purchaseKey] = purchase;
+        _unresolvedProductId = purchase.productID;
+        emit(
+          state.copyWith(
+            status: AppleIapStatus.verificationRequired,
+            activeProductId: purchase.productID,
+            transactionKey: purchaseKey,
+            message:
+                'وصلت معاملة لمنتج غير موجود في المحتوى المفتوح. لم يتم التحقق أو التسجيل؛ افتح المحتوى المرتبط بالمنتج ثم أعد Restore.',
+          ),
+        );
+        continue;
+      }
+
       switch (purchase.status) {
         case PurchaseStatus.pending:
           emit(state.copyWith(status: AppleIapStatus.pending));
@@ -540,7 +630,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
             );
           }
         case PurchaseStatus.canceled:
-          restoreFailed = true;
+          if (_restoreFuture != null) restoreFailed = true;
           if (!_processedTerminalPurchaseKeys.add(terminalPurchaseKey)) {
             continue;
           }
@@ -553,7 +643,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
           );
           await _completeRejectedPurchase(purchase, terminalPurchaseKey);
         case PurchaseStatus.error:
-          restoreFailed = true;
+          if (_restoreFuture != null) restoreFailed = true;
           if (!_processedTerminalPurchaseKeys.add(terminalPurchaseKey)) {
             continue;
           }
@@ -574,18 +664,25 @@ class AppleIapCubit extends Cubit<AppleIapState> {
             final currentUserId = _preferences?.getInt(
               PreferencesKeys.userId.name,
             );
-            emit(
-              _transactionConflictState(
-                _submittedTransactionMessage(purchaseKey, currentUserId),
-                productId: purchase.productID,
-              ),
-            );
-            _transactionConflictProductId = purchase.productID;
-            continue;
+            if (currentUserId == null ||
+                _submittedPurchaseOwners[purchaseKey] != currentUserId) {
+              emit(
+                _transactionConflictState(
+                  _submittedTransactionMessage(purchaseKey, currentUserId),
+                  productId: purchase.productID,
+                ),
+              );
+              _transactionConflictProductId = purchase.productID;
+              continue;
+            }
           }
           _pendingPurchases[purchaseKey] = purchase;
           _unresolvedProductId = purchase.productID;
-          await _verifyPurchase(purchase: purchase, purchaseKey: purchaseKey);
+          await _verifyPurchase(
+            purchase: purchase,
+            purchaseKey: purchaseKey,
+            isRestored: false,
+          );
         case PurchaseStatus.restored:
           if (!_processedTerminalPurchaseKeys.add(terminalPurchaseKey)) {
             restoreFailed = true;
@@ -611,32 +708,57 @@ class AppleIapCubit extends Cubit<AppleIapState> {
           }
           _pendingPurchases[purchaseKey] = purchase;
           _unresolvedProductId = purchase.productID;
-          restoreFailed = true;
-          await _verifyPurchase(purchase: purchase, purchaseKey: purchaseKey);
+          final verifiedAndEnrolled = await _verifyPurchase(
+            purchase: purchase,
+            purchaseKey: purchaseKey,
+            isRestored: true,
+          );
+          if (!verifiedAndEnrolled) restoreFailed = true;
       }
     }
-    if (restoreFailed) {
-      _finishRestore(false);
+    if (sawRestoreResult) {
+      _finishRestore(!restoreFailed);
     }
   }
 
-  Future<void> _verifyPurchase({
+  Future<bool> _verifyPurchase({
     required PurchaseDetails purchase,
     required String purchaseKey,
+    required bool isRestored,
   }) async {
+    final savedRecord = _pendingEnrollmentRecords[purchaseKey];
+    final target = savedRecord?.target ?? targetFor(purchase.productID);
+    final currentUserId = _preferences?.getInt(PreferencesKeys.userId.name);
+    final currentTarget = targetFor(purchase.productID);
+
+    if (savedRecord != null &&
+        (savedRecord.productId != purchase.productID ||
+            savedRecord.ownerId != currentUserId ||
+            (currentTarget != null &&
+                !_sameTarget(savedRecord.target, currentTarget)))) {
+      emit(
+        _transactionConflictState(
+          'المعاملة المؤكدة مرتبطة بحساب أو محتوى آخر. لم يتم التسجيل.',
+          productId: purchase.productID,
+        ),
+      );
+      return false;
+    }
+
     final signedTransaction = purchase.verificationData.serverVerificationData;
     final verifyUseCase = verifyApplePurchaseUseCase;
-    if (signedTransaction.isEmpty || verifyUseCase == null) {
+    if (signedTransaction.isEmpty || verifyUseCase == null || target == null) {
       emit(
         state.copyWith(
-          status: AppleIapStatus.verificationRequired,
+          status: AppleIapStatus.failure,
           activeProductId: purchase.productID,
           transactionKey: purchaseKey,
           message:
-              'تعذر التحقق من الشراء. لم يتم تسجيل المحتوى؛ أعد المحاولة عبر استعادة المشتريات.',
+              'تعذر تحديد محتوى المعاملة أو التحقق منها. لم يتم التسجيل؛ افتح المحتوى الصحيح ثم أعد Restore.',
+          clearVerificationStatusCode: true,
         ),
       );
-      return;
+      return false;
     }
 
     emit(
@@ -645,59 +767,292 @@ class AppleIapCubit extends Cubit<AppleIapState> {
         activeProductId: purchase.productID,
         transactionKey: purchaseKey,
         message: 'جارٍ التحقق من عملية الشراء...',
+        clearVerificationStatusCode: true,
       ),
     );
 
-    final result = await verifyUseCase(signedTransaction);
-    if (isClosed) return;
-    if (signedTransaction.isNotEmpty) {
-      _diagnosticSignedTransactions[purchaseKey] = signedTransaction;
+    ApplePurchaseVerificationResult result;
+    try {
+      result = await verifyUseCase(signedTransaction);
+    } catch (_) {
+      emit(
+        state.copyWith(
+          status: AppleIapStatus.failure,
+          activeProductId: purchase.productID,
+          transactionKey: purchaseKey,
+          message:
+              'تعذر الاتصال بخدمة التحقق. لم يتم التسجيل؛ أعد Restore لإعادة المحاولة.',
+          clearVerificationStatusCode: true,
+        ),
+      );
+      return false;
+    }
+    if (isClosed) return false;
+    if (!result.isVerified) {
+      emit(
+        state.copyWith(
+          status: AppleIapStatus.failure,
+          activeProductId: purchase.productID,
+          transactionKey: purchaseKey,
+          message: result.isHttpResponse
+              ? 'رفض خادم التحقق المعاملة (HTTP ${result.statusCode}). لم يتم التسجيل؛ أعد Restore لإعادة المحاولة.'
+              : '${result.networkError ?? 'تعذر الاتصال بخدمة التحقق'}. لم يتم التسجيل؛ أعد Restore لإعادة المحاولة.',
+          verificationStatusCode: result.statusCode,
+        ),
+      );
+      return false;
     }
 
-    final diagnosticText = _verificationDiagnosticText(result);
-    if (result.isHttpResponse) {
+    if (enrollCourseUseCase == null || enrollChapterUseCase == null) {
       emit(
         state.copyWith(
           status: AppleIapStatus.verificationRequired,
           activeProductId: purchase.productID,
           transactionKey: purchaseKey,
+          verificationStatusCode: 200,
           message:
-              'وصل رد التحقق، لكن لا يمكن تأكيد الاستحقاق لأن عقد استجابة الخادم غير موثق. لم يتم تسجيل المحتوى.',
-          verificationDiagnostic: diagnosticText,
-          verificationStatusCode: result.statusCode,
-          verificationResponseBody: result.responseBody,
-          verificationNetworkError: null,
+              'تم التحقق من المعاملة (HTTP 200)، لكن مسار التسجيل غير مهيأ. لم يتم منح المحتوى.',
         ),
       );
-      return;
+      return false;
+    }
+
+    if (target.contentId <= 0 ||
+        (target.type == AppleIapProductType.chapter &&
+            (target.parentContentId == null || target.parentContentId! <= 0))) {
+      emit(
+        state.copyWith(
+          status: AppleIapStatus.verificationRequired,
+          activeProductId: purchase.productID,
+          transactionKey: purchaseKey,
+          verificationStatusCode: 200,
+          message:
+              'تم التحقق من المعاملة، لكن ربط المنتج بالمحتوى غير صالح. لم يتم التسجيل.',
+        ),
+      );
+      return false;
+    }
+
+    if (currentUserId == null || !service.isAuthenticated) {
+      emit(
+        state.copyWith(
+          status: AppleIapStatus.verificationRequired,
+          activeProductId: purchase.productID,
+          transactionKey: purchaseKey,
+          verificationStatusCode: 200,
+          message:
+              'تم التحقق من المعاملة، لكن تعذر تحديد الحساب المرتبط بها. لم يتم التسجيل؛ أعد Restore بعد تسجيل الدخول.',
+        ),
+      );
+      return false;
+    }
+
+    if (_submittedPurchaseKeys.contains(purchaseKey)) {
+      if (_submittedPurchaseOwners[purchaseKey] != currentUserId) {
+        emit(
+          _transactionConflictState(
+            _submittedTransactionMessage(purchaseKey, currentUserId),
+            productId: purchase.productID,
+          ),
+        );
+        return false;
+      }
+      return _completePreviouslyEnrolledPurchase(
+        purchase: purchase,
+        purchaseKey: purchaseKey,
+        productId: purchase.productID,
+        isRestored: isRestored,
+      );
+    }
+
+    final record =
+        savedRecord ??
+        _PendingAppleEnrollment(
+          transactionKey: purchaseKey,
+          productId: purchase.productID,
+          ownerId: currentUserId,
+          target: target,
+        );
+    _pendingEnrollmentRecords[purchaseKey] = record;
+    if (!await _persistPendingEnrollmentRecords()) {
+      _pendingEnrollmentRecords.remove(purchaseKey);
+      emit(
+        state.copyWith(
+          status: AppleIapStatus.failure,
+          activeProductId: purchase.productID,
+          transactionKey: purchaseKey,
+          verificationStatusCode: 200,
+          message:
+              'تم التحقق من المعاملة، لكن تعذر حفظ حالة الاستحقاق. لم يتم التسجيل أو إكمال معاملة Apple؛ أعد Restore.',
+        ),
+      );
+      return false;
+    }
+
+    return _enrollVerifiedPurchase(
+      record: record,
+      purchase: purchase,
+      purchaseKey: purchaseKey,
+      isRestored: isRestored,
+    );
+  }
+
+  bool _sameTarget(AppleIapProductTarget left, AppleIapProductTarget right) =>
+      left.type == right.type &&
+      left.contentId == right.contentId &&
+      left.parentContentId == right.parentContentId;
+
+  Future<bool> _completePreviouslyEnrolledPurchase({
+    required PurchaseDetails purchase,
+    required String purchaseKey,
+    required String productId,
+    required bool isRestored,
+  }) async {
+    var completed = true;
+    try {
+      await service.completePurchase(purchase);
+    } catch (_) {
+      completed = false;
+    }
+
+    if (completed) {
+      _successfulTerminalPurchaseKeys.add('${purchase.status}:$purchaseKey');
+      _pendingPurchases.remove(purchaseKey);
+      _pendingEnrollmentRecords.remove(purchaseKey);
+      await _persistPendingEnrollmentRecords();
+      if (_unresolvedProductId == productId) _unresolvedProductId = null;
     }
 
     emit(
       state.copyWith(
-        status: AppleIapStatus.failure,
-        activeProductId: purchase.productID,
+        status: isRestored
+            ? AppleIapStatus.restored
+            : AppleIapStatus.purchaseConfirmed,
+        activeProductId: productId,
         transactionKey: purchaseKey,
-        message:
-            'تعذر الاتصال بخدمة التحقق. لم يتم تسجيل المحتوى؛ أعد المحاولة عبر استعادة المشتريات.',
-        verificationDiagnostic: diagnosticText,
-        verificationStatusCode: null,
-        verificationResponseBody: null,
-        verificationNetworkError: result.networkError,
+        verificationStatusCode: 200,
+        message: completed
+            ? 'تم تأكيد الشراء، والمحتوى متاح بالفعل'
+            : 'تم تأكيد الشراء والمحتوى متاح، لكن تعذر تأكيد معاملة Apple. أعد Restore للتسوية.',
+        alreadyEnrolled: true,
       ),
     );
+    return completed;
   }
 
-  String _verificationDiagnosticText(
-    ApplePurchaseVerificationDiagnostic diagnostic,
-  ) {
-    if (diagnostic.isHttpResponse) {
-      final body = (diagnostic.responseBody ?? '').trim();
-      return 'HTTP ${diagnostic.statusCode}\n${body.isNotEmpty ? body : 'response body empty'}';
-    }
+  Future<bool> _enrollVerifiedPurchase({
+    required _PendingAppleEnrollment record,
+    required PurchaseDetails purchase,
+    required String purchaseKey,
+    required bool isRestored,
+  }) async {
+    if (isClosed || !_enrollmentKeysInFlight.add(purchaseKey)) return false;
+    try {
+      final currentUserId = _preferences?.getInt(PreferencesKeys.userId.name);
+      final currentTarget = targetFor(record.productId);
+      if (!service.isAuthenticated ||
+          currentUserId != record.ownerId ||
+          (currentTarget != null &&
+              !_sameTarget(record.target, currentTarget))) {
+        emit(
+          _transactionConflictState(
+            'المعاملة المؤكدة لا تطابق الحساب أو المحتوى الحالي. لم يتم التسجيل.',
+            productId: record.productId,
+          ),
+        );
+        return false;
+      }
 
-    final error = (diagnostic.networkError ?? 'تعذر الاتصال بخدمة التحقق')
-        .trim();
-    return 'NETWORK_ERROR\n$error';
+      final Either<Failure, EnrollmentResult> result;
+      try {
+        result = record.target.type == AppleIapProductType.course
+            ? await enrollCourseUseCase!(record.target.contentId)
+            : await enrollChapterUseCase!(record.target.contentId);
+      } catch (_) {
+        emit(
+          state.copyWith(
+            status: AppleIapStatus.failure,
+            activeProductId: record.productId,
+            transactionKey: purchaseKey,
+            verificationStatusCode: 200,
+            message:
+                'تم التحقق من الشراء، لكن تعذر تسجيل المحتوى. لم يتم إكمال معاملة Apple؛ أعد Restore لإعادة التسجيل دون شراء جديد.',
+          ),
+        );
+        return false;
+      }
+      final enrollmentResult = result.fold<EnrollmentResult?>(
+        (_) => null,
+        (enrollment) => enrollment,
+      );
+      if (enrollmentResult == null) {
+        emit(
+          state.copyWith(
+            status: AppleIapStatus.failure,
+            activeProductId: record.productId,
+            transactionKey: purchaseKey,
+            verificationStatusCode: 200,
+            message:
+                'تم التحقق من الشراء، لكن تعذر تسجيل المحتوى. لم يتم إكمال معاملة Apple؛ أعد Restore لإعادة التسجيل دون شراء جديد.',
+          ),
+        );
+        return false;
+      }
+
+      _submittedPurchaseKeys.add(purchaseKey);
+      _submittedPurchaseOwners[purchaseKey] = record.ownerId;
+      if (!await _persistSubmittedPurchaseOwnership()) {
+        _submittedPurchaseKeys.remove(purchaseKey);
+        _submittedPurchaseOwners.remove(purchaseKey);
+        emit(
+          state.copyWith(
+            status: AppleIapStatus.failure,
+            activeProductId: record.productId,
+            transactionKey: purchaseKey,
+            verificationStatusCode: 200,
+            message:
+                'تم التسجيل، لكن تعذر حفظ حالة المعاملة. لم تكتمل معاملة Apple؛ أعد Restore للتسوية.',
+          ),
+        );
+        return false;
+      }
+
+      var completed = true;
+      try {
+        await service.completePurchase(purchase);
+      } catch (_) {
+        completed = false;
+      }
+
+      if (completed) {
+        _successfulTerminalPurchaseKeys.add('${purchase.status}:$purchaseKey');
+        _pendingPurchases.remove(purchaseKey);
+        _pendingEnrollmentRecords.remove(purchaseKey);
+        if (!await _persistPendingEnrollmentRecords()) {
+          _pendingEnrollmentRecords[purchaseKey] = record;
+        }
+        if (_unresolvedProductId == record.productId) {
+          _unresolvedProductId = null;
+        }
+      }
+      emit(
+        state.copyWith(
+          status: isRestored
+              ? AppleIapStatus.restored
+              : AppleIapStatus.purchaseConfirmed,
+          activeProductId: record.productId,
+          transactionKey: purchaseKey,
+          verificationStatusCode: 200,
+          message: completed
+              ? enrollmentResult.message
+              : 'تم تسجيل المحتوى، لكن تعذر تأكيد معاملة Apple. أعد Restore للتسوية دون شراء جديد.',
+          alreadyEnrolled: enrollmentResult.alreadyEnrolled,
+        ),
+      );
+      return completed;
+    } finally {
+      _enrollmentKeysInFlight.remove(purchaseKey);
+    }
   }
 
   String _submittedTransactionMessage(String purchaseKey, int? currentUserId) {
@@ -760,8 +1115,66 @@ class AppleIapCubit extends Cubit<AppleIapState> {
   Future<void> close() async {
     _purchaseResponseTimer?.cancel();
     await _purchaseSubscription?.cancel();
-    _diagnosticSignedTransactions.clear();
     _finishRestore(false);
     return super.close();
+  }
+}
+
+class _PendingAppleEnrollment {
+  final String transactionKey;
+  final String productId;
+  final int ownerId;
+  final AppleIapProductTarget target;
+
+  const _PendingAppleEnrollment({
+    required this.transactionKey,
+    required this.productId,
+    required this.ownerId,
+    required this.target,
+  });
+
+  Map<String, Object?> toJson() => {
+    'transactionKey': transactionKey,
+    'productId': productId,
+    'ownerId': ownerId,
+    'targetType': target.type.name,
+    'contentId': target.contentId,
+    'parentContentId': target.parentContentId,
+  };
+
+  static _PendingAppleEnrollment? fromJson(Map<String, dynamic> json) {
+    final transactionKey = json['transactionKey'];
+    final productId = json['productId'];
+    final ownerId = json['ownerId'];
+    final typeName = json['targetType'];
+    final contentId = json['contentId'];
+    final parentContentId = json['parentContentId'];
+    if (transactionKey is! String ||
+        transactionKey.isEmpty ||
+        productId is! String ||
+        productId.isEmpty ||
+        ownerId is! int ||
+        typeName is! String ||
+        contentId is! int) {
+      return null;
+    }
+    final productType = AppleIapProductType.values.where(
+      (candidate) => candidate.name == typeName,
+    );
+    if (productType.isEmpty ||
+        (productType.single == AppleIapProductType.chapter &&
+            parentContentId is! int)) {
+      return null;
+    }
+    return _PendingAppleEnrollment(
+      transactionKey: transactionKey,
+      productId: productId,
+      ownerId: ownerId,
+      target: AppleIapProductTarget(
+        type: productType.single,
+        contentId: contentId,
+        parentContentId: parentContentId is int ? parentContentId : null,
+      ),
+    );
   }
 }

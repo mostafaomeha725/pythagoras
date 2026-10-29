@@ -6,11 +6,18 @@ import 'package:pythagoras/features/courses/presentation/cubit/request_enrollmen
 class RequestEnrollmentCubit extends Cubit<RequestEnrollmentState> {
   final RequestCourseUseCase requestCourseUseCase;
   final RequestChapterUseCase requestChapterUseCase;
+  final bool Function() _isCourseLessonRequestsEnabled;
 
-  RequestEnrollmentCubit(this.requestCourseUseCase, this.requestChapterUseCase)
-      : super(RequestEnrollmentInitial());
+  RequestEnrollmentCubit(
+    this.requestCourseUseCase,
+    this.requestChapterUseCase, {
+    bool Function()? isCourseLessonRequestsEnabled,
+  }) : _isCourseLessonRequestsEnabled =
+           isCourseLessonRequestsEnabled ?? (() => true),
+       super(RequestEnrollmentInitial());
 
   Future<void> requestCourse(int courseId, {String? courseTitle}) async {
+    if (!_isCourseLessonRequestsEnabled()) return;
     emit(RequestEnrollmentLoading());
     final result = await requestCourseUseCase(courseId);
     result.fold(
@@ -26,6 +33,7 @@ class RequestEnrollmentCubit extends Cubit<RequestEnrollmentState> {
   }
 
   Future<void> requestChapter(int chapterId, {String? chapterTitle}) async {
+    if (!_isCourseLessonRequestsEnabled()) return;
     emit(RequestEnrollmentLoading());
     final result = await requestChapterUseCase(chapterId);
     result.fold(

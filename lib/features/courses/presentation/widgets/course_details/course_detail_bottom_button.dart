@@ -13,6 +13,7 @@ import 'package:pythagoras/features/courses/presentation/cubit/request_enrollmen
 import 'package:pythagoras/core/widgets/custom_button.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_detail.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/remote_config/remote_config_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/apple_iap_action_spacing.dart';
 
 class CourseDetailBottomButton extends StatelessWidget {
@@ -27,6 +28,13 @@ class CourseDetailBottomButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final requestsEnabled = context
+        .watch<RemoteConfigCubit>()
+        .state
+        .courseLessonRequestsEnabled;
+    if (!course.isEnrolled && !requestsEnabled) {
+      return const SizedBox.shrink();
+    }
     final isPending = course.requestStatus?.trim().toLowerCase() == 'pending';
 
     return Padding(

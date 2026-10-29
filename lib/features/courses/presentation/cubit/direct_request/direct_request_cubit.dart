@@ -11,16 +11,22 @@ import 'package:pythagoras/features/courses/presentation/cubit/direct_request/di
 class DirectRequestCubit extends Cubit<DirectRequestState> {
   final RequestCourseDirectUseCase requestCourseDirectUseCase;
   final RequestChapterDirectUseCase requestChapterDirectUseCase;
+  final bool Function() _isCourseLessonRequestsEnabled;
 
   DirectRequestCubit({
     required this.requestCourseDirectUseCase,
     required this.requestChapterDirectUseCase,
-  }) : super(DirectRequestInitial());
+    bool Function()? isCourseLessonRequestsEnabled,
+  }) : _isCourseLessonRequestsEnabled =
+           isCourseLessonRequestsEnabled ?? (() => true),
+       super(DirectRequestInitial());
 
   /// Sends a direct course enrollment request for [courseId].
   /// Ignored when a request is already in-flight.
   Future<void> requestCourse(int courseId) async {
-    if (state is DirectRequestLoading) return;
+    if (!_isCourseLessonRequestsEnabled() || state is DirectRequestLoading) {
+      return;
+    }
     emit(DirectRequestLoading());
     final result = await requestCourseDirectUseCase(courseId);
     result.fold(
@@ -32,7 +38,9 @@ class DirectRequestCubit extends Cubit<DirectRequestState> {
   /// Sends a direct chapter enrollment request for [chapterId].
   /// Ignored when a request is already in-flight.
   Future<void> requestChapter(int chapterId) async {
-    if (state is DirectRequestLoading) return;
+    if (!_isCourseLessonRequestsEnabled() || state is DirectRequestLoading) {
+      return;
+    }
     emit(DirectRequestLoading());
     final result = await requestChapterDirectUseCase(chapterId);
     result.fold(

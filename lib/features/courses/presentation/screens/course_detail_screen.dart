@@ -23,7 +23,6 @@ import 'package:pythagoras/core/widgets/no_internet_widget.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_tablet_landscape.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_tablet_shimmer.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/apple_iap_purchase_section.dart';
-import 'package:pythagoras/core/utils/easy_loading.dart';
 
 class CourseDetailScreen extends StatefulWidget {
   final int courseId;
@@ -159,23 +158,29 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                 EasyLoading.show(status: 'جاري انتظار تأكيد Apple...');
               } else if (state.status == AppleIapStatus.verifying) {
                 EasyLoading.show(status: 'جارٍ التحقق من عملية الشراء...');
-              } else if (state.status == AppleIapStatus.restored) {
+              } else if (state.status == AppleIapStatus.restored ||
+                  state.status == AppleIapStatus.purchaseConfirmed) {
                 EasyLoading.dismiss();
-                EasyLoading.showInfo(
-                  'تمت استعادة معاملة Apple. جارٍ تحديث حالة الكورس من حسابك؛ التفعيل يعتمد على حالة الطلب وموافقة الإدارة.',
-                );
                 final restoredTarget = _appleIapCubit.targetFor(
                   state.activeProductId ?? '',
                 );
-                if (restoredTarget != null &&
+                final targetMatchesCurrentCourse =
+                    restoredTarget != null &&
                     (restoredTarget.type == AppleIapProductType.course
                         ? restoredTarget.contentId == widget.courseId
-                        : restoredTarget.parentContentId == widget.courseId)) {
+                        : restoredTarget.parentContentId == widget.courseId);
+                if (targetMatchesCurrentCourse) {
                   _courseDetailsCubit.fetchCourseDetails(widget.courseId);
+                  if (mounted) {
+                    context.read<CoursesListCubit>().fetchCourses();
+                  }
                 }
-                if (mounted) {
-                  context.read<CoursesListCubit>().fetchCourses();
-                }
+                final successMessage = state.alreadyEnrolled
+                    ? 'تم تأكيد الشراء، والمحتوى متاح بالفعل'
+                    : restoredTarget?.type == AppleIapProductType.chapter
+                    ? 'تم شراء الحصة وتفعيلها بنجاح'
+                    : 'تم شراء الكورس وتفعيله بنجاح';
+                EasyLoading.showSuccess(successMessage);
               } else if (state.status == AppleIapStatus.restoreEmpty) {
                 EasyLoading.dismiss();
                 EasyLoading.showInfo(
@@ -184,6 +189,11 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
               } else if (state.status == AppleIapStatus.cancelled) {
                 EasyLoading.dismiss();
                 EasyLoading.showInfo(state.message ?? 'تم إلغاء عملية الشراء');
+              } else if (state.status == AppleIapStatus.failure) {
+                EasyLoading.dismiss();
+                EasyLoading.showError(
+                  state.message ?? 'تعذر إتمام عملية Apple',
+                );
               } else if (state.status == AppleIapStatus.transactionConflict) {
                 EasyLoading.dismiss();
                 EasyLoading.showError(
@@ -195,65 +205,10 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                   state.message ?? 'لم يصل تأكيد من Apple؛ استخدم Restore.',
                 );
               } else if (state.status == AppleIapStatus.verificationRequired) {
-                final statusCode = state.verificationStatusCode;
-                final responseBody = state.verificationResponseBody;
-                final networkError = state.verificationNetworkError;
-                final hasDiagnostic =
-                    statusCode != null ||
-                    responseBody != null ||
-                    networkError != null;
-                if (hasDiagnostic) {
-                  final productId = state.activeProductId;
-                  final target = productId == null
-                      ? null
-                      : _appleIapCubit.targetFor(productId);
-                  showVerificationDiagnostic(
-                    context,
-                    statusCode: statusCode,
-                    responseBody: responseBody,
-                    networkError: networkError,
-                    productId: productId,
-                    targetType: target?.type.name,
-                    contentId: target?.contentId,
-                    signedTransaction: _appleIapCubit
-                        .takeDiagnosticSignedTransaction(state.transactionKey),
-                  );
-                  return;
-                }
                 EasyLoading.dismiss();
                 EasyLoading.showError(
                   state.message ?? 'لم يتم تأكيد استحقاق المحتوى من الخادم.',
                   duration: const Duration(seconds: 6),
-                );
-              } else if (state.status == AppleIapStatus.failure) {
-                final statusCode = state.verificationStatusCode;
-                final responseBody = state.verificationResponseBody;
-                final networkError = state.verificationNetworkError;
-                final hasDiagnostic =
-                    statusCode != null ||
-                    responseBody != null ||
-                    networkError != null;
-                if (hasDiagnostic) {
-                  final productId = state.activeProductId;
-                  final target = productId == null
-                      ? null
-                      : _appleIapCubit.targetFor(productId);
-                  showVerificationDiagnostic(
-                    context,
-                    statusCode: statusCode,
-                    responseBody: responseBody,
-                    networkError: networkError,
-                    productId: productId,
-                    targetType: target?.type.name,
-                    contentId: target?.contentId,
-                    signedTransaction: _appleIapCubit
-                        .takeDiagnosticSignedTransaction(state.transactionKey),
-                  );
-                  return;
-                }
-                EasyLoading.dismiss();
-                EasyLoading.showError(
-                  state.message ?? 'تعذر إتمام عملية Apple',
                 );
               }
             },

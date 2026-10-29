@@ -25,10 +25,8 @@ class AppleIapState extends Equatable {
   final String? activeProductId;
   final String? transactionKey;
   final String? message;
-  final String? verificationDiagnostic;
   final int? verificationStatusCode;
-  final String? verificationResponseBody;
-  final String? verificationNetworkError;
+  final bool alreadyEnrolled;
 
   const AppleIapState({
     this.status = AppleIapStatus.initial,
@@ -36,10 +34,8 @@ class AppleIapState extends Equatable {
     this.activeProductId,
     this.transactionKey,
     this.message,
-    this.verificationDiagnostic,
     this.verificationStatusCode,
-    this.verificationResponseBody,
-    this.verificationNetworkError,
+    this.alreadyEnrolled = false,
   });
 
   AppleIapState copyWith({
@@ -51,12 +47,9 @@ class AppleIapState extends Equatable {
     bool clearTransactionKey = false,
     String? message,
     bool clearMessage = false,
-    String? verificationDiagnostic,
-    bool clearVerificationDiagnostic = false,
     int? verificationStatusCode,
-    String? verificationResponseBody,
-    String? verificationNetworkError,
-    bool clearVerificationPayload = false,
+    bool clearVerificationStatusCode = false,
+    bool alreadyEnrolled = false,
   }) {
     return AppleIapState(
       status: status ?? this.status,
@@ -68,18 +61,10 @@ class AppleIapState extends Equatable {
           ? null
           : (transactionKey ?? this.transactionKey),
       message: clearMessage ? null : (message ?? this.message),
-      verificationDiagnostic: clearVerificationDiagnostic
-          ? null
-          : (verificationDiagnostic ?? this.verificationDiagnostic),
-      verificationStatusCode: clearVerificationPayload
+      verificationStatusCode: clearVerificationStatusCode
           ? null
           : (verificationStatusCode ?? this.verificationStatusCode),
-      verificationResponseBody: clearVerificationPayload
-          ? null
-          : (verificationResponseBody ?? this.verificationResponseBody),
-      verificationNetworkError: clearVerificationPayload
-          ? null
-          : (verificationNetworkError ?? this.verificationNetworkError),
+      alreadyEnrolled: alreadyEnrolled,
     );
   }
 
@@ -90,9 +75,7 @@ class AppleIapState extends Equatable {
     activeProductId,
     transactionKey,
     message,
-    verificationDiagnostic,
     verificationStatusCode,
-    verificationResponseBody,
-    verificationNetworkError,
+    alreadyEnrolled,
   ];
 }

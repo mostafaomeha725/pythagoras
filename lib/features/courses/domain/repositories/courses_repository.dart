@@ -15,7 +15,8 @@ import 'package:pythagoras/features/courses/domain/entities/course_resource.dart
 import 'package:pythagoras/features/courses/domain/entities/course_review.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_reviews_data.dart';
 import 'package:pythagoras/features/courses/domain/entities/course_lesson.dart';
-import 'package:pythagoras/features/courses/domain/entities/apple_purchase_verification_diagnostic.dart';
+import 'package:pythagoras/features/courses/domain/entities/apple_purchase_verification_result.dart';
+import 'package:pythagoras/features/courses/domain/entities/enrollment_result.dart';
 
 abstract class CoursesRepository {
   Future<Either<Failure, List<StudentClass>>> getClasses({
@@ -36,9 +37,9 @@ abstract class CoursesRepository {
   });
   Future<Either<Failure, String>> requestCourse(int courseId);
   Future<Either<Failure, String>> requestChapter(int chapterId);
-  Future<Either<Failure, String>> enrollCourse(int courseId);
-  Future<Either<Failure, String>> enrollChapter(int chapterId);
-  Future<ApplePurchaseVerificationDiagnostic> verifyApplePurchase(
+  Future<Either<Failure, EnrollmentResult>> enrollCourse(int courseId);
+  Future<Either<Failure, EnrollmentResult>> enrollChapter(int chapterId);
+  Future<ApplePurchaseVerificationResult> verifyApplePurchase(
     String signedTransaction,
   );
 

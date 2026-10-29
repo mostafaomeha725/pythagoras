@@ -9,6 +9,7 @@ class RemoteConfigCubit extends Cubit<RemoteConfigState> {
   final RemoteConfigService remoteConfigService;
   Future<void>? _loadFuture;
   StreamSubscription<bool>? _updatesSubscription;
+  StreamSubscription<bool>? _courseLessonRequestsSubscription;
 
   RemoteConfigCubit({required this.remoteConfigService})
     : super(const RemoteConfigState());
@@ -25,13 +26,24 @@ class RemoteConfigCubit extends Cubit<RemoteConfigState> {
       await remoteConfigService.initialize();
       if (isClosed) return;
       _updatesSubscription ??= remoteConfigService.iosIapEnabledChanges.listen(
-        _emitFeatureState,
+        _emitIapState,
         onError: (Object error, StackTrace stackTrace) =>
-            _emitFeatureState(false, errorMessage: error.toString()),
+            _emitIapState(false, errorMessage: error.toString()),
       );
+      _courseLessonRequestsSubscription ??= remoteConfigService
+          .courseLessonRequestsEnabledChanges
+          .listen(
+            _emitCourseLessonRequestsState,
+            onError: (Object error, StackTrace stackTrace) =>
+                _emitCourseLessonRequestsState(
+                  remoteConfigService.courseLessonRequestsEnabled,
+                ),
+          );
       emit(
         state.copyWith(
           iosIapEnabled: remoteConfigService.iosIapEnabled,
+          courseLessonRequestsEnabled:
+              remoteConfigService.courseLessonRequestsEnabled,
           isLoading: false,
         ),
       );
@@ -51,7 +63,7 @@ class RemoteConfigCubit extends Cubit<RemoteConfigState> {
     }
   }
 
-  void _emitFeatureState(bool enabled, {String? errorMessage}) {
+  void _emitIapState(bool enabled, {String? errorMessage}) {
     if (isClosed) return;
     emit(
       state.copyWith(
@@ -63,9 +75,17 @@ class RemoteConfigCubit extends Cubit<RemoteConfigState> {
     );
   }
 
+  void _emitCourseLessonRequestsState(bool enabled) {
+    if (isClosed) return;
+    emit(
+      state.copyWith(courseLessonRequestsEnabled: enabled, isLoading: false),
+    );
+  }
+
   @override
   Future<void> close() async {
     await _updatesSubscription?.cancel();
+    await _courseLessonRequestsSubscription?.cancel();
     return super.close();
   }
 }

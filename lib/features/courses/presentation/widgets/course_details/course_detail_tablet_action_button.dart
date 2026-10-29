@@ -13,6 +13,7 @@ import 'package:pythagoras/features/courses/presentation/cubit/courses_list/cour
 import 'package:pythagoras/features/courses/presentation/cubit/request_enrollment/request_enrollment_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_cubit.dart';
 import 'package:pythagoras/features/profile/presentation/cubit/profile/profile_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/remote_config/remote_config_cubit.dart';
 
 /// Fixed action button ("طلب الدورة" / "عرض الدورة") for Tablet Landscape.
 /// Stays sticky on the screen aligned with the curriculum column.
@@ -23,6 +24,13 @@ class CourseDetailTabletActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final requestsEnabled = context
+        .watch<RemoteConfigCubit>()
+        .state
+        .courseLessonRequestsEnabled;
+    if (!course.isEnrolled && !requestsEnabled) {
+      return const SizedBox.shrink();
+    }
     final isPending = course.requestStatus?.trim().toLowerCase() == 'pending';
 
     return SafeArea(
