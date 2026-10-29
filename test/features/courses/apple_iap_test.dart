@@ -109,6 +109,8 @@ class AppleIapService extends apple_iap_service.AppleIapService {
 
 class FakeDirectRequestRepository implements CoursesRepository {
   int? requestedChapterId;
+  final List<int> enrolledCourseIds = [];
+  final List<int> enrolledChapterIds = [];
 
   @override
   Future<Either<Failure, String>> requestChapterDirect(int chapterId) async {
@@ -117,17 +119,38 @@ class FakeDirectRequestRepository implements CoursesRepository {
   }
 
   @override
+  Future<Either<Failure, String>> enrollCourse(int courseId) async {
+    enrolledCourseIds.add(courseId);
+    return Left(Failure('enrollment should not be called by Apple IAP'));
+  }
+
+  @override
+  Future<Either<Failure, String>> enrollChapter(int chapterId) async {
+    enrolledChapterIds.add(chapterId);
+    return Left(Failure('enrollment should not be called by Apple IAP'));
+  }
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class FakeVerifyApplePurchaseUseCase extends VerifyApplePurchaseUseCase {
-  FakeVerifyApplePurchaseUseCase() : super(FakeDirectRequestRepository());
+  factory FakeVerifyApplePurchaseUseCase([
+    FakeDirectRequestRepository? repository,
+  ]) => FakeVerifyApplePurchaseUseCase._(
+    repository ?? FakeDirectRequestRepository(),
+  );
+
+  FakeVerifyApplePurchaseUseCase._(this.fakeRepository) : super(fakeRepository);
+
+  final FakeDirectRequestRepository fakeRepository;
 
   final List<String> submittedTransactions = [];
-  ApplePurchaseVerificationDiagnostic response = const ApplePurchaseVerificationDiagnostic.http(
-    statusCode: 200,
-    responseBody: '{"message":"Verification response received"}',
-  );
+  ApplePurchaseVerificationDiagnostic response =
+      const ApplePurchaseVerificationDiagnostic.http(
+        statusCode: 200,
+        responseBody: '{"message":"Verification response received"}',
+      );
 
   @override
   Future<ApplePurchaseVerificationDiagnostic> call(
@@ -273,6 +296,63 @@ void main() {
     expect(missingCourse.appleProductId, isNull);
     expect(blankChapter.appleProductId, '  ');
   });
+
+  test(
+    'backend 422 apple verification remains fail-closed and uses the API-bound product ID',
+    () async {
+      final store = FakeAppleIapStore()
+        ..response = ProductDetailsResponse(
+          productDetails: [product(id: 'backend.course.21')],
+          notFoundIDs: const [],
+        );
+      final service = AppleIapService(store: store, isIos: true);
+      final repository = FakeDirectRequestRepository();
+      final verifyUseCase = FakeVerifyApplePurchaseUseCase(repository)
+        ..response = const ApplePurchaseVerificationDiagnostic.http(
+          statusCode: 422,
+          responseBody: '{"message":"المنتج غير مرتبط بكورس أو درس"}',
+        );
+      final cubit = AppleIapCubit(
+        service: service,
+        verifyApplePurchaseUseCase: verifyUseCase,
+        isIos: true,
+      );
+
+      await cubit.updateCourseAndChapterAccess(
+        courseId: 21,
+        isRequestStatusEligible: true,
+        isEnrolled: false,
+        hasPendingRequest: false,
+        eligibleChapterIds: const {},
+        courseAppleProductId: 'backend.course.21',
+        chapterAppleProductIds: const {},
+      );
+
+      await cubit.purchase('backend.course.21');
+      store.purchaseController.add([
+        purchaseDetails(
+          PurchaseStatus.purchased,
+          productId: 'backend.course.21',
+          serverVerificationData: 'server-verification-data-422',
+        ),
+      ]);
+      await settleStream();
+
+      expect(cubit.state.status, AppleIapStatus.verificationRequired);
+      expect(cubit.state.verificationStatusCode, 422);
+      expect(
+        cubit.state.verificationResponseBody,
+        contains('المنتج غير مرتبط بكورس أو درس'),
+      );
+      expect(cubit.targetFor('backend.course.21')?.contentId, 21);
+      expect(verifyUseCase.fakeRepository.enrolledCourseIds, isEmpty);
+      expect(verifyUseCase.fakeRepository.enrolledChapterIds, isEmpty);
+
+      await cubit.close();
+      await store.close();
+    },
+  );
+
   late FakeAppleIapStore store;
   late AppleIapService service;
   late FakeVerifyApplePurchaseUseCase verifyApplePurchaseUseCase;
@@ -356,6 +436,73 @@ void main() {
         'api.course.id',
         'api.chapter.id',
       ]);
+
+      await localCubit.close();
+      await localStore.close();
+    },
+  );
+
+  test(
+    'restored course and chapter transactions submit their own verification data',
+    () async {
+      final localStore = FakeAppleIapStore()
+        ..response = ProductDetailsResponse(
+          productDetails: [
+            product(id: 'api.course.id'),
+            product(id: 'api.chapter.id'),
+          ],
+          notFoundIDs: const [],
+        );
+      final localService = AppleIapService(store: localStore, isIos: true);
+      final verifyUseCase = FakeVerifyApplePurchaseUseCase();
+      final localCubit = AppleIapCubit(
+        service: localService,
+        verifyApplePurchaseUseCase: verifyUseCase,
+        isIos: true,
+      );
+
+      await localCubit.updateCourseAndChapterAccess(
+        courseId: 21,
+        isRequestStatusEligible: true,
+        isEnrolled: false,
+        hasPendingRequest: false,
+        eligibleChapterIds: {245},
+        courseAppleProductId: 'api.course.id',
+        chapterAppleProductIds: {245: 'api.chapter.id'},
+      );
+      final restore = localCubit.restorePurchases();
+      await settleStream();
+      localStore.purchaseController.add([
+        purchaseDetails(
+          PurchaseStatus.restored,
+          id: 'course-transaction',
+          productId: 'api.course.id',
+          serverVerificationData: 'course-server-verification-data',
+        ),
+        purchaseDetails(
+          PurchaseStatus.restored,
+          id: 'chapter-transaction',
+          productId: 'api.chapter.id',
+          serverVerificationData: 'chapter-server-verification-data',
+        ),
+      ]);
+      await restore;
+
+      expect(localCubit.targetFor('api.course.id')?.contentId, 21);
+      expect(localCubit.targetFor('api.chapter.id')?.contentId, 245);
+      expect(verifyUseCase.submittedTransactions, [
+        'course-server-verification-data',
+        'chapter-server-verification-data',
+      ]);
+      expect(
+        localCubit.takeDiagnosticSignedTransaction('course-transaction'),
+        'course-server-verification-data',
+      );
+      expect(
+        localCubit.takeDiagnosticSignedTransaction('chapter-transaction'),
+        'chapter-server-verification-data',
+      );
+      expect(localStore.completedPurchases, isEmpty);
 
       await localCubit.close();
       await localStore.close();
@@ -2017,6 +2164,14 @@ void main() {
       ]);
       expect(cubit.state.status, AppleIapStatus.verificationRequired);
       expect(cubit.state.transactionKey, isNot(contains(signedTransaction)));
+      expect(
+        cubit.takeDiagnosticSignedTransaction(cubit.state.transactionKey),
+        signedTransaction,
+      );
+      expect(
+        cubit.takeDiagnosticSignedTransaction(cubit.state.transactionKey),
+        isNull,
+      );
       expect(store.completedPurchases, isEmpty);
     },
   );
@@ -2037,10 +2192,11 @@ void main() {
 
   test('verification 404 and 422 responses never grant content', () async {
     for (final statusCode in [404, 422]) {
-      verifyApplePurchaseUseCase.response = ApplePurchaseVerificationDiagnostic.http(
-        statusCode: statusCode,
-        responseBody: '{"message":"HTTP $statusCode"}',
-      );
+      verifyApplePurchaseUseCase.response =
+          ApplePurchaseVerificationDiagnostic.http(
+            statusCode: statusCode,
+            responseBody: '{"message":"HTTP $statusCode"}',
+          );
       store.purchaseController.add([
         purchaseDetails(
           PurchaseStatus.purchased,
@@ -2063,10 +2219,11 @@ void main() {
     await settleStream();
     expect(cubit.state.status, AppleIapStatus.failure);
 
-    verifyApplePurchaseUseCase.response = const ApplePurchaseVerificationDiagnostic.http(
-      statusCode: 200,
-      responseBody: '{"message":"accepted"}',
-    );
+    verifyApplePurchaseUseCase.response =
+        const ApplePurchaseVerificationDiagnostic.http(
+          statusCode: 200,
+          responseBody: '{"message":"accepted"}',
+        );
     final restore = cubit.restorePurchases();
     await settleStream();
     store.purchaseController.add([

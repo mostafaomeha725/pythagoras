@@ -29,6 +29,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
   Timer? _purchaseResponseTimer;
   final Set<String> _processedTerminalPurchaseKeys = <String>{};
   final Map<String, PurchaseDetails> _pendingPurchases = {};
+  final Map<String, String> _diagnosticSignedTransactions = {};
   final Set<int> _eligibleChapterIds = <int>{};
   final Set<String> _conflictingProductIds = <String>{};
   String? _unresolvedProductId;
@@ -78,6 +79,11 @@ class AppleIapCubit extends Cubit<AppleIapState> {
 
   AppleIapProductTarget? targetFor(String productId) =>
       _productTargets[productId];
+
+  String? takeDiagnosticSignedTransaction(String? transactionKey) {
+    if (transactionKey == null) return null;
+    return _diagnosticSignedTransactions.remove(transactionKey);
+  }
 
   bool isProductConfigurationConflict(String? productId) =>
       productId != null && _conflictingProductIds.contains(productId.trim());
@@ -644,6 +650,9 @@ class AppleIapCubit extends Cubit<AppleIapState> {
 
     final result = await verifyUseCase(signedTransaction);
     if (isClosed) return;
+    if (signedTransaction.isNotEmpty) {
+      _diagnosticSignedTransactions[purchaseKey] = signedTransaction;
+    }
 
     final diagnosticText = _verificationDiagnosticText(result);
     if (result.isHttpResponse) {
@@ -751,6 +760,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
   Future<void> close() async {
     _purchaseResponseTimer?.cancel();
     await _purchaseSubscription?.cancel();
+    _diagnosticSignedTransactions.clear();
     _finishRestore(false);
     return super.close();
   }

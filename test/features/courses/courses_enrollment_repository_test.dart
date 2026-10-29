@@ -158,18 +158,44 @@ void main() {
     expect(result.statusCode, 200);
   });
 
-  test('Apple verification 404 and 422 responses are captured as diagnostics', () async {
-    for (final statusCode in [404, 422]) {
-      networkService.sensitiveResponse = SensitiveHttpResult.http(
-        statusCode: statusCode,
-        responseBody: '{"message":"HTTP $statusCode"}',
+  test(
+    'Apple verification 404 and 422 responses are captured as diagnostics',
+    () async {
+      for (final statusCode in [404, 422]) {
+        networkService.sensitiveResponse = SensitiveHttpResult.http(
+          statusCode: statusCode,
+          responseBody: '{"message":"HTTP $statusCode"}',
+        );
+
+        final result = await repository.verifyApplePurchase('actual-proof');
+
+        expect(result.isHttpResponse, isTrue);
+        expect(result.statusCode, statusCode);
+        expect(networkService.requestedEndpoint, isNull);
+      }
+    },
+  );
+
+  test(
+    'Apple verification response redacts sensitive values before display',
+    () async {
+      networkService.sensitiveResponse = const SensitiveHttpResult.http(
+        statusCode: 422,
+        responseBody:
+            '{"message":"verification rejected","signedTransaction":"private-jws",'
+            '"Authorization":"Bearer private-token","email":"student@example.com",'
+            '"accountId":123}',
       );
 
-      final result = await repository.verifyApplePurchase('actual-proof');
+      final result = await repository.verifyApplePurchase('submitted-proof');
+      final responseBody = result.responseBody!;
 
-      expect(result.isHttpResponse, isTrue);
-      expect(result.statusCode, statusCode);
-      expect(networkService.requestedEndpoint, isNull);
-    }
-  });
+      expect(responseBody, contains('verification rejected'));
+      expect(responseBody, contains('[REDACTED]'));
+      expect(responseBody, isNot(contains('private-jws')));
+      expect(responseBody, isNot(contains('private-token')));
+      expect(responseBody, isNot(contains('student@example.com')));
+      expect(responseBody, isNot(contains('123')));
+    },
+  );
 }

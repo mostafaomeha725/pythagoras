@@ -199,13 +199,24 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                 final responseBody = state.verificationResponseBody;
                 final networkError = state.verificationNetworkError;
                 final hasDiagnostic =
-                    statusCode != null || responseBody != null || networkError != null;
+                    statusCode != null ||
+                    responseBody != null ||
+                    networkError != null;
                 if (hasDiagnostic) {
+                  final productId = state.activeProductId;
+                  final target = productId == null
+                      ? null
+                      : _appleIapCubit.targetFor(productId);
                   showVerificationDiagnostic(
                     context,
                     statusCode: statusCode,
                     responseBody: responseBody,
                     networkError: networkError,
+                    productId: productId,
+                    targetType: target?.type.name,
+                    contentId: target?.contentId,
+                    signedTransaction: _appleIapCubit
+                        .takeDiagnosticSignedTransaction(state.transactionKey),
                   );
                   return;
                 }
@@ -219,13 +230,24 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                 final responseBody = state.verificationResponseBody;
                 final networkError = state.verificationNetworkError;
                 final hasDiagnostic =
-                    statusCode != null || responseBody != null || networkError != null;
+                    statusCode != null ||
+                    responseBody != null ||
+                    networkError != null;
                 if (hasDiagnostic) {
+                  final productId = state.activeProductId;
+                  final target = productId == null
+                      ? null
+                      : _appleIapCubit.targetFor(productId);
                   showVerificationDiagnostic(
                     context,
                     statusCode: statusCode,
                     responseBody: responseBody,
                     networkError: networkError,
+                    productId: productId,
+                    targetType: target?.type.name,
+                    contentId: target?.contentId,
+                    signedTransaction: _appleIapCubit
+                        .takeDiagnosticSignedTransaction(state.transactionKey),
                   );
                   return;
                 }
