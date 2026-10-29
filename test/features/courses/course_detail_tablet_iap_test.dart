@@ -31,6 +31,7 @@ import 'package:pythagoras/features/courses/domain/use_cases/enroll_course_use_c
 import 'package:pythagoras/features/courses/domain/use_cases/enroll_chapter_use_case.dart';
 import 'package:pythagoras/features/courses/data/models/course_detail_model.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/apple_iap/apple_iap_cubit.dart';
+import 'package:pythagoras/features/courses/presentation/cubit/apple_iap/apple_iap_state.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/course_details/course_details_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/courses_list/courses_list_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/direct_request/direct_request_cubit.dart';
@@ -133,7 +134,11 @@ class _TabletCoursesRepository implements CoursesRepository {
   CourseDetail course;
   int? requestedCourseId;
   int? requestedChapterId;
+  int? requestedCourseDirectId;
+  int? requestedChapterDirectId;
   int curriculumCalls = 0;
+  String? requestedCourseStatus;
+  final Map<int, String> requestedChapterStatuses = {};
   final List<int> enrolledCourseIds = [];
   final List<int> enrolledChapterIds = [];
   ApplePurchaseVerificationResult verificationResult =
@@ -147,7 +152,18 @@ class _TabletCoursesRepository implements CoursesRepository {
     bool fromCache = false,
   }) async {
     curriculumCalls++;
-    return Right(course);
+    return Right(
+      course.copyWith(
+        requestStatus: requestedCourseStatus ?? course.requestStatus,
+        chapters: [
+          for (final chapter in course.chapters)
+            chapter.copyWith(
+              requestStatus:
+                  requestedChapterStatuses[chapter.id] ?? chapter.requestStatus,
+            ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -158,14 +174,28 @@ class _TabletCoursesRepository implements CoursesRepository {
   }) async => const Right([]);
 
   @override
-  Future<Either<Failure, String>> requestCourseDirect(int courseId) async {
+  Future<Either<Failure, String>> requestCourse(int courseId) async {
     requestedCourseId = courseId;
+    requestedCourseStatus = 'pending';
+    return const Right('https://wa.me/201234567890?text=course-request');
+  }
+
+  @override
+  Future<Either<Failure, String>> requestChapter(int chapterId) async {
+    requestedChapterId = chapterId;
+    requestedChapterStatuses[chapterId] = 'pending';
+    return const Right('https://wa.me/201234567890?text=chapter-request');
+  }
+
+  @override
+  Future<Either<Failure, String>> requestCourseDirect(int courseId) async {
+    requestedCourseDirectId = courseId;
     return const Right('تم استلام الطلب');
   }
 
   @override
   Future<Either<Failure, String>> requestChapterDirect(int chapterId) async {
-    requestedChapterId = chapterId;
+    requestedChapterDirectId = chapterId;
     return const Right('تم استلام الطلب');
   }
 
@@ -210,6 +240,7 @@ class _TabletHarness {
   final _TabletStore store;
   final _TabletRemoteConfig remoteConfig;
   final CoursesListCubit coursesListCubit;
+  final AppleIapCubit appleIapCubit;
 
   const _TabletHarness({
     required this.course,
@@ -217,6 +248,7 @@ class _TabletHarness {
     required this.store,
     required this.remoteConfig,
     required this.coursesListCubit,
+    required this.appleIapCubit,
   });
 }
 
@@ -325,6 +357,20 @@ Future<_TabletHarness> _pumpCourseDetailScreen(
     isAuthenticated: () => preferencesStorage.isAuthenticated,
   );
   final coursesListCubit = CoursesListCubit(GetCoursesUseCase(repository));
+  final appleIapCubit = AppleIapCubit(
+    service: service,
+    verifyApplePurchaseUseCase: configureVerifiedIap
+        ? VerifyApplePurchaseUseCase(repository)
+        : null,
+    enrollCourseUseCase: configureVerifiedIap
+        ? EnrollCourseUseCase(repository)
+        : null,
+    enrollChapterUseCase: configureVerifiedIap
+        ? EnrollChapterUseCase(repository)
+        : null,
+    preferences: sharedPreferences,
+    isIos: true,
+  );
 
   sl.registerFactory(
     () => CourseDetailsCubit(GetCourseCurriculumUseCase(repository)),
@@ -348,22 +394,7 @@ Future<_TabletHarness> _pumpCourseDetailScreen(
   sl.registerFactory(
     () => RemoteConfigCubit(remoteConfigService: remoteConfig),
   );
-  sl.registerFactory(
-    () => AppleIapCubit(
-      service: service,
-      verifyApplePurchaseUseCase: configureVerifiedIap
-          ? VerifyApplePurchaseUseCase(repository)
-          : null,
-      enrollCourseUseCase: configureVerifiedIap
-          ? EnrollCourseUseCase(repository)
-          : null,
-      enrollChapterUseCase: configureVerifiedIap
-          ? EnrollChapterUseCase(repository)
-          : null,
-      preferences: sharedPreferences,
-      isIos: true,
-    ),
-  );
+  sl.registerFactory<AppleIapCubit>(() => appleIapCubit);
 
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -392,6 +423,7 @@ Future<_TabletHarness> _pumpCourseDetailScreen(
     store: store,
     remoteConfig: remoteConfig,
     coursesListCubit: coursesListCubit,
+    appleIapCubit: appleIapCubit,
   );
 }
 
@@ -493,6 +525,85 @@ void main() {
 
       expect(harness.repository.enrolledCourseIds, isEmpty);
       expect(EasyLoading.isShow, isFalse);
+
+      await _disposeTabletHarness(tester, harness);
+    },
+  );
+
+  testWidgets(
+    'iOS course request uses legacy API and refreshes pending state',
+    (tester) async {
+      final harness = await _pumpCourseDetailScreen(
+        tester,
+        size: const Size(390, 844),
+      );
+
+      await tester.tap(find.text('طلب الدورة'));
+      await _pumpTabletFrames(tester);
+
+      expect(harness.repository.requestedCourseId, 21);
+      expect(harness.repository.requestedCourseDirectId, isNull);
+      expect(harness.repository.curriculumCalls, 2);
+      expect(find.text('قيد الانتظار'), findsWidgets);
+
+      await _disposeTabletHarness(tester, harness);
+    },
+  );
+
+  testWidgets(
+    'iOS chapter request uses legacy API and refreshes pending state',
+    (tester) async {
+      final harness = await _pumpCourseDetailScreen(
+        tester,
+        size: const Size(390, 844),
+      );
+      await tester.tap(find.text('Chapter 245'));
+      await _pumpTabletFrames(tester);
+
+      await tester.tap(find.textContaining('طلب الحصة'));
+      await _pumpTabletFrames(tester);
+
+      expect(harness.repository.requestedChapterId, 245);
+      expect(harness.repository.requestedChapterDirectId, isNull);
+      expect(harness.repository.curriculumCalls, 2);
+      expect(find.text('قيد الانتظار'), findsWidgets);
+
+      await _disposeTabletHarness(tester, harness);
+    },
+  );
+
+  testWidgets(
+    'already-enrolled course reports unrelated restored products informationally',
+    (tester) async {
+      final harness = await _pumpCourseDetailScreen(
+        tester,
+        size: const Size(390, 844),
+        courseEnrolled: true,
+      );
+
+      await tester.tap(find.text('استعادة المشتريات'));
+      await tester.pump();
+      harness.store.purchases.add([
+        _purchase('unrelated.course.product', status: PurchaseStatus.restored),
+      ]);
+      await _pumpTabletFrames(tester);
+
+      expect(
+        find.textContaining('منتج غير موجود في المحتوى المفتوح'),
+        findsNothing,
+      );
+      expect(
+        harness.appleIapCubit.state.status,
+        AppleIapStatus.verificationRequired,
+      );
+      expect(harness.appleIapCubit.state.restoreHasUnmappedProducts, isTrue);
+      expect(
+        harness.appleIapCubit.state.restoreHasConfirmedEnrollment,
+        isFalse,
+      );
+      expect(harness.repository.enrolledCourseIds, isEmpty);
+      expect(harness.repository.enrolledChapterIds, isEmpty);
+      expect(harness.store.completed, isEmpty);
 
       await _disposeTabletHarness(tester, harness);
     },

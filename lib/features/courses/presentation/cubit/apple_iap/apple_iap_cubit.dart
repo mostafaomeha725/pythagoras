@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/services.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:dartz/dartz.dart';
 import 'package:pythagoras/core/enums/app_enums.dart';
@@ -20,6 +21,8 @@ import 'package:pythagoras/features/courses/domain/entities/apple_purchase_verif
 import 'apple_iap_state.dart';
 
 class AppleIapCubit extends Cubit<AppleIapState> {
+  static const _unmappedProductRestoreMessage =
+      'وصلت معاملة لمنتج غير موجود في المحتوى المفتوح. لم يتم التحقق أو التسجيل؛ افتح المحتوى المرتبط بالمنتج ثم أعد Restore.';
   static const _submittedPurchaseKeysKey = 'apple_iap_submitted_purchase_keys';
   static const _submittedPurchaseOwnersKey =
       'apple_iap_submitted_purchase_owners';
@@ -184,9 +187,39 @@ class AppleIapCubit extends Cubit<AppleIapState> {
         !_isProductEnabled(productId) ||
         _restoreFuture != null ||
         _isPurchaseInProgress ||
-        _unresolvedProductId == productId ||
         state.status == AppleIapStatus.loading ||
         _transactionConflictProductId == productId) {
+      return;
+    }
+    final pendingRecord = _pendingRecordForProduct(productId);
+    if (pendingRecord != null) {
+      _unresolvedProductId = productId;
+      final currentUserId = _preferences?.getInt(PreferencesKeys.userId.name);
+      final isDifferentOwner =
+          pendingRecord.ownerId != null &&
+          currentUserId != pendingRecord.ownerId;
+      final isAlreadySubmitted = _submittedPurchaseKeys.contains(
+        pendingRecord.transactionKey,
+      );
+      emit(
+        state.copyWith(
+          status: isDifferentOwner || pendingRecord.ownerId == null
+              ? AppleIapStatus.transactionConflict
+              : AppleIapStatus.verificationRequired,
+          activeProductId: productId,
+          clearTransactionKey: true,
+          message: pendingRecord.ownerId == null
+              ? 'Apple أفاد بوجود معاملة سابقة لهذا المنتج، لكن لا يمكن تحديد حساب Pythagoras الذي بدأها. لم يتم التفعيل أو نقل الملكية؛ استخدم الاستعادة أو تواصل مع الدعم.'
+              : isDifferentOwner
+              ? 'هذه المعاملة مرتبطة بحساب طالب آخر. لم يتم نقلها أو تفعيل هذا الحساب؛ سجّل الدخول بالحساب الأصلي أو تواصل مع الدعم.'
+              : isAlreadySubmitted
+              ? 'تم شراء هذا المنتج وربطه بهذا الحساب مسبقًا. لم تبدأ عملية جديدة؛ استخدم الاستعادة أو افتح المحتوى المرتبط بالحساب.'
+              : 'توجد معاملة Apple سابقة لهذا المنتج لم تُسوَّ بعد. استخدم استعادة المشتريات؛ لم تبدأ عملية شراء جديدة.',
+        ),
+      );
+      return;
+    }
+    if (_unresolvedProductId == productId) {
       return;
     }
     ProductDetails? product;
@@ -201,11 +234,48 @@ class AppleIapCubit extends Cubit<AppleIapState> {
     debugPrint('[IAP][Purchase] requested productId=$productId');
     final target = targetFor(productId);
     if (target == null) return;
+    final currentUserId = _preferences?.getInt(PreferencesKeys.userId.name);
+    final intentKey = _purchaseIntentKey(productId);
+    if (_preferences != null) {
+      if (currentUserId == null) {
+        emit(
+          state.copyWith(
+            status: AppleIapStatus.failure,
+            message:
+                'تعذر تحديد حساب الطالب قبل بدء الشراء. لم تبدأ عملية Apple.',
+            clearActiveProductId: true,
+          ),
+        );
+        return;
+      }
+      _pendingEnrollmentRecords[intentKey] = _PendingAppleEnrollment(
+        transactionKey: intentKey,
+        productId: productId,
+        ownerId: currentUserId,
+        target: target,
+      );
+      if (!await _persistPendingEnrollmentRecords()) {
+        _pendingEnrollmentRecords.remove(intentKey);
+        _unresolvedProductId = productId;
+        emit(
+          state.copyWith(
+            status: AppleIapStatus.failure,
+            message:
+                'تعذر حفظ ملكية عملية الشراء محليًا. لم تبدأ عملية Apple؛ أعد المحاولة بعد معالجة التخزين.',
+            clearActiveProductId: true,
+          ),
+        );
+        return;
+      }
+    }
     emit(
       state.copyWith(
         status: AppleIapStatus.purchasing,
         activeProductId: productId,
         clearMessage: true,
+        restoreInProgress: false,
+        restoreHasConfirmedEnrollment: false,
+        restoreHasUnmappedProducts: false,
       ),
     );
     try {
@@ -213,6 +283,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
           .purchase(product)
           .timeout(_purchaseResponseTimeout);
       if (!started && !isClosed) {
+        await _removePurchaseIntent(productId);
         _purchaseResponseTimer?.cancel();
         emit(
           state.copyWith(
@@ -232,12 +303,42 @@ class AppleIapCubit extends Cubit<AppleIapState> {
         );
       }
     } catch (error) {
+      if (error is PlatformException &&
+          error.code == 'storekit_duplicate_product_object') {
+        _unresolvedProductId = productId;
+        final intentKey = _purchaseIntentKey(productId);
+        final intent = _pendingEnrollmentRecords[intentKey];
+        if (intent != null) {
+          _pendingEnrollmentRecords[intentKey] = _PendingAppleEnrollment(
+            transactionKey: intentKey,
+            productId: intent.productId,
+            ownerId: null,
+            target: intent.target,
+          );
+          await _persistPendingEnrollmentRecords();
+        }
+        if (!isClosed) {
+          emit(
+            state.copyWith(
+              status: AppleIapStatus.verificationRequired,
+              activeProductId: productId,
+              message:
+                  'Apple أفاد بوجود معاملة سابقة لهذا المنتج. لم نكرر الشراء؛ استخدم استعادة المشتريات أو تواصل مع الدعم لربطها بالحساب الصحيح. (${error.message ?? error.code})',
+            ),
+          );
+        }
+        return;
+      }
+      if (error is TimeoutException) {
+        if (!isClosed) {
+          _purchaseResponseTimer?.cancel();
+          _emitPurchaseTimedOut();
+        }
+        return;
+      }
+      await _removePurchaseIntent(productId);
       if (!isClosed) {
         _purchaseResponseTimer?.cancel();
-        if (error is TimeoutException) {
-          _emitPurchaseTimedOut();
-          return;
-        }
         emit(
           state.copyWith(
             status: AppleIapStatus.failure,
@@ -269,7 +370,24 @@ class AppleIapCubit extends Cubit<AppleIapState> {
   bool get purchaseNeedsReconciliation => _unresolvedProductId != null;
 
   bool purchaseNeedsReconciliationFor(String productId) =>
-      _unresolvedProductId == productId;
+      _unresolvedProductId == productId ||
+      _pendingRecordForProduct(productId) != null;
+
+  _PendingAppleEnrollment? _pendingRecordForProduct(String productId) {
+    for (final record in _pendingEnrollmentRecords.values) {
+      if (record.productId == productId) return record;
+    }
+    return null;
+  }
+
+  String _purchaseIntentKey(String productId) => 'purchase-intent:$productId';
+
+  Future<void> _removePurchaseIntent(String productId) async {
+    if (_pendingEnrollmentRecords.remove(_purchaseIntentKey(productId)) !=
+        null) {
+      await _persistPendingEnrollmentRecords();
+    }
+  }
 
   void _emitPurchaseTimedOut() {
     if (isClosed ||
@@ -426,6 +544,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
           message: 'جاري استعادة المشتريات...',
           restoreInProgress: true,
           restoreHasConfirmedEnrollment: false,
+          restoreHasUnmappedProducts: false,
         ),
       );
       await Future.wait<dynamic>([
@@ -481,12 +600,20 @@ class AppleIapCubit extends Cubit<AppleIapState> {
         if (_restoreSawPendingTransaction)
           'معاملة Apple ما زالت قيد الانتظار؛ لم يتم تأكيد الدفع أو التفعيل.',
       };
-      final unknownProduct = failedOutcomes.any(
-        (outcome) => outcome.status == AppleIapStatus.verificationRequired,
-      );
+      final unknownProduct = failedOutcomes.any(_isUnmappedRestoreOutcome);
+      final hasOtherFailure =
+          failedOutcomes.any(
+            (outcome) => !_isUnmappedRestoreOutcome(outcome),
+          ) ||
+          _restoreSawPendingTransaction;
       final hasConflict = failedOutcomes.any(
         (outcome) => outcome.status == AppleIapStatus.transactionConflict,
       );
+      final allVerificationRequired =
+          failedOutcomes.isNotEmpty &&
+          failedOutcomes.every(
+            (outcome) => outcome.status == AppleIapStatus.verificationRequired,
+          );
       final allCancelled =
           failedOutcomes.isNotEmpty &&
           successfulOutcomes.isEmpty &&
@@ -503,7 +630,8 @@ class AppleIapCubit extends Cubit<AppleIapState> {
           );
       emit(
         failureTemplate.copyWith(
-          status: unknownProduct
+          status:
+              (unknownProduct && !hasOtherFailure) || allVerificationRequired
               ? AppleIapStatus.verificationRequired
               : hasConflict
               ? AppleIapStatus.transactionConflict
@@ -517,7 +645,8 @@ class AppleIapCubit extends Cubit<AppleIapState> {
               ? 'تعذر استعادة بعض المشتريات.'
               : messages.join('\n'),
           restoreInProgress: false,
-          restoreHasConfirmedEnrollment: successfulOutcomes.isNotEmpty,
+          restoreHasConfirmedEnrollment: successfulProductId.isNotEmpty,
+          restoreHasUnmappedProducts: unknownProduct,
         ),
       );
       return;
@@ -529,6 +658,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
           status: AppleIapStatus.restored,
           restoreInProgress: false,
           restoreHasConfirmedEnrollment: true,
+          restoreHasUnmappedProducts: false,
         ),
       );
       return;
@@ -540,6 +670,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
         message: 'لم يتم العثور على مشتريات سابقة',
         restoreInProgress: false,
         restoreHasConfirmedEnrollment: false,
+        restoreHasUnmappedProducts: false,
       ),
     );
   }
@@ -549,6 +680,10 @@ class AppleIapCubit extends Cubit<AppleIapState> {
       (target.type == AppleIapProductType.course
           ? target.contentId == _chapterParentCourseId
           : target.parentContentId == _chapterParentCourseId);
+
+  bool _isUnmappedRestoreOutcome(AppleIapState outcome) =>
+      outcome.status == AppleIapStatus.verificationRequired &&
+      outcome.message == _unmappedProductRestoreMessage;
 
   void _recordRestoreOutcome(PurchaseDetails purchase, AppleIapState outcome) {
     _restoreOutcomes['${purchase.status}:${_purchaseKey(purchase)}'] = outcome;
@@ -734,6 +869,24 @@ class AppleIapCubit extends Cubit<AppleIapState> {
       );
 
       final savedEnrollment = _pendingEnrollmentRecords[purchaseKey];
+      if (purchase.status == PurchaseStatus.restored &&
+          _submittedPurchaseKeys.contains(purchaseKey)) {
+        final currentUserId = _preferences?.getInt(PreferencesKeys.userId.name);
+        final previousOwnerId = _submittedPurchaseOwners[purchaseKey];
+        if (previousOwnerId != null &&
+            currentUserId != null &&
+            previousOwnerId != currentUserId) {
+          _processedTerminalPurchaseKeys.add(terminalPurchaseKey);
+          restoreFailed = true;
+          _restoreOutcomes[terminalPurchaseKey] = _transactionConflictState(
+            _submittedTransactionMessage(purchaseKey, currentUserId),
+            productId: purchase.productID,
+          );
+          _transactionConflictProductId = purchase.productID;
+          continue;
+        }
+      }
+
       if ((purchase.status == PurchaseStatus.purchased ||
               purchase.status == PurchaseStatus.restored) &&
           !productIds.contains(purchase.productID) &&
@@ -754,8 +907,9 @@ class AppleIapCubit extends Cubit<AppleIapState> {
           status: AppleIapStatus.verificationRequired,
           activeProductId: purchase.productID,
           transactionKey: purchaseKey,
-          message:
-              'وصلت معاملة لمنتج غير موجود في المحتوى المفتوح. لم يتم التحقق أو التسجيل؛ افتح المحتوى المرتبط بالمنتج ثم أعد Restore.',
+          restoreHasConfirmedEnrollment: false,
+          restoreHasUnmappedProducts: false,
+          message: _unmappedProductRestoreMessage,
         );
         if (_restoreCompleter != null) {
           _recordRestoreOutcome(purchase, unresolvedState);
@@ -892,13 +1046,32 @@ class AppleIapCubit extends Cubit<AppleIapState> {
     required String purchaseKey,
     required bool isRestored,
   }) async {
-    final savedRecord = _pendingEnrollmentRecords[purchaseKey];
+    var savedRecord =
+        _pendingEnrollmentRecords[purchaseKey] ??
+        _pendingRecordForProduct(purchase.productID);
     final target = savedRecord?.target ?? targetFor(purchase.productID);
     final currentUserId = _preferences?.getInt(PreferencesKeys.userId.name);
     final currentTarget = targetFor(purchase.productID);
 
+    if (isRestored &&
+        savedRecord == null &&
+        !_submittedPurchaseKeys.contains(purchaseKey) &&
+        _preferences != null) {
+      _unresolvedProductId = purchase.productID;
+      _transactionConflictProductId = purchase.productID;
+      _recordOrEmitRestoreOutcome(
+        purchase,
+        _transactionConflictState(
+          'Apple أعاد معاملة لا يوجد لها ربط محلي بحساب Pythagoras. لم يتم التحقق أو التفعيل تلقائيًا؛ سجّل الدخول بالحساب الأصلي أو تواصل مع الدعم.',
+          productId: purchase.productID,
+        ),
+      );
+      return false;
+    }
+
     if (savedRecord != null &&
         (savedRecord.productId != purchase.productID ||
+            savedRecord.ownerId == null ||
             savedRecord.ownerId != currentUserId ||
             (currentTarget != null &&
                 !_sameTarget(savedRecord.target, currentTarget)))) {
@@ -910,6 +1083,33 @@ class AppleIapCubit extends Cubit<AppleIapState> {
         ),
       );
       return false;
+    }
+
+    if (savedRecord != null && savedRecord.transactionKey != purchaseKey) {
+      final transactionRecord = _PendingAppleEnrollment(
+        transactionKey: purchaseKey,
+        productId: purchase.productID,
+        ownerId: savedRecord.ownerId,
+        target: savedRecord.target,
+      );
+      _pendingEnrollmentRecords.remove(savedRecord.transactionKey);
+      _pendingEnrollmentRecords[purchaseKey] = transactionRecord;
+      if (!await _persistPendingEnrollmentRecords()) {
+        _pendingEnrollmentRecords.remove(purchaseKey);
+        _pendingEnrollmentRecords[savedRecord.transactionKey] = savedRecord;
+        _recordOrEmitRestoreOutcome(
+          purchase,
+          state.copyWith(
+            status: AppleIapStatus.failure,
+            activeProductId: purchase.productID,
+            transactionKey: purchaseKey,
+            message:
+                'وصلت معاملة Apple، لكن تعذر حفظ ربطها بحساب الطالب. لم يتم التحقق أو إكمال المعاملة؛ أعد Restore.',
+          ),
+        );
+        return false;
+      }
+      savedRecord = transactionRecord;
     }
 
     final signedTransaction = purchase.verificationData.serverVerificationData;
@@ -1097,7 +1297,6 @@ class AppleIapCubit extends Cubit<AppleIapState> {
     if (completed) {
       _successfulTerminalPurchaseKeys.add('${purchase.status}:$purchaseKey');
       _pendingPurchases.remove(purchaseKey);
-      _pendingEnrollmentRecords.remove(purchaseKey);
       await _persistPendingEnrollmentRecords();
       if (_unresolvedProductId == productId) _unresolvedProductId = null;
     }
@@ -1130,9 +1329,11 @@ class AppleIapCubit extends Cubit<AppleIapState> {
     if (isClosed || !_enrollmentKeysInFlight.add(purchaseKey)) return false;
     try {
       final currentUserId = _preferences?.getInt(PreferencesKeys.userId.name);
+      final ownerId = record.ownerId;
       final currentTarget = targetFor(record.productId);
       if (!service.isAuthenticated ||
-          currentUserId != record.ownerId ||
+          ownerId == null ||
+          currentUserId != ownerId ||
           (currentTarget != null &&
               !_sameTarget(record.target, currentTarget))) {
         _recordOrEmitRestoreOutcome(
@@ -1184,7 +1385,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
       }
 
       _submittedPurchaseKeys.add(purchaseKey);
-      _submittedPurchaseOwners[purchaseKey] = record.ownerId;
+      _submittedPurchaseOwners[purchaseKey] = ownerId;
       if (!await _persistSubmittedPurchaseOwnership()) {
         _submittedPurchaseKeys.remove(purchaseKey);
         _submittedPurchaseOwners.remove(purchaseKey);
@@ -1212,10 +1413,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
       if (completed) {
         _successfulTerminalPurchaseKeys.add('${purchase.status}:$purchaseKey');
         _pendingPurchases.remove(purchaseKey);
-        _pendingEnrollmentRecords.remove(purchaseKey);
-        if (!await _persistPendingEnrollmentRecords()) {
-          _pendingEnrollmentRecords[purchaseKey] = record;
-        }
+        await _persistPendingEnrollmentRecords();
         if (_unresolvedProductId == record.productId) {
           _unresolvedProductId = null;
         }
@@ -1269,6 +1467,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
   ) async {
     try {
       await service.completePurchase(purchase);
+      await _removePurchaseIntent(purchase.productID);
     } catch (error) {
       _processedTerminalPurchaseKeys.remove(terminalPurchaseKey);
       _recordOrEmitRestoreOutcome(
@@ -1310,7 +1509,7 @@ class AppleIapCubit extends Cubit<AppleIapState> {
 class _PendingAppleEnrollment {
   final String transactionKey;
   final String productId;
-  final int ownerId;
+  final int? ownerId;
   final AppleIapProductTarget target;
 
   const _PendingAppleEnrollment({
@@ -1340,7 +1539,7 @@ class _PendingAppleEnrollment {
         transactionKey.isEmpty ||
         productId is! String ||
         productId.isEmpty ||
-        ownerId is! int ||
+        (ownerId != null && ownerId is! int) ||
         typeName is! String ||
         contentId is! int) {
       return null;
@@ -1356,7 +1555,7 @@ class _PendingAppleEnrollment {
     return _PendingAppleEnrollment(
       transactionKey: transactionKey,
       productId: productId,
-      ownerId: ownerId,
+      ownerId: ownerId as int?,
       target: AppleIapProductTarget(
         type: productType.single,
         contentId: contentId,

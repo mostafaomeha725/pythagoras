@@ -129,6 +129,10 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                 EasyLoading.show(status: 'جاري التحميل...');
               } else if (state is RequestEnrollmentSuccess) {
                 EasyLoading.dismiss();
+                if (Theme.of(context).platform == TargetPlatform.iOS) {
+                  _courseDetailsCubit.fetchCourseDetails(widget.courseId);
+                  context.read<CoursesListCubit>().fetchCourses();
+                }
                 final launched = await UrlLauncherUtil.openWhatsAppUrl(
                   state.whatsappUrl,
                   chapterTitle: state.chapterTitle,
@@ -159,6 +163,24 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                   EasyLoading.show(status: 'جارٍ التحقق من عملية الشراء...');
                 }
                 return;
+              }
+
+              if (state.status == AppleIapStatus.verificationRequired &&
+                  state.restoreHasUnmappedProducts) {
+                final currentDetailsState = _courseDetailsCubit.state;
+                final courseAlreadyAvailable =
+                    currentDetailsState is CourseDetailsLoaded &&
+                    currentDetailsState.courseDetail.isEnrolled;
+                if (state.restoreHasConfirmedEnrollment ||
+                    courseAlreadyAvailable) {
+                  EasyLoading.dismiss();
+                  EasyLoading.showInfo(
+                    courseAlreadyAvailable
+                        ? 'الدورة متاحة بالفعل. لم يتم تفعيل مشتريات أخرى غير مرتبطة بها.'
+                        : 'تم تأكيد المحتوى المرتبط بالدورة الحالية. لم يتم تفعيل مشتريات أخرى غير مرتبطة بها.',
+                  );
+                  return;
+                }
               }
 
               final shouldRefreshCourse =

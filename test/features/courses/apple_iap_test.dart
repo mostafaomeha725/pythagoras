@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -50,6 +52,7 @@ class FakeAppleIapStore implements AppleIapStore {
   Completer<void>? restoreGate;
   Completer<void>? completeGate;
   Object? completeError;
+  Object? purchaseError;
   int completeCalls = 0;
   int loadProductsCalls = 0;
   Set<String> queriedProductIds = {};
@@ -75,6 +78,8 @@ class FakeAppleIapStore implements AppleIapStore {
   Future<bool> purchase(ProductDetails product) async {
     purchaseCalls++;
     purchasedProductIds.add(product.id);
+    final error = purchaseError;
+    if (error != null) throw error;
     return purchaseStarted;
   }
 
@@ -226,14 +231,18 @@ PurchaseDetails purchaseDetails(
 
 class _EnrollmentHarness {
   final FakeAppleIapStore store;
+  final AppleIapService service;
   final FakeDirectRequestRepository repository;
   final FakeVerifyApplePurchaseUseCase verify;
+  final SharedPreferences preferences;
   final AppleIapCubit cubit;
 
   const _EnrollmentHarness({
     required this.store,
+    required this.service,
     required this.repository,
     required this.verify,
+    required this.preferences,
     required this.cubit,
   });
 
@@ -247,7 +256,9 @@ Future<_EnrollmentHarness> _enrollmentHarness({
   required String productId,
   required AppleIapProductTarget target,
   Map<String, AppleIapProductTarget> additionalTargets = const {},
+  Map<String, String> restoreOwners = const {},
   Completer<void>? restoreGate,
+  Duration purchaseResponseTimeout = const Duration(seconds: 90),
 }) async {
   final targets = <String, AppleIapProductTarget>{
     productId: target,
@@ -258,6 +269,24 @@ Future<_EnrollmentHarness> _enrollmentHarness({
     PreferencesKeys.userToken.name: 'test-token',
   });
   final preferences = await SharedPreferences.getInstance();
+  if (restoreOwners.isNotEmpty) {
+    await preferences.setStringList(
+      'apple_iap_pending_enrollment_records',
+      restoreOwners.entries
+          .map((entry) {
+            final restoredTarget = targets[entry.value]!;
+            return jsonEncode({
+              'transactionKey': entry.key,
+              'productId': entry.value,
+              'ownerId': 91,
+              'targetType': restoredTarget.type.name,
+              'contentId': restoredTarget.contentId,
+              'parentContentId': restoredTarget.parentContentId,
+            });
+          })
+          .toList(growable: false),
+    );
+  }
   final store = FakeAppleIapStore()
     ..restoreGate = restoreGate
     ..response = ProductDetailsResponse(
@@ -280,6 +309,7 @@ Future<_EnrollmentHarness> _enrollmentHarness({
     productTargets: targets,
     preferences: preferences,
     isIos: true,
+    purchaseResponseTimeout: purchaseResponseTimeout,
   );
   int? courseId;
   String? courseProductId;
@@ -304,8 +334,10 @@ Future<_EnrollmentHarness> _enrollmentHarness({
   );
   return _EnrollmentHarness(
     store: store,
+    service: service,
     repository: repository,
     verify: verify,
+    preferences: preferences,
     cubit: cubit,
   );
 }
@@ -479,6 +511,9 @@ void main() {
     expect(harness.cubit.state.status, AppleIapStatus.purchaseConfirmed);
     expect(harness.cubit.state.alreadyEnrolled, isFalse);
     expect(harness.store.completedPurchases, hasLength(1));
+    await harness.cubit.purchase('course.product.36');
+    expect(harness.store.purchaseCalls, 0);
+    expect(harness.cubit.state.status, AppleIapStatus.purchaseConfirmed);
     await harness.close();
   });
 
@@ -561,6 +596,7 @@ void main() {
       ),
     );
     harness.verify.response = const ApplePurchaseVerificationResult.http(422);
+    await harness.cubit.purchase('course.product.36');
 
     harness.store.purchaseController.add([
       purchaseDetails(PurchaseStatus.purchased, productId: 'course.product.36'),
@@ -571,6 +607,12 @@ void main() {
     expect(harness.repository.enrolledCourseIds, isEmpty);
     expect(harness.store.completedPurchases, isEmpty);
     expect(harness.cubit.state.message, contains('HTTP 422'));
+    await harness.cubit.purchase('course.product.36');
+    expect(harness.store.purchaseCalls, 1);
+    expect(
+      harness.preferences.getStringList('apple_iap_pending_enrollment_records'),
+      hasLength(1),
+    );
     await harness.close();
   });
 
@@ -606,6 +648,48 @@ void main() {
   });
 
   test(
+    'unmapped Restore metadata does not leak into a later purchase error',
+    () async {
+      final harness = await _enrollmentHarness(
+        productId: 'course.product.36',
+        target: const AppleIapProductTarget(
+          type: AppleIapProductType.course,
+          contentId: 36,
+        ),
+      );
+
+      final restore = harness.cubit.restorePurchases();
+      await settleStream();
+      harness.store.purchaseController.add([
+        purchaseDetails(
+          PurchaseStatus.restored,
+          id: 'unmapped-restore',
+          productId: 'unknown.product',
+        ),
+      ]);
+      await restore;
+      expect(harness.cubit.state.restoreHasUnmappedProducts, isTrue);
+
+      harness.verify.response = const ApplePurchaseVerificationResult.http(422);
+      await harness.cubit.purchase('course.product.36');
+      harness.store.purchaseController.add([
+        purchaseDetails(
+          PurchaseStatus.purchased,
+          id: 'later-purchase',
+          productId: 'course.product.36',
+        ),
+      ]);
+      await settleStream();
+
+      expect(harness.cubit.state.status, AppleIapStatus.failure);
+      expect(harness.cubit.state.verificationStatusCode, 422);
+      expect(harness.cubit.state.restoreHasUnmappedProducts, isFalse);
+      expect(harness.repository.enrolledCourseIds, isEmpty);
+      await harness.close();
+    },
+  );
+
+  test(
     'enrollment failure after HTTP 200 does not complete or succeed',
     () async {
       final harness = await _enrollmentHarness(
@@ -618,6 +702,7 @@ void main() {
       harness.repository.courseEnrollmentResponse = Left(
         Failure('Enrollment failed'),
       );
+      await harness.cubit.purchase('course.product.36');
 
       harness.store.purchaseController.add([
         purchaseDetails(
@@ -631,9 +716,197 @@ void main() {
       expect(harness.cubit.state.status, AppleIapStatus.failure);
       expect(harness.cubit.state.verificationStatusCode, 200);
       expect(harness.store.completedPurchases, isEmpty);
+      await harness.cubit.purchase('course.product.36');
+      expect(harness.store.purchaseCalls, 1);
+      expect(harness.repository.enrolledCourseIds, [36]);
       await harness.close();
     },
   );
+
+  test('pending Apple transaction blocks a second purchase attempt', () async {
+    final harness = await _enrollmentHarness(
+      productId: 'course.product.36',
+      target: const AppleIapProductTarget(
+        type: AppleIapProductType.course,
+        contentId: 36,
+      ),
+    );
+    await harness.cubit.purchase('course.product.36');
+    harness.store.purchaseController.add([
+      purchaseDetails(PurchaseStatus.pending, productId: 'course.product.36'),
+    ]);
+    await settleStream();
+
+    await harness.cubit.purchase('course.product.36');
+
+    expect(harness.store.purchaseCalls, 1);
+    expect(harness.cubit.state.status, AppleIapStatus.pending);
+    expect(harness.store.completedPurchases, isEmpty);
+    await harness.close();
+  });
+
+  test('purchase timeout reservation survives Cubit recreation', () async {
+    final harness = await _enrollmentHarness(
+      productId: 'course.product.36',
+      target: const AppleIapProductTarget(
+        type: AppleIapProductType.course,
+        contentId: 36,
+      ),
+      purchaseResponseTimeout: const Duration(milliseconds: 10),
+    );
+    await harness.cubit.purchase('course.product.36');
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(harness.cubit.state.status, AppleIapStatus.purchaseTimedOut);
+    await harness.cubit.close();
+
+    final reopenedCubit = AppleIapCubit(
+      service: harness.service,
+      verifyApplePurchaseUseCase: harness.verify,
+      enrollCourseUseCase: EnrollCourseUseCase(harness.repository),
+      enrollChapterUseCase: EnrollChapterUseCase(harness.repository),
+      productTargets: const {
+        'course.product.36': AppleIapProductTarget(
+          type: AppleIapProductType.course,
+          contentId: 36,
+        ),
+      },
+      preferences: harness.preferences,
+      isIos: true,
+    );
+    await reopenedCubit.updateCourseAndChapterAccess(
+      courseId: 36,
+      isRequestStatusEligible: true,
+      isEnrolled: false,
+      hasPendingRequest: false,
+      eligibleChapterIds: const {},
+      courseAppleProductId: 'course.product.36',
+      chapterAppleProductIds: const {},
+    );
+    await reopenedCubit.purchase('course.product.36');
+
+    expect(harness.store.purchaseCalls, 1);
+    expect(reopenedCubit.state.status, AppleIapStatus.verificationRequired);
+    expect(harness.repository.enrolledCourseIds, isEmpty);
+    await reopenedCubit.close();
+    await harness.store.close();
+  });
+
+  test(
+    'same Apple product cannot be reassigned after Pythagoras logout',
+    () async {
+      final harness = await _enrollmentHarness(
+        productId: 'course.product.36',
+        target: const AppleIapProductTarget(
+          type: AppleIapProductType.course,
+          contentId: 36,
+        ),
+      );
+      await harness.cubit.purchase('course.product.36');
+      harness.verify.response = const ApplePurchaseVerificationResult.http(422);
+      harness.store.purchaseController.add([
+        purchaseDetails(
+          PurchaseStatus.purchased,
+          id: 'student-a-pending-transaction',
+          productId: 'course.product.36',
+        ),
+      ]);
+      await settleStream();
+      await harness.cubit.close();
+      await harness.preferences.remove(PreferencesKeys.userId.name);
+      await harness.preferences.setInt(PreferencesKeys.userId.name, 202);
+
+      final secondCubit = AppleIapCubit(
+        service: harness.service,
+        verifyApplePurchaseUseCase: harness.verify,
+        enrollCourseUseCase: EnrollCourseUseCase(harness.repository),
+        enrollChapterUseCase: EnrollChapterUseCase(harness.repository),
+        productTargets: const {
+          'course.product.36': AppleIapProductTarget(
+            type: AppleIapProductType.course,
+            contentId: 36,
+          ),
+        },
+        preferences: harness.preferences,
+        isIos: true,
+      );
+      await secondCubit.updateCourseAndChapterAccess(
+        courseId: 36,
+        isRequestStatusEligible: true,
+        isEnrolled: false,
+        hasPendingRequest: false,
+        eligibleChapterIds: const {},
+        courseAppleProductId: 'course.product.36',
+        chapterAppleProductIds: const {},
+      );
+      await secondCubit.purchase('course.product.36');
+
+      expect(secondCubit.state.status, AppleIapStatus.transactionConflict);
+      expect(secondCubit.state.message, contains('حساب طالب آخر'));
+      expect(harness.store.purchaseCalls, 1);
+      expect(harness.repository.enrolledCourseIds, isEmpty);
+      expect(harness.store.completedPurchases, isEmpty);
+      await secondCubit.close();
+      await harness.store.close();
+    },
+  );
+
+  test(
+    'StoreKit duplicate object is retained for safe reconciliation',
+    () async {
+      final harness = await _enrollmentHarness(
+        productId: 'course.product.36',
+        target: const AppleIapProductTarget(
+          type: AppleIapProductType.course,
+          contentId: 36,
+        ),
+      );
+      harness.store.purchaseError = PlatformException(
+        code: 'storekit_duplicate_product_object',
+        message: 'A transaction is pending for this product.',
+      );
+
+      await harness.cubit.purchase('course.product.36');
+      expect(harness.cubit.state.status, AppleIapStatus.verificationRequired);
+      await harness.cubit.purchase('course.product.36');
+
+      expect(harness.cubit.state.status, AppleIapStatus.transactionConflict);
+      expect(harness.store.purchaseCalls, 1);
+      expect(harness.repository.enrolledCourseIds, isEmpty);
+      expect(harness.store.completedPurchases, isEmpty);
+      await harness.close();
+    },
+  );
+
+  test('Restore and purchase do not overlap', () async {
+    final restoreGate = Completer<void>();
+    final harness = await _enrollmentHarness(
+      productId: 'course.product.36',
+      target: const AppleIapProductTarget(
+        type: AppleIapProductType.course,
+        contentId: 36,
+      ),
+      restoreGate: restoreGate,
+    );
+
+    final restore = harness.cubit.restorePurchases();
+    await settleStream();
+    await harness.cubit.purchase('course.product.36');
+    harness.store.purchaseController.add([
+      purchaseDetails(
+        PurchaseStatus.canceled,
+        id: 'restore-cancelled',
+        productId: 'course.product.36',
+      ),
+    ]);
+    await settleStream();
+    restoreGate.complete();
+    await restore;
+
+    expect(harness.store.restoreCalls, 1);
+    expect(harness.store.purchaseCalls, 0);
+    expect(harness.store.completedPurchases, hasLength(1));
+    await harness.close();
+  });
 
   test('duplicate purchase event verifies but enrolls only once', () async {
     final harness = await _enrollmentHarness(
@@ -671,6 +944,7 @@ void main() {
         contentId: 245,
         parentContentId: 36,
       ),
+      restoreOwners: const {'transaction-1': 'chapter.product.245'},
     );
 
     final restore = harness.cubit.restorePurchases();
@@ -706,6 +980,10 @@ void main() {
             contentId: 245,
             parentContentId: 36,
           ),
+        },
+        restoreOwners: const {
+          'restore-course-36': 'course.product.36',
+          'restore-chapter-245': 'chapter.product.245',
         },
         restoreGate: restoreGate,
       );
@@ -770,6 +1048,10 @@ void main() {
             parentContentId: 36,
           ),
         },
+        restoreOwners: const {
+          'restore-known-course': 'course.product.36',
+          'restore-known-chapter': 'chapter.product.245',
+        },
         restoreGate: restoreGate,
       );
       final finalResults = <AppleIapState>[];
@@ -827,6 +1109,35 @@ void main() {
       );
       expect(finalResults, hasLength(1));
       await subscription.cancel();
+      await harness.close();
+    },
+  );
+
+  test(
+    'Restore without local purchase ownership cannot grant a course',
+    () async {
+      final harness = await _enrollmentHarness(
+        productId: 'course.product.36',
+        target: const AppleIapProductTarget(
+          type: AppleIapProductType.course,
+          contentId: 36,
+        ),
+      );
+      final restore = harness.cubit.restorePurchases();
+      await settleStream();
+      harness.store.purchaseController.add([
+        purchaseDetails(
+          PurchaseStatus.restored,
+          id: 'unowned-restore',
+          productId: 'course.product.36',
+        ),
+      ]);
+      await restore;
+
+      expect(harness.cubit.state.status, AppleIapStatus.transactionConflict);
+      expect(harness.verify.submittedTransactions, isEmpty);
+      expect(harness.repository.enrolledCourseIds, isEmpty);
+      expect(harness.store.completedPurchases, isEmpty);
       await harness.close();
     },
   );
@@ -2240,6 +2551,50 @@ void main() {
     await localStore.close();
   });
 
+  test('unmapped restore reports prior-account transaction conflict', () async {
+    SharedPreferences.setMockInitialValues({
+      PreferencesKeys.userId.name: 202,
+      'apple_iap_submitted_purchase_keys': ['apple-tx-previous-account'],
+      'apple_iap_submitted_purchase_owners': ['101|apple-tx-previous-account'],
+    });
+    final preferences = await SharedPreferences.getInstance();
+    final localStore = FakeAppleIapStore()
+      ..response = ProductDetailsResponse(
+        productDetails: [product()],
+        notFoundIDs: const [],
+      );
+    final localService = AppleIapService(
+      store: localStore,
+      productIds: {'test.product.course'},
+      isIos: true,
+    );
+    final localCubit = AppleIapCubit(
+      service: localService,
+      productIds: {'test.product.course'},
+      isIos: true,
+      preferences: preferences,
+    );
+    await localCubit.loadProducts();
+
+    final restore = localCubit.restorePurchases();
+    await settleStream();
+    localStore.purchaseController.add([
+      purchaseDetails(
+        PurchaseStatus.restored,
+        id: 'apple-tx-previous-account',
+        productId: 'product.from.another.course',
+      ),
+    ]);
+    await restore;
+
+    expect(localCubit.state.status, AppleIapStatus.transactionConflict);
+    expect(localCubit.state.message, contains('حساب طالب آخر'));
+    expect(localStore.completedPurchases, isEmpty);
+    expect(localStore.restoreCalls, 1);
+    await localCubit.close();
+    await localStore.close();
+  });
+
   test(
     'restoring one non-consumable does not block a different product',
     () async {
@@ -2743,6 +3098,7 @@ void main() {
         type: AppleIapProductType.course,
         contentId: 36,
       ),
+      restoreOwners: const {'transaction-1': 'course.product.36'},
     );
     harness.store.completeError = Exception('StoreKit completion failed');
 

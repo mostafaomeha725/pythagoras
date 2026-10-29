@@ -29,6 +29,7 @@ class AppleIapState extends Equatable {
   final bool alreadyEnrolled;
   final bool restoreInProgress;
   final bool restoreHasConfirmedEnrollment;
+  final bool restoreHasUnmappedProducts;
 
   const AppleIapState({
     this.status = AppleIapStatus.initial,
@@ -40,6 +41,7 @@ class AppleIapState extends Equatable {
     this.alreadyEnrolled = false,
     this.restoreInProgress = false,
     this.restoreHasConfirmedEnrollment = false,
+    this.restoreHasUnmappedProducts = false,
   });
 
   AppleIapState copyWith({
@@ -56,6 +58,7 @@ class AppleIapState extends Equatable {
     bool alreadyEnrolled = false,
     bool? restoreInProgress,
     bool? restoreHasConfirmedEnrollment,
+    bool? restoreHasUnmappedProducts,
   }) {
     return AppleIapState(
       status: status ?? this.status,
@@ -74,6 +77,8 @@ class AppleIapState extends Equatable {
       restoreInProgress: restoreInProgress ?? this.restoreInProgress,
       restoreHasConfirmedEnrollment:
           restoreHasConfirmedEnrollment ?? this.restoreHasConfirmedEnrollment,
+      restoreHasUnmappedProducts:
+          restoreHasUnmappedProducts ?? this.restoreHasUnmappedProducts,
     );
   }
 
@@ -88,5 +93,6 @@ class AppleIapState extends Equatable {
     alreadyEnrolled,
     restoreInProgress,
     restoreHasConfirmedEnrollment,
+    restoreHasUnmappedProducts,
   ];
 }
