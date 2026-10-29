@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:pythagoras/core/constants/strings.dart';
 
@@ -92,53 +93,126 @@ void showNoInternetError([String? message]) {
 /// VERIFICATION DIAGNOSTIC
 /// ===============================
 void showVerificationDiagnostic(
-  BuildContext context,
-  String diagnosticText,
-) {
+  BuildContext context, {
+  int? statusCode,
+  String? responseBody,
+  String? networkError,
+}) {
   hideLoading();
 
-  final content = diagnosticText.trim();
-  if (content.isEmpty) return;
+  final httpStatus = statusCode != null ? 'HTTP $statusCode' : 'HTTP status unavailable';
+  final bodyText = (responseBody ?? networkError ?? 'No response body available').trim();
+  final copyText = [
+    'HTTP status: ${statusCode ?? 'unavailable'}',
+    '',
+    'Response Body:',
+    responseBody?.trim().isNotEmpty == true ? responseBody!.trim() : networkError ?? '',
+  ].join('\n');
+
+  if (!context.mounted) return;
 
   showDialog(
     context: context,
-    barrierDismissible: true,
+    barrierDismissible: false,
     builder: (dialogContext) => Dialog(
       insetPadding: const EdgeInsets.all(16),
       backgroundColor: Colors.black.withOpacity(0.92),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420, maxHeight: 420),
+        constraints: const BoxConstraints(maxWidth: 620, maxHeight: 520),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.info_outline, color: Colors.white70),
-                  SizedBox(width: 8),
-                  Text(
-                    'Apple verification response',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                  const Icon(Icons.info_outline, color: Colors.white70),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Apple verification response',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: copyText));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Response copied'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    tooltip: 'Copy Response',
+                    color: Colors.white,
+                    icon: const Icon(Icons.copy_all_rounded),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: SelectableText(
+                  httpStatus,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Response Body',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
               Flexible(
-                child: SingleChildScrollView(
-                  child: SelectableText(
-                    content,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      height: 1.6,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.04),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white12),
+                  ),
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      bodyText,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        height: 1.7,
+                      ),
                     ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text(
+                    'Close',
+                    style: TextStyle(color: Colors.white),
                   ),
                 ),
               ),

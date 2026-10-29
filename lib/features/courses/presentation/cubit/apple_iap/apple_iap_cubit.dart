@@ -655,6 +655,9 @@ class AppleIapCubit extends Cubit<AppleIapState> {
           message:
               'وصل رد التحقق، لكن لا يمكن تأكيد الاستحقاق لأن عقد استجابة الخادم غير موثق. لم يتم تسجيل المحتوى.',
           verificationDiagnostic: diagnosticText,
+          verificationStatusCode: result.statusCode,
+          verificationResponseBody: result.responseBody,
+          verificationNetworkError: null,
         ),
       );
       return;
@@ -668,6 +671,9 @@ class AppleIapCubit extends Cubit<AppleIapState> {
         message:
             'تعذر الاتصال بخدمة التحقق. لم يتم تسجيل المحتوى؛ أعد المحاولة عبر استعادة المشتريات.',
         verificationDiagnostic: diagnosticText,
+        verificationStatusCode: null,
+        verificationResponseBody: null,
+        verificationNetworkError: result.networkError,
       ),
     );
   }

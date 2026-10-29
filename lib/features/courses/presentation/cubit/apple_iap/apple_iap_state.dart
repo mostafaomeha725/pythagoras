@@ -26,6 +26,9 @@ class AppleIapState extends Equatable {
   final String? transactionKey;
   final String? message;
   final String? verificationDiagnostic;
+  final int? verificationStatusCode;
+  final String? verificationResponseBody;
+  final String? verificationNetworkError;
 
   const AppleIapState({
     this.status = AppleIapStatus.initial,
@@ -34,6 +37,9 @@ class AppleIapState extends Equatable {
     this.transactionKey,
     this.message,
     this.verificationDiagnostic,
+    this.verificationStatusCode,
+    this.verificationResponseBody,
+    this.verificationNetworkError,
   });
 
   AppleIapState copyWith({
@@ -47,6 +53,10 @@ class AppleIapState extends Equatable {
     bool clearMessage = false,
     String? verificationDiagnostic,
     bool clearVerificationDiagnostic = false,
+    int? verificationStatusCode,
+    String? verificationResponseBody,
+    String? verificationNetworkError,
+    bool clearVerificationPayload = false,
   }) {
     return AppleIapState(
       status: status ?? this.status,
@@ -61,6 +71,15 @@ class AppleIapState extends Equatable {
       verificationDiagnostic: clearVerificationDiagnostic
           ? null
           : (verificationDiagnostic ?? this.verificationDiagnostic),
+      verificationStatusCode: clearVerificationPayload
+          ? null
+          : (verificationStatusCode ?? this.verificationStatusCode),
+      verificationResponseBody: clearVerificationPayload
+          ? null
+          : (verificationResponseBody ?? this.verificationResponseBody),
+      verificationNetworkError: clearVerificationPayload
+          ? null
+          : (verificationNetworkError ?? this.verificationNetworkError),
     );
   }
 
@@ -72,5 +91,8 @@ class AppleIapState extends Equatable {
     transactionKey,
     message,
     verificationDiagnostic,
+    verificationStatusCode,
+    verificationResponseBody,
+    verificationNetworkError,
   ];
 }

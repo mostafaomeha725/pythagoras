@@ -195,9 +195,18 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                   state.message ?? 'لم يصل تأكيد من Apple؛ استخدم Restore.',
                 );
               } else if (state.status == AppleIapStatus.verificationRequired) {
-                final diagnosticText = state.verificationDiagnostic;
-                if (diagnosticText != null && diagnosticText.isNotEmpty) {
-                  showVerificationDiagnostic(context, diagnosticText);
+                final statusCode = state.verificationStatusCode;
+                final responseBody = state.verificationResponseBody;
+                final networkError = state.verificationNetworkError;
+                final hasDiagnostic =
+                    statusCode != null || responseBody != null || networkError != null;
+                if (hasDiagnostic) {
+                  showVerificationDiagnostic(
+                    context,
+                    statusCode: statusCode,
+                    responseBody: responseBody,
+                    networkError: networkError,
+                  );
                   return;
                 }
                 EasyLoading.dismiss();
@@ -206,9 +215,18 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                   duration: const Duration(seconds: 6),
                 );
               } else if (state.status == AppleIapStatus.failure) {
-                final diagnosticText = state.verificationDiagnostic;
-                if (diagnosticText != null && diagnosticText.isNotEmpty) {
-                  showVerificationDiagnostic(context, diagnosticText);
+                final statusCode = state.verificationStatusCode;
+                final responseBody = state.verificationResponseBody;
+                final networkError = state.verificationNetworkError;
+                final hasDiagnostic =
+                    statusCode != null || responseBody != null || networkError != null;
+                if (hasDiagnostic) {
+                  showVerificationDiagnostic(
+                    context,
+                    statusCode: statusCode,
+                    responseBody: responseBody,
+                    networkError: networkError,
+                  );
                   return;
                 }
                 EasyLoading.dismiss();
