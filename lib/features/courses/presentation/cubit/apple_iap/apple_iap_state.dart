@@ -27,6 +27,8 @@ class AppleIapState extends Equatable {
   final String? message;
   final int? verificationStatusCode;
   final bool alreadyEnrolled;
+  final bool restoreInProgress;
+  final bool restoreHasConfirmedEnrollment;
 
   const AppleIapState({
     this.status = AppleIapStatus.initial,
@@ -36,6 +38,8 @@ class AppleIapState extends Equatable {
     this.message,
     this.verificationStatusCode,
     this.alreadyEnrolled = false,
+    this.restoreInProgress = false,
+    this.restoreHasConfirmedEnrollment = false,
   });
 
   AppleIapState copyWith({
@@ -50,6 +54,8 @@ class AppleIapState extends Equatable {
     int? verificationStatusCode,
     bool clearVerificationStatusCode = false,
     bool alreadyEnrolled = false,
+    bool? restoreInProgress,
+    bool? restoreHasConfirmedEnrollment,
   }) {
     return AppleIapState(
       status: status ?? this.status,
@@ -65,6 +71,9 @@ class AppleIapState extends Equatable {
           ? null
           : (verificationStatusCode ?? this.verificationStatusCode),
       alreadyEnrolled: alreadyEnrolled,
+      restoreInProgress: restoreInProgress ?? this.restoreInProgress,
+      restoreHasConfirmedEnrollment:
+          restoreHasConfirmedEnrollment ?? this.restoreHasConfirmedEnrollment,
     );
   }
 
@@ -77,5 +86,7 @@ class AppleIapState extends Equatable {
     message,
     verificationStatusCode,
     alreadyEnrolled,
+    restoreInProgress,
+    restoreHasConfirmedEnrollment,
   ];
 }

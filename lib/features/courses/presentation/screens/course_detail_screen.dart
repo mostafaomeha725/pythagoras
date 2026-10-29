@@ -13,7 +13,6 @@ import 'package:pythagoras/features/courses/presentation/cubit/request_enrollmen
 import 'package:pythagoras/features/courses/presentation/cubit/apple_iap/apple_iap_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/apple_iap/apple_iap_state.dart';
 import 'package:pythagoras/features/courses/data/services/apple_iap_product_catalog.dart';
-import 'package:pythagoras/features/courses/domain/entities/course_detail.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/remote_config/remote_config_cubit.dart';
 import 'package:pythagoras/features/courses/presentation/cubit/remote_config/remote_config_state.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/course_details/course_detail_shimmer.dart';
@@ -49,30 +48,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
   late final RemoteConfigCubit _remoteConfigCubit;
   late final AppleIapCubit _appleIapCubit;
   bool _isWaitingForWhatsApp = false;
-  int? _expandedRestoreChapterId;
-
-  void _onChapterExpansionChanged(int chapterId, bool isExpanded) {
-    if (Theme.of(context).platform != TargetPlatform.iOS) return;
-    setState(() {
-      _expandedRestoreChapterId = isExpanded
-          ? chapterId
-          : (_expandedRestoreChapterId == chapterId
-                ? null
-                : _expandedRestoreChapterId);
-    });
-  }
-
-  int? _restoreChapterFor(CourseDetail course) {
-    if (course.isEnrolled || _expandedRestoreChapterId == null) return null;
-    for (final chapter in course.chapters) {
-      if (chapter.id == _expandedRestoreChapterId &&
-          !chapter.isEnrolled &&
-          chapter.requestStatus.trim().toLowerCase() != 'accepted') {
-        return chapter.id;
-      }
-    }
-    return null;
-  }
 
   @override
   void initState() {
@@ -175,6 +150,41 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
           ),
           BlocListener<AppleIapCubit, AppleIapState>(
             listener: (context, state) {
+              if (state.restoreInProgress) {
+                if (state.status == AppleIapStatus.loading) {
+                  EasyLoading.show(status: state.message);
+                } else if (state.status == AppleIapStatus.pending) {
+                  EasyLoading.show(status: 'جاري انتظار تأكيد Apple...');
+                } else if (state.status == AppleIapStatus.verifying) {
+                  EasyLoading.show(status: 'جارٍ التحقق من عملية الشراء...');
+                }
+                return;
+              }
+
+              final shouldRefreshCourse =
+                  state.status == AppleIapStatus.restored ||
+                  state.status == AppleIapStatus.purchaseConfirmed ||
+                  (state.restoreHasConfirmedEnrollment &&
+                      (state.status == AppleIapStatus.failure ||
+                          state.status == AppleIapStatus.verificationRequired ||
+                          state.status == AppleIapStatus.transactionConflict));
+              if (shouldRefreshCourse) {
+                final target = _appleIapCubit.targetFor(
+                  state.activeProductId ?? '',
+                );
+                final targetMatchesCurrentCourse =
+                    target != null &&
+                    (target.type == AppleIapProductType.course
+                        ? target.contentId == widget.courseId
+                        : target.parentContentId == widget.courseId);
+                if (targetMatchesCurrentCourse) {
+                  _courseDetailsCubit.fetchCourseDetails(widget.courseId);
+                  if (mounted) {
+                    context.read<CoursesListCubit>().fetchCourses();
+                  }
+                }
+              }
+
               if (state.status == AppleIapStatus.loading &&
                   state.message == 'جاري استعادة المشتريات...') {
                 EasyLoading.show(status: state.message);
@@ -190,17 +200,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                 final restoredTarget = _appleIapCubit.targetFor(
                   state.activeProductId ?? '',
                 );
-                final targetMatchesCurrentCourse =
-                    restoredTarget != null &&
-                    (restoredTarget.type == AppleIapProductType.course
-                        ? restoredTarget.contentId == widget.courseId
-                        : restoredTarget.parentContentId == widget.courseId);
-                if (targetMatchesCurrentCourse) {
-                  _courseDetailsCubit.fetchCourseDetails(widget.courseId);
-                  if (mounted) {
-                    context.read<CoursesListCubit>().fetchCourses();
-                  }
-                }
                 EasyLoading.showSuccess(
                   appleIapSuccessMessage(
                     isRestore: state.status == AppleIapStatus.restored,
@@ -281,18 +280,12 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                         );
                       } else if (state is CourseDetailsLoaded) {
                         final updatedCourse = state.courseDetail;
-                        final restoreChapterId = _restoreChapterFor(
-                          updatedCourse,
-                        );
 
                         // ── Tablet Landscape: dedicated two-column layout ──
                         if (isTabletLandscape) {
                           return CourseDetailTabletLandscape(
                             course: updatedCourse,
                             constraints: constraints,
-                            restoreChapterId: restoreChapterId,
-                            onChapterExpansionChanged:
-                                _onChapterExpansionChanged,
                           );
                         }
 
@@ -307,9 +300,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                                     TargetPlatform.iOS,
                                 child: CourseDetailScreenBody(
                                   course: updatedCourse,
-                                  restoreChapterId: restoreChapterId,
-                                  onChapterExpansionChanged:
-                                      _onChapterExpansionChanged,
                                 ),
                               ),
                             ),
@@ -329,10 +319,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                                       .toLowerCase() ==
                                   'pending',
                               showRestoreButton:
-                                  restoreChapterId == null &&
-                                  (remoteConfigState
-                                          .courseLessonRequestsEnabled ||
-                                      updatedCourse.isEnrolled),
+                                  remoteConfigState
+                                      .courseLessonRequestsEnabled ||
+                                  updatedCourse.isEnrolled,
                             ),
                             BlocBuilder<AppleIapCubit, AppleIapState>(
                               builder: (context, appleIapState) {
@@ -357,7 +346,6 @@ class _CourseDetailScreenState extends State<CourseDetailScreen>
                                   course: updatedCourse,
                                   appleIapActionsVisible:
                                       hasVisibleAppleActions,
-                                  showRestoreButton: restoreChapterId == null,
                                 );
                               },
                             ),

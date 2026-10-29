@@ -18,16 +18,11 @@ import 'package:pythagoras/features/courses/presentation/cubit/remote_config/rem
 class CourseDetailTabletLandscape extends StatelessWidget {
   final CourseDetail course;
   final BoxConstraints constraints;
-  final int? restoreChapterId;
-  final void Function(int chapterId, bool isExpanded)?
-  onChapterExpansionChanged;
 
   const CourseDetailTabletLandscape({
     super.key,
     required this.course,
     required this.constraints,
-    this.restoreChapterId,
-    this.onChapterExpansionChanged,
   });
 
   @override
@@ -75,12 +70,7 @@ class CourseDetailTabletLandscape extends StatelessWidget {
                       children: [
                         // Right Column (Curriculum + Chapters)
                         Expanded(
-                          child: CourseDetailCurriculumCard(
-                            course: course,
-                            restoreChapterId: restoreChapterId,
-                            onChapterExpansionChanged:
-                                onChapterExpansionChanged,
-                          ),
+                          child: CourseDetailCurriculumCard(course: course),
                         ),
 
                         const SizedBox(width: 20),
@@ -116,15 +106,14 @@ class CourseDetailTabletLandscape extends StatelessWidget {
                 hasPendingRequest:
                     course.requestStatus?.trim().toLowerCase() == 'pending',
                 tabletLandscape: true,
-                showRestoreButton:
-                    !moveRestoreToRequestSlot && restoreChapterId == null,
+                showRestoreButton: !moveRestoreToRequestSlot,
                 onAuthenticated: () {
                   context.read<CourseDetailsCubit>().fetchCourseDetails(
                     course.id,
                   );
                 },
               ),
-              if (moveRestoreToRequestSlot && restoreChapterId == null)
+              if (moveRestoreToRequestSlot)
                 AppleIapPurchaseSection(
                   key: const ValueKey('course-detail-restore-action-slot'),
                   type: AppleIapProductType.course,

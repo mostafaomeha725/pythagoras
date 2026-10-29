@@ -9,16 +9,8 @@ import 'package:pythagoras/features/courses/presentation/widgets/chapters/course
 /// Curriculum Header, Chapters List, and Bottom Action Button.
 class CourseDetailCurriculumCard extends StatelessWidget {
   final CourseDetail course;
-  final int? restoreChapterId;
-  final void Function(int chapterId, bool isExpanded)?
-  onChapterExpansionChanged;
 
-  const CourseDetailCurriculumCard({
-    super.key,
-    required this.course,
-    this.restoreChapterId,
-    this.onChapterExpansionChanged,
-  });
+  const CourseDetailCurriculumCard({super.key, required this.course});
 
   @override
   Widget build(BuildContext context) {
@@ -65,8 +57,7 @@ class CourseDetailCurriculumCard extends StatelessWidget {
               isEnrolled: course.isEnrolled,
               course: course,
               tabletLandscape: true,
-              showRestoreButton: entry.value.id == restoreChapterId,
-              onExpansionChanged: onChapterExpansionChanged,
+              showRestoreButton: false,
             );
           }),
         ],

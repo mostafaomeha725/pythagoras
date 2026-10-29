@@ -9,16 +9,8 @@ import 'package:pythagoras/features/courses/presentation/widgets/course_details/
 
 class CourseDetailScreenBody extends StatelessWidget {
   final CourseDetail course;
-  final int? restoreChapterId;
-  final void Function(int chapterId, bool isExpanded)?
-  onChapterExpansionChanged;
 
-  const CourseDetailScreenBody({
-    super.key,
-    required this.course,
-    this.restoreChapterId,
-    this.onChapterExpansionChanged,
-  });
+  const CourseDetailScreenBody({super.key, required this.course});
 
   @override
   Widget build(BuildContext context) {
@@ -58,8 +50,7 @@ class CourseDetailScreenBody extends StatelessWidget {
               index: entry.key + 1,
               isEnrolled: course.isEnrolled,
               course: course,
-              showRestoreButton: entry.value.id == restoreChapterId,
-              onExpansionChanged: onChapterExpansionChanged,
+              showRestoreButton: false,
             );
           }),
         ],
@@ -75,9 +66,6 @@ class CourseDetailBodyRegion extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (Theme.of(context).platform == TargetPlatform.iOS) {
-      return Flexible(fit: FlexFit.loose, child: child);
-    }
     return Expanded(child: child);
   }
 }

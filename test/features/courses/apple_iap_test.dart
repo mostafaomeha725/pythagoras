@@ -246,22 +246,29 @@ class _EnrollmentHarness {
 Future<_EnrollmentHarness> _enrollmentHarness({
   required String productId,
   required AppleIapProductTarget target,
+  Map<String, AppleIapProductTarget> additionalTargets = const {},
+  Completer<void>? restoreGate,
 }) async {
+  final targets = <String, AppleIapProductTarget>{
+    productId: target,
+    ...additionalTargets,
+  };
   SharedPreferences.setMockInitialValues({
     PreferencesKeys.userId.name: 91,
     PreferencesKeys.userToken.name: 'test-token',
   });
   final preferences = await SharedPreferences.getInstance();
   final store = FakeAppleIapStore()
+    ..restoreGate = restoreGate
     ..response = ProductDetailsResponse(
-      productDetails: [product(id: productId)],
+      productDetails: [for (final id in targets.keys) product(id: id)],
       notFoundIDs: const [],
     );
   final repository = FakeDirectRequestRepository();
   final verify = FakeVerifyApplePurchaseUseCase(repository);
   final service = AppleIapService(
     store: store,
-    productIds: {productId},
+    productIds: targets.keys.toSet(),
     isIos: true,
     isAuthenticated: () => true,
   );
@@ -270,24 +277,30 @@ Future<_EnrollmentHarness> _enrollmentHarness({
     verifyApplePurchaseUseCase: verify,
     enrollCourseUseCase: EnrollCourseUseCase(repository),
     enrollChapterUseCase: EnrollChapterUseCase(repository),
+    productTargets: targets,
     preferences: preferences,
     isIos: true,
   );
-  final courseId = target.parentContentId ?? target.contentId;
+  int? courseId;
+  String? courseProductId;
+  final chapterProductIds = <int, String?>{};
+  for (final entry in targets.entries) {
+    if (entry.value.type == AppleIapProductType.course) {
+      courseId ??= entry.value.contentId;
+      courseProductId ??= entry.key;
+    } else {
+      courseId ??= entry.value.parentContentId;
+      chapterProductIds[entry.value.contentId] = entry.key;
+    }
+  }
   await cubit.updateCourseAndChapterAccess(
-    courseId: courseId,
+    courseId: courseId ?? target.contentId,
     isRequestStatusEligible: true,
     isEnrolled: false,
     hasPendingRequest: false,
-    eligibleChapterIds: target.type == AppleIapProductType.chapter
-        ? {target.contentId}
-        : const {},
-    courseAppleProductId: target.type == AppleIapProductType.course
-        ? productId
-        : null,
-    chapterAppleProductIds: target.type == AppleIapProductType.chapter
-        ? {target.contentId: productId}
-        : const {},
+    eligibleChapterIds: chapterProductIds.keys.toSet(),
+    courseAppleProductId: courseProductId,
+    chapterAppleProductIds: chapterProductIds,
   );
   return _EnrollmentHarness(
     store: store,
@@ -676,6 +689,147 @@ void main() {
     expect(harness.store.completedPurchases, hasLength(1));
     await harness.close();
   });
+
+  test(
+    'Restore aggregates multiple valid transactions into one result',
+    () async {
+      final restoreGate = Completer<void>();
+      final harness = await _enrollmentHarness(
+        productId: 'course.product.36',
+        target: const AppleIapProductTarget(
+          type: AppleIapProductType.course,
+          contentId: 36,
+        ),
+        additionalTargets: const {
+          'chapter.product.245': AppleIapProductTarget(
+            type: AppleIapProductType.chapter,
+            contentId: 245,
+            parentContentId: 36,
+          ),
+        },
+        restoreGate: restoreGate,
+      );
+      final finalResults = <AppleIapState>[];
+      final subscription = harness.cubit.stream.listen((state) {
+        if (!state.restoreInProgress &&
+            (state.status == AppleIapStatus.restored ||
+                state.status == AppleIapStatus.restoreEmpty ||
+                state.status == AppleIapStatus.failure ||
+                state.status == AppleIapStatus.verificationRequired)) {
+          finalResults.add(state);
+        }
+      });
+
+      final restore = harness.cubit.restorePurchases();
+      await settleStream();
+      harness.store.purchaseController.add([
+        purchaseDetails(
+          PurchaseStatus.restored,
+          id: 'restore-course-36',
+          productId: 'course.product.36',
+        ),
+      ]);
+      await settleStream();
+      harness.store.purchaseController.add([
+        purchaseDetails(
+          PurchaseStatus.restored,
+          id: 'restore-chapter-245',
+          productId: 'chapter.product.245',
+        ),
+      ]);
+      await settleStream();
+      restoreGate.complete();
+      await restore;
+      await settleStream();
+
+      expect(harness.verify.submittedTransactions, hasLength(2));
+      expect(harness.repository.enrolledCourseIds, [36]);
+      expect(harness.repository.enrolledChapterIds, [245]);
+      expect(harness.store.completedPurchases, hasLength(2));
+      expect(harness.cubit.state.status, AppleIapStatus.restored);
+      expect(finalResults, hasLength(1));
+      await subscription.cancel();
+      await harness.close();
+    },
+  );
+
+  test(
+    'Restore reports unknown products once and still enrolls known items',
+    () async {
+      final restoreGate = Completer<void>();
+      final harness = await _enrollmentHarness(
+        productId: 'course.product.36',
+        target: const AppleIapProductTarget(
+          type: AppleIapProductType.course,
+          contentId: 36,
+        ),
+        additionalTargets: const {
+          'chapter.product.245': AppleIapProductTarget(
+            type: AppleIapProductType.chapter,
+            contentId: 245,
+            parentContentId: 36,
+          ),
+        },
+        restoreGate: restoreGate,
+      );
+      final finalResults = <AppleIapState>[];
+      final subscription = harness.cubit.stream.listen((state) {
+        if (!state.restoreInProgress &&
+            (state.status == AppleIapStatus.verificationRequired ||
+                state.status == AppleIapStatus.failure ||
+                state.status == AppleIapStatus.restored)) {
+          finalResults.add(state);
+        }
+      });
+
+      final restore = harness.cubit.restorePurchases();
+      await settleStream();
+      harness.store.purchaseController.add([
+        purchaseDetails(
+          PurchaseStatus.restored,
+          id: 'restore-known-course',
+          productId: 'course.product.36',
+        ),
+        purchaseDetails(
+          PurchaseStatus.restored,
+          id: 'restore-unknown-one',
+          productId: 'unknown.product.one',
+        ),
+      ]);
+      await settleStream();
+      harness.store.purchaseController.add([
+        purchaseDetails(
+          PurchaseStatus.restored,
+          id: 'restore-known-chapter',
+          productId: 'chapter.product.245',
+        ),
+        purchaseDetails(
+          PurchaseStatus.restored,
+          id: 'restore-unknown-two',
+          productId: 'unknown.product.two',
+        ),
+      ]);
+      await settleStream();
+      restoreGate.complete();
+      await restore;
+      await settleStream();
+
+      expect(harness.verify.submittedTransactions, hasLength(2));
+      expect(harness.repository.enrolledCourseIds, [36]);
+      expect(harness.repository.enrolledChapterIds, [245]);
+      expect(harness.store.completedPurchases, hasLength(2));
+      expect(harness.cubit.state.status, AppleIapStatus.verificationRequired);
+      expect(harness.cubit.state.restoreHasConfirmedEnrollment, isTrue);
+      expect(harness.cubit.state.message, contains('منتج غير موجود'));
+      expect(
+        'منتج غير موجود'.allMatches(harness.cubit.state.message!).length,
+        1,
+      );
+      expect(finalResults, hasLength(1));
+      await subscription.cancel();
+      await harness.close();
+    },
+  );
 
   test(
     'API product IDs load and resolve to their actual course and chapter',
@@ -2391,6 +2545,7 @@ void main() {
     );
     store.purchaseController.add([restored, restored]);
     await restore;
+    await settleStream();
 
     expect(cubit.state.status, AppleIapStatus.verificationRequired);
     expect(cubit.state.message, contains('منتج غير موجود'));

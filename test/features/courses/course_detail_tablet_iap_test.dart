@@ -532,7 +532,7 @@ void main() {
           of: find.byType(CourseChapterTile).first,
           matching: find.text('استعادة المشتريات'),
         ),
-        findsOneWidget,
+        findsNothing,
       );
 
       final chapterBuyButton = find.descendant(
@@ -649,6 +649,22 @@ void main() {
           courseLessonRequestsEnabled: false,
           platform: scenario.platform,
         );
+        double? restoreTopBeforeExpansion;
+
+        if (scenario.platform == TargetPlatform.iOS) {
+          final staleRestore = _purchase(
+            'stale.unknown.product',
+            status: PurchaseStatus.restored,
+          );
+          harness.store.purchases.add([staleRestore]);
+          harness.store.purchases.add([staleRestore]);
+          await _pumpTabletFrames(tester);
+          expect(
+            find.textContaining('وصلت معاملة لمنتج غير موجود'),
+            findsNothing,
+          );
+          expect(harness.store.completed, isEmpty);
+        }
 
         if (scenario.requestVisibleWhenDisabled) {
           expect(find.text('طلب الدورة'), findsOneWidget);
@@ -661,6 +677,9 @@ void main() {
           expect(find.text('طلب الدورة'), findsNothing);
           expect(find.textContaining('شراء عبر Apple -'), findsOneWidget);
           expect(find.text('استعادة المشتريات'), findsOneWidget);
+          restoreTopBeforeExpansion = tester
+              .getTopLeft(find.text('استعادة المشتريات'))
+              .dy;
           expect(
             find.descendant(
               of: find.byKey(
@@ -680,10 +699,18 @@ void main() {
         if (scenario.platform == TargetPlatform.iOS) {
           expect(find.text('استعادة المشتريات'), findsOneWidget);
           expect(
+            tester.getTopLeft(find.text('استعادة المشتريات')).dy,
+            closeTo(restoreTopBeforeExpansion!, 1),
+          );
+          expect(
             find.descendant(
               of: find.byType(CourseChapterTile).first,
               matching: find.text('استعادة المشتريات'),
             ),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const ValueKey('course-detail-restore-action-slot')),
             findsOneWidget,
           );
         }
@@ -704,7 +731,7 @@ void main() {
               of: find.byType(CourseChapterTile).first,
               matching: find.text('استعادة المشتريات'),
             ),
-            findsOneWidget,
+            findsNothing,
           );
           expect(
             find.byKey(const ValueKey('course-detail-restore-action-slot')),
@@ -731,11 +758,11 @@ void main() {
               of: find.byType(CourseChapterTile).first,
               matching: find.text('استعادة المشتريات'),
             ),
-            findsOneWidget,
+            findsNothing,
           );
           expect(
             find.byKey(const ValueKey('course-detail-restore-action-slot')),
-            findsNothing,
+            findsOneWidget,
           );
         }
 

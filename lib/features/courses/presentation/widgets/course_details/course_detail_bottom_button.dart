@@ -21,13 +21,11 @@ import 'package:pythagoras/features/courses/presentation/widgets/apple_iap_purch
 class CourseDetailBottomButton extends StatelessWidget {
   final CourseDetail course;
   final bool appleIapActionsVisible;
-  final bool showRestoreButton;
 
   const CourseDetailBottomButton({
     super.key,
     required this.course,
     this.appleIapActionsVisible = false,
-    this.showRestoreButton = true,
   });
 
   @override
@@ -37,8 +35,7 @@ class CourseDetailBottomButton extends StatelessWidget {
         .state
         .courseLessonRequestsEnabled;
     if (!course.isEnrolled && !requestsEnabled) {
-      if (Theme.of(context).platform == TargetPlatform.iOS &&
-          showRestoreButton) {
+      if (Theme.of(context).platform == TargetPlatform.iOS) {
         return SafeArea(
           top: false,
           child: AppleIapPurchaseSection(
