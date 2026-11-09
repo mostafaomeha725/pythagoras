@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pythagoras/core/theme/light_colors.dart';
 import 'package:pythagoras/core/theme/styles.dart';
+import 'package:pythagoras/core/utils/responsive_helper.dart';
 import 'package:pythagoras/core/widgets/custom_button.dart';
 import 'package:pythagoras/core/widgets/custom_text.dart';
 
@@ -36,6 +37,7 @@ class NoInternetWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isOffline = _isConnectionIssue;
+    final isTablet = ResponsiveHelper.isTablet(context);
 
     return Center(
       child: Padding(
@@ -105,20 +107,51 @@ class NoInternetWidget extends StatelessWidget {
             ),
             if (onRetry != null) ...[
               SizedBox(height: 28.h),
-              SizedBox(
-                width: 200.w,
-                child: AppButton(
-                  text: retryText ?? 'إعادة المحاولة',
-                  onPressed: onRetry,
-                  height: 48.h,
-                  radius: 14.r,
-                  color: AppLightColors.primary,
-                  textColor: Colors.white,
-                  textSize: 15.sp,
-                  textWeight: FontWeight.w700,
-                  elevation: 0,
+              if (isTablet)
+                SizedBox(
+                  width: 190,
+                  height: 44,
+                  child: TextButton.icon(
+                    onPressed: onRetry,
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: Text(
+                      retryText ?? 'إعادة المحاولة',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        height: 1.1,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      backgroundColor: AppLightColors.primary,
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                SizedBox(
+                  width: 200.w,
+                  child: AppButton(
+                    text: retryText ?? 'إعادة المحاولة',
+                    onPressed: onRetry,
+                    height: 48.h,
+                    radius: 14.r,
+                    color: AppLightColors.primary,
+                    textColor: Colors.white,
+                    textSize: 15.sp,
+                    textWeight: FontWeight.w700,
+                    elevation: 0,
+                  ),
                 ),
-              ),
             ],
           ],
         ),

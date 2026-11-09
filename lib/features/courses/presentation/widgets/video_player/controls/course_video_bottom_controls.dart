@@ -36,24 +36,12 @@ class CourseVideoBottomControls extends StatelessWidget {
         animation: adapter,
         builder: (context, child) {
           final replayButton = GestureDetector(
-            onTap: () {
-              adapter.seekTo(
-                adapter.position - const Duration(seconds: 10),
-              );
-            },
-            child: const Icon(
-              Icons.replay_10,
-              color: Colors.white,
-              size: 24.0,
-            ),
+            onTap: () => adapter.seekBy(const Duration(seconds: -10)),
+            child: const Icon(Icons.replay_10, color: Colors.white, size: 24.0),
           );
 
           final forwardButton = GestureDetector(
-            onTap: () {
-              adapter.seekTo(
-                adapter.position + const Duration(seconds: 10),
-              );
-            },
+            onTap: () => adapter.seekBy(const Duration(seconds: 10)),
             child: const Icon(
               Icons.forward_10,
               color: Colors.white,
@@ -62,32 +50,32 @@ class CourseVideoBottomControls extends StatelessWidget {
           );
 
           final isTablet = ResponsiveHelper.isTablet(context);
+          final displayedPosition =
+              adapter.pendingSeekPosition ?? adapter.position;
 
-          final timeText =
-              adapter.supportsPosition && adapter.supportsDuration
-                  ? AppText(
-                      '${_formatDuration(adapter.position)} / ${_formatDuration(adapter.duration)}',
-                      style: isTablet
-                          ? font12w400.copyWith(
-                              color: Colors.white,
-                              fontSize: 13,
-                            )
-                          : font12w400.copyWith(color: Colors.white),
-                      overflow: TextOverflow.ellipsis,
-                    )
-                  : const SizedBox.shrink();
+          final timeText = adapter.supportsPosition && adapter.supportsDuration
+              ? AppText(
+                  '${_formatDuration(displayedPosition)} / ${_formatDuration(adapter.duration)}',
+                  style: isTablet
+                      ? font12w400.copyWith(color: Colors.white, fontSize: 13)
+                      : font12w400.copyWith(color: Colors.white),
+                  overflow: TextOverflow.ellipsis,
+                )
+              : const SizedBox.shrink();
 
           final volumeButton = adapter.supportsVolume
-              ? GestureDetector(
-                  onTap: () {
-                    adapter.toggleMute();
-                  },
-                  child: Icon(
-                    adapter.volume == 0
-                        ? Icons.volume_off
-                        : Icons.volume_up,
-                    color: Colors.white,
-                    size: 22.0,
+              ? IconButton(
+                  tooltip: adapter.isMuted ? 'إلغاء كتم الصوت' : 'كتم الصوت',
+                  onPressed: adapter.toggleMute,
+                  icon: Icon(
+                    adapter.isMuted ? Icons.volume_off : Icons.volume_up,
+                    color: adapter.isMuted ? Colors.white70 : Colors.white,
+                  ),
+                  iconSize: 22,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 36,
+                    height: 36,
                   ),
                 )
               : const SizedBox.shrink();
@@ -95,26 +83,20 @@ class CourseVideoBottomControls extends StatelessWidget {
           final fullscreenBtn = GestureDetector(
             onTap: onToggleFullScreen,
             child: Icon(
-              isFullScreen
-                  ? Icons.fullscreen_exit
-                  : Icons.fullscreen,
+              isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
               color: Colors.white,
               size: 24.0,
             ),
           );
 
           final playPauseButton = GestureDetector(
-            onTap: () {
-              if (adapter.isPlaying) {
-                adapter.pause();
-              } else {
-                adapter.play();
-              }
-            },
+            onTap: adapter.togglePlayPause,
             child: Icon(
-              adapter.isPlaying ? Icons.pause : Icons.play_arrow,
+              adapter.isPlaying
+                  ? Icons.pause_rounded
+                  : Icons.play_arrow_rounded,
               color: Colors.white,
-              size: 28.0,
+              size: 32.0,
             ),
           );
 
@@ -147,27 +129,14 @@ class CourseVideoBottomControls extends StatelessWidget {
                         overlayRadius: 14.0,
                       ),
                       activeTrackColor: Colors.blue,
-                      inactiveTrackColor: Colors.white.withValues(
-                        alpha: 0.3,
-                      ),
+                      inactiveTrackColor: Colors.white.withValues(alpha: 0.3),
                       thumbColor: Colors.blue,
                     ),
                     child: Directionality(
                       textDirection: TextDirection.ltr,
-                      child: Slider(
-                        value: (adapter.duration.inMilliseconds > 0)
-                            ? (adapter.position.inMilliseconds /
-                                    adapter.duration.inMilliseconds)
-                                .clamp(0.0, 1.0)
-                            : 0.0,
-                        onChanged: (value) {
-                          final newPos = Duration(
-                            milliseconds: (value *
-                                    adapter.duration.inMilliseconds)
-                                .toInt(),
-                          );
-                          adapter.seekTo(newPos);
-                        },
+                      child: _CourseVideoProgressSlider(
+                        adapter: adapter,
+                        duration: adapter.duration,
                       ),
                     ),
                   ),
@@ -183,7 +152,7 @@ class CourseVideoBottomControls extends StatelessWidget {
                     Expanded(child: timeText),
                     if (adapter.supportsSeek) ...[
                       forwardButton,
-                      const SizedBox(width: 8.0),
+                      const SizedBox(width: 24.0),
                       replayButton,
                     ],
                     const SizedBox(width: 12.0),
@@ -195,6 +164,69 @@ class CourseVideoBottomControls extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+}
+
+class _CourseVideoProgressSlider extends StatefulWidget {
+  final CourseVideoAdapter adapter;
+  final Duration duration;
+
+  const _CourseVideoProgressSlider({
+    required this.adapter,
+    required this.duration,
+  });
+
+  @override
+  State<_CourseVideoProgressSlider> createState() =>
+      _CourseVideoProgressSliderState();
+}
+
+class _CourseVideoProgressSliderState
+    extends State<_CourseVideoProgressSlider> {
+  Duration? _dragPosition;
+
+  Duration _positionFor(double fraction) {
+    return Duration(
+      milliseconds: (fraction * widget.duration.inMilliseconds).round(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final durationMilliseconds = widget.duration.inMilliseconds;
+    final pendingSeekPosition = widget.adapter.pendingSeekPosition;
+    final position =
+        _dragPosition ?? pendingSeekPosition ?? widget.adapter.position;
+    final value = durationMilliseconds > 0
+        ? (position.inMilliseconds / durationMilliseconds).clamp(0.0, 1.0)
+        : 0.0;
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: value, end: value),
+      duration: _dragPosition == null
+          ? const Duration(milliseconds: 180)
+          : Duration.zero,
+      curve: Curves.easeOutCubic,
+      builder: (context, animatedValue, child) {
+        final sliderValue = _dragPosition != null || pendingSeekPosition != null
+            ? value
+            : animatedValue;
+        return Slider(
+          value: sliderValue.clamp(0.0, 1.0),
+          onChangeStart: (fraction) {
+            setState(() => _dragPosition = _positionFor(fraction));
+          },
+          onChanged: (fraction) {
+            setState(() => _dragPosition = _positionFor(fraction));
+          },
+          onChangeEnd: (fraction) {
+            final target = _positionFor(fraction);
+            widget.adapter.seekTo(target);
+            setState(() => _dragPosition = null);
+          },
+        );
+      },
     );
   }
 }

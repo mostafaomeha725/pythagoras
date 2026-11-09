@@ -3,6 +3,7 @@ import 'course_video_adapter.dart';
 
 class CourseNativeAdapter extends CourseVideoAdapter {
   final VideoPlayerController controller;
+  double _playbackSpeed = 1.0;
 
   CourseNativeAdapter(this.controller) {
     controller.addListener(notifyListeners);
@@ -24,6 +25,9 @@ class CourseNativeAdapter extends CourseVideoAdapter {
   double get volume => controller.value.volume;
 
   @override
+  double get playbackSpeed => _playbackSpeed;
+
+  @override
   void play() => controller.play();
 
   @override
@@ -43,6 +47,13 @@ class CourseNativeAdapter extends CourseVideoAdapter {
 
   @override
   void setVolume(double vol) => controller.setVolume(vol);
+
+  @override
+  void setPlaybackSpeed(double speed) {
+    _playbackSpeed = speed;
+    controller.setPlaybackSpeed(speed);
+    notifyListeners();
+  }
 
   @override
   void toggleMute() {

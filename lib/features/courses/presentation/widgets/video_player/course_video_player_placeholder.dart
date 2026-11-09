@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:pythagoras/core/utils/responsive_helper.dart';
 import 'package:pythagoras/core/utils/system_ui_manager.dart';
 
 import 'package:pythagoras/features/courses/presentation/widgets/video_player/course_video_player_manager.dart';
@@ -111,7 +112,12 @@ class _CourseVideoPlayerPlaceholderState
     );
 
     if (!isFullscreenRoute) {
-      return AspectRatio(aspectRatio: 16 / 9, child: content);
+      final aspectRatio =
+          ResponsiveHelper.isMobile(context) &&
+              ResponsiveHelper.isPortrait(context)
+          ? 16 / 10.5
+          : 16 / 9;
+      return AspectRatio(aspectRatio: aspectRatio, child: content);
     }
 
     return content;

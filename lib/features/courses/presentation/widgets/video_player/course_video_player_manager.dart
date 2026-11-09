@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:developer' as developer;
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
@@ -18,6 +20,39 @@ import 'package:pythagoras/features/courses/presentation/widgets/video_player/ut
 
 /// Manages the state and logic for the unified video player.
 class CourseVideoPlayerManager extends ChangeNotifier {
+  CourseVideoPlayerManager({
+    Future<bool> Function()? hasInternetConnection,
+    Future<void> Function()? enableScreenProtection,
+    Future<void> Function()? disableScreenProtection,
+    YoutubePlayerController Function(String, YoutubePlayerParams)?
+    youtubeControllerFactory,
+  }) : _hasInternetConnection =
+           hasInternetConnection ??
+           CourseVideoNetworkChecker.hasInternetConnection,
+       _enableScreenProtection =
+           enableScreenProtection ?? CourseVideoScreenSecurity.enable,
+       _disableScreenProtection =
+           disableScreenProtection ?? CourseVideoScreenSecurity.disable,
+       _youtubeControllerFactory =
+           youtubeControllerFactory ?? _createYoutubeController;
+
+  static YoutubePlayerController _createYoutubeController(
+    String videoId,
+    YoutubePlayerParams params,
+  ) {
+    return YoutubePlayerController.fromVideoId(
+      videoId: videoId,
+      autoPlay: true,
+      params: params,
+    );
+  }
+
+  final Future<bool> Function() _hasInternetConnection;
+  final Future<void> Function() _enableScreenProtection;
+  final Future<void> Function() _disableScreenProtection;
+  final YoutubePlayerController Function(String, YoutubePlayerParams)
+  _youtubeControllerFactory;
+
   VideoProviderType providerType = VideoProviderType.unknown;
   bool _isDisposed = false;
 
@@ -36,17 +71,37 @@ class CourseVideoPlayerManager extends ChangeNotifier {
   String? errorMessage;
   String? currentVideoUrl;
   Timer? _networkTimer;
+  StreamSubscription<YoutubePlayerValue>? _youtubeValueSubscription;
+  int _initializationGeneration = 0;
+  int _youtubeControllerCreationCount = 0;
+  bool _nativeRecoveryInProgress = false;
+  Duration? _nativeResumePosition;
+  bool _nativeResumePlayback = false;
 
   // Fullscreen orientation state tracking (Tablet support)
   bool wasTablet = false;
   Orientation? preFullscreenOrientation;
   bool isExitingFullScreen = false;
 
-  Future<void> _handleError(String fallbackMsg, String url) async {
-    if (_isDisposed || currentVideoUrl != url) return;
+  bool _isCurrentSession(String url, int generation) {
+    return !_isDisposed &&
+        currentVideoUrl == url &&
+        _initializationGeneration == generation;
+  }
 
-    final hasInternet = await CourseVideoNetworkChecker.hasInternetConnection();
-    if (_isDisposed || currentVideoUrl != url) return;
+  void _debugYoutubeLog(String message) {
+    if (kDebugMode) developer.log(message, name: 'CourseYoutubePlayer');
+  }
+
+  Future<void> _handleError(
+    String fallbackMsg,
+    String url,
+    int generation,
+  ) async {
+    if (!_isCurrentSession(url, generation)) return;
+
+    final hasInternet = await _hasInternetConnection();
+    if (!_isCurrentSession(url, generation)) return;
 
     if (!hasInternet) {
       errorMessage = 'لا يوجد اتصال بالإنترنت، تأكد من اتصالك وحاول مرة أخرى.';
@@ -54,191 +109,287 @@ class CourseVideoPlayerManager extends ChangeNotifier {
       errorMessage = fallbackMsg;
     }
     isInitializing = false;
-    _disposePlayers(keepScreenProtection: true);
+    _networkTimer?.cancel();
     notifyListeners();
+    await _disposePlayers(keepScreenProtection: true);
   }
 
-  void _startTimeoutTimer(String url) {
+  void _startTimeoutTimer(String url, int generation) {
     _networkTimer?.cancel();
     _networkTimer = Timer(const Duration(seconds: 15), () async {
       // Allow timeout if it's still initializing OR if it's stuck buffering
       final isStuck = isInitializing || (adapter?.isBuffering ?? true);
-      if (currentVideoUrl != url || _isDisposed || !isStuck) return;
+      if (!_isCurrentSession(url, generation) || !isStuck) return;
 
-      final hasInternet =
-          await CourseVideoNetworkChecker.hasInternetConnection();
-      if (currentVideoUrl != url ||
-          _isDisposed ||
+      final hasInternet = await _hasInternetConnection();
+      if (!_isCurrentSession(url, generation) ||
           (!isInitializing && !(adapter?.isBuffering ?? true))) {
         return;
       }
 
       isInitializing = false;
       if (!hasInternet) {
-        errorMessage =
-            'لا يوجد اتصال بالإنترنت، تأكد من اتصالك وحاول مرة أخرى.';
+        errorMessage = 'لا يوجد اتصال بالإنترنت، تأكد من اتصالك';
       } else {
         errorMessage =
             'استغرق تحميل الفيديو وقتاً طويلاً. يرجى إعادة المحاولة.';
       }
-      _disposePlayers(keepScreenProtection: true);
       notifyListeners();
+      await _disposePlayers(keepScreenProtection: true);
     });
   }
 
-  void _startImmediateNetworkCheck(String url) async {
-    final hasInternet = await CourseVideoNetworkChecker.hasInternetConnection();
+  Future<void> _startImmediateNetworkCheck(String url, int generation) async {
+    final hasInternet = await _hasInternetConnection();
     final isStuck = isInitializing || (adapter?.isBuffering ?? true);
-    if (_isDisposed || currentVideoUrl != url || !isStuck) return;
+    if (!_isCurrentSession(url, generation) || !isStuck) return;
 
     if (!hasInternet) {
       _networkTimer?.cancel();
       isInitializing = false;
       errorMessage = 'لا يوجد اتصال بالإنترنت، تأكد من اتصالك وحاول مرة أخرى.';
-      _disposePlayers(keepScreenProtection: true);
       notifyListeners();
+      await _disposePlayers(keepScreenProtection: true);
     }
   }
 
-  void initPlayer(String? videoUrl, [String? videoTypeStr]) async {
+  Future<void> initPlayer(String? videoUrl, [String? videoTypeStr]) async {
     if (videoUrl == currentVideoUrl && errorMessage == null) {
       return; // Already initialized
     }
 
+    final generation = ++_initializationGeneration;
+    _nativeRecoveryInProgress = false;
+    _nativeResumePosition = null;
+    _nativeResumePlayback = false;
     currentVideoUrl = videoUrl;
     errorMessage = null;
+    _networkTimer?.cancel();
 
     if (videoUrl == null || videoUrl.isEmpty) {
-      _disposePlayers();
+      isInitializing = false;
+      await _disposePlayers();
+      notifyListeners();
       return;
     }
 
-    // 1. Force Loading immediately to avoid Empty Image before async tasks
-    currentVideoUrl = videoUrl;
     isInitializing = true;
     notifyListeners();
 
-    // Start immediate network check (takes max 3s)
-    _startImmediateNetworkCheck(videoUrl);
+    await _disposePlayers(keepScreenProtection: true);
+    if (!_isCurrentSession(videoUrl, generation) || errorMessage != null) {
+      return;
+    }
 
-    // Start robust timeout monitoring (15s)
-    _startTimeoutTimer(videoUrl);
+    unawaited(_startImmediateNetworkCheck(videoUrl, generation));
+    _startTimeoutTimer(videoUrl, generation);
 
-    // Enable Screen Protection safely without crashing
-    await CourseVideoScreenSecurity.enable();
-
-    // 2. Race condition check: abort if user selected another video while awaiting
-    if (currentVideoUrl != videoUrl) return;
+    await _enableScreenProtection();
+    if (!_isCurrentSession(videoUrl, generation) || errorMessage != null) {
+      return;
+    }
 
     final newProviderType = determineVideoProvider(videoUrl, videoTypeStr);
     final actualNewProviderType = CourseVideoUrlHelper.isDirectVideo(videoUrl)
         ? VideoProviderType.native
         : newProviderType;
 
-    // We no longer reuse the YouTube controller. Reusing it causes the old
-    // video's last frame to remain visible because state listeners leak the old state.
-
     providerType = actualNewProviderType;
-
-    _disposePlayers(keepScreenProtection: true); // Clear previous controllers
 
     try {
       isInitializing = true;
       switch (providerType) {
         case VideoProviderType.youtube:
-          _initYoutube(videoUrl);
+          _initYoutube(videoUrl, generation);
           break;
         case VideoProviderType.native:
-          _initNative(videoUrl);
+          _initNative(videoUrl, generation);
           break;
         case VideoProviderType.bunny:
-          _initWebView(videoUrl, isVimeo: false);
+          _initWebView(videoUrl, generation, isVimeo: false);
           break;
         case VideoProviderType.vimeo:
           final embedUrl = formatEmbedUrl(videoUrl, providerType);
-          _initWebView(embedUrl, isVimeo: true);
+          _initWebView(embedUrl, generation, isVimeo: true);
           break;
         case VideoProviderType.viewlock:
         case VideoProviderType.unknown:
           final embedUrl = formatEmbedUrl(videoUrl, providerType);
-          _initWebView(embedUrl, isVimeo: false);
+          _initWebView(embedUrl, generation, isVimeo: false);
           break;
       }
     } catch (e) {
-      _handleError('عذراً، حدثت مشكلة في تهيئة الفيديو.', videoUrl);
+      await _handleError(
+        'عذراً، حدثت مشكلة في تهيئة الفيديو.',
+        videoUrl,
+        generation,
+      );
     }
 
     notifyListeners();
   }
 
-  void _initYoutube(String url) {
+  void _initYoutube(String url, int generation) {
     final youtubeId = YoutubePlayerController.convertUrlToId(url) ?? url;
-    ytController = YoutubePlayerController.fromVideoId(
-      videoId: youtubeId,
-      autoPlay: true,
-      params: const YoutubePlayerParams(
+    final controller = _youtubeControllerFactory(
+      youtubeId,
+      const YoutubePlayerParams(
         showFullscreenButton: false,
         mute: false,
+        enableCaption: false,
         showControls: false,
         showVideoAnnotations: false,
         strictRelatedVideos: true,
-        pointerEvents: PointerEvents.initial,
+        pointerEvents: PointerEvents.none,
         enableKeyboard: false,
+        videoStateUpdateInterval: 250,
       ),
     );
-    adapter = CourseYoutubeAdapter(ytController!);
+    ytController = controller;
+    _youtubeControllerCreationCount++;
+    _debugYoutubeLog(
+      'controllerCreated count=$_youtubeControllerCreationCount '
+      'state=${controller.value.playerState.name} positionMs=0 durationMs=0 buffering=false',
+    );
+    adapter = CourseYoutubeAdapter(controller);
     notifyListeners();
 
-    ytController!.listen((value) {
-      bool needsNotify = false;
+    _youtubeValueSubscription = controller.listen((value) {
+      if (!_isCurrentSession(url, generation) || ytController != controller) {
+        return;
+      }
+
+      final currentAdapter = adapter;
+      _debugYoutubeLog(
+        'state=${value.playerState.name} errorCode=${value.error.code} '
+        'positionMs=${currentAdapter?.position.inMilliseconds ?? 0} '
+        'durationMs=${currentAdapter?.duration.inMilliseconds ?? 0} '
+        'buffering=${currentAdapter?.isBuffering ?? false}',
+      );
 
       if (value.error != YoutubeError.none && errorMessage == null) {
-        _handleError(
-          'عذراً، حدثت مشكلة في تحميل هذا الفيديو. (السبب: ${value.error.name})',
-          url,
-        );
+        unawaited(_handleYoutubeError(value.error, url, generation));
+        return;
       }
 
       if (isInitializing &&
           (value.playerState == PlayerState.playing ||
               value.playerState == PlayerState.paused)) {
+        _networkTimer?.cancel();
         isInitializing = false;
-        needsNotify = true;
+        notifyListeners();
       }
-
-      if (needsNotify) notifyListeners();
     });
   }
 
-  void _initNative(String url) {
+  Future<void> _handleYoutubeError(
+    YoutubeError error,
+    String url,
+    int generation,
+  ) async {
+    if (!_isCurrentSession(url, generation) || errorMessage != null) return;
+
+    _debugYoutubeLog('fatalError code=${error.code} error=${error.name}');
+    final hasInternet = await _hasInternetConnection();
+    if (!_isCurrentSession(url, generation)) return;
+
+    errorMessage = !hasInternet
+        ? 'لا يوجد اتصال بالإنترنت، تأكد من اتصالك وحاول مرة أخرى.'
+        : switch (error) {
+            YoutubeError.invalidParam => 'رابط فيديو YouTube غير صالح (رمز 2).',
+            YoutubeError.html5Error => 'واجه مشغل YouTube خطأ HTML5 (رمز 5).',
+            YoutubeError.videoNotFound || YoutubeError.cannotFindVideo =>
+              'فيديو YouTube غير موجود أو خاص (رمز ${error.code}).',
+            YoutubeError.notEmbeddable ||
+            YoutubeError.sameAsNotEmbeddable ||
+            YoutubeError.sameAsNotEmbeddable2 =>
+              'مالك الفيديو لا يسمح بتشغيله داخل التطبيق (رمز ${error.code}).',
+            YoutubeError.none => 'حدث خطأ غير متوقع في مشغل YouTube.',
+            YoutubeError.unknown =>
+              'أبلغ YouTube عن خطأ غير معروف. تعذر على إصدار المشغل الحالي تحديد رمزه.',
+          };
+    isInitializing = false;
+    _networkTimer?.cancel();
+    notifyListeners();
+    await _disposePlayers(keepScreenProtection: true);
+  }
+
+  void _initNative(String url, int generation) {
     nativeController = VideoPlayerController.networkUrl(Uri.parse(url));
     final controller = nativeController!;
 
     controller
         .initialize()
-        .then((_) {
+        .then((_) async {
           if (nativeController != controller) return;
+
+          final resumePosition = _nativeResumePosition;
+          final resumePlayback = _nativeResumePlayback;
+          _nativeResumePosition = null;
+          _nativeResumePlayback = false;
+
+          if (resumePosition != null && resumePosition > Duration.zero) {
+            await controller.seekTo(resumePosition);
+            if (resumePlayback) await controller.play();
+          }
+
+          _nativeRecoveryInProgress = false;
           isInitializing = false;
           notifyListeners();
         })
         .catchError((e) {
           if (nativeController != controller) return;
-          _handleError('عذراً، تعذر تشغيل الفيديو.', url);
+          unawaited(
+            _handleError('عذراً، تعذر تشغيل الفيديو.', url, generation),
+          );
         });
     controller.addListener(() {
       if (nativeController != controller) return;
       if (controller.value.hasError && errorMessage == null) {
-        _handleError(
-          'عذراً، انقطع الاتصال أو حدث خطأ أثناء تشغيل الفيديو.',
-          url,
-        );
+        if (_nativeRecoveryInProgress) {
+          _handleError(
+            'عذراً، انقطع الاتصال أو حدث خطأ أثناء تشغيل الفيديو.',
+            url,
+            generation,
+          );
+        } else {
+          unawaited(_recoverNativePlayback(url, generation, controller));
+        }
       }
     });
     adapter = CourseNativeAdapter(controller);
     notifyListeners();
   }
 
-  void _initWebView(String url, {bool isVimeo = false}) {
+  Future<void> _recoverNativePlayback(
+    String url,
+    int generation,
+    VideoPlayerController failedController,
+  ) async {
+    if (_nativeRecoveryInProgress || !_isCurrentSession(url, generation)) {
+      return;
+    }
+
+    _nativeRecoveryInProgress = true;
+    _nativeResumePosition = failedController.value.position;
+    _nativeResumePlayback = failedController.value.isPlaying;
+    isInitializing = true;
+    _networkTimer?.cancel();
+    notifyListeners();
+
+    await _disposePlayers(keepScreenProtection: true);
+    if (!_isCurrentSession(url, generation)) {
+      _nativeRecoveryInProgress = false;
+      _nativeResumePosition = null;
+      _nativeResumePlayback = false;
+      return;
+    }
+
+    _startTimeoutTimer(url, generation);
+    _initNative(url, generation);
+  }
+
+  void _initWebView(String url, int generation, {bool isVimeo = false}) {
     debugPrint('Init WebView with URL: $url (isVimeo: $isVimeo)');
 
     webViewController = WebViewController()
@@ -287,6 +438,7 @@ class CourseVideoPlayerManager extends ChangeNotifier {
             _handleError(
               'عذراً، حدثت مشكلة أثناء تحميل الفيديو. يرجى المحاولة مرة أخرى.',
               url,
+              generation,
             );
           }
         },
@@ -332,35 +484,44 @@ class CourseVideoPlayerManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _disposePlayers({bool keepScreenProtection = false}) {
+  Future<void> _disposePlayers({bool keepScreenProtection = false}) async {
     isExitingFullScreen = false;
     playerKey = GlobalKey(); // Force widget tree to drop the old player state
 
     adapter?.disposeAdapter();
     adapter = null;
 
-    try {
-      ytController?.close();
-    } catch (e) {
-      debugPrint('YoutubePlayer close exception: $e');
-    }
-    ytController = null;
+    final youtubeSubscription = _youtubeValueSubscription;
+    _youtubeValueSubscription = null;
+    await youtubeSubscription?.cancel();
 
-    nativeController?.dispose();
+    final youtubeController = ytController;
+    ytController = null;
+    if (youtubeController != null) {
+      try {
+        await youtubeController.close();
+      } catch (e) {
+        debugPrint('YoutubePlayer close exception: $e');
+      }
+    }
+
+    final previousNativeController = nativeController;
     nativeController = null;
+    await previousNativeController?.dispose();
 
     webViewController = null;
 
     if (!keepScreenProtection) {
-      CourseVideoScreenSecurity.disable();
+      await _disableScreenProtection();
     }
   }
 
   @override
   void dispose() {
     _isDisposed = true;
+    _initializationGeneration++;
     _networkTimer?.cancel();
-    _disposePlayers();
+    unawaited(_disposePlayers());
     super.dispose();
   }
 

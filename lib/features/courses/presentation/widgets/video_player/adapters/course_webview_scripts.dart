@@ -79,6 +79,13 @@ class CourseWebViewScripts {
     return 'var v = document.querySelector(\'video\'); if (v) v.volume = $vol;';
   }
 
+  static String setPlaybackSpeedScript(double speed, {required bool isVimeo}) {
+    if (isVimeo) {
+      return 'if(window.flutterPlaybackSpeed) window.flutterPlaybackSpeed($speed);';
+    }
+    return 'var v = document.querySelector(\'video\'); if (v) v.playbackRate = $speed;';
+  }
+
   static String toggleMuteScript(bool newMuted, {required bool isVimeo}) {
     if (isVimeo) {
       return 'if(window.flutterVolume) window.flutterVolume(${newMuted ? 0.0 : 1.0});';

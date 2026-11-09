@@ -15,6 +15,7 @@ class CourseWebViewAdapter extends CourseVideoAdapter {
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   double _volume = 1.0;
+  double _playbackSpeed = 1.0;
   bool _isMuted = false;
   bool hasError = false;
   int _errorConsecutiveCount = 0;
@@ -105,6 +106,9 @@ class CourseWebViewAdapter extends CourseVideoAdapter {
   double get volume => _isMuted ? 0.0 : _volume;
 
   @override
+  double get playbackSpeed => _playbackSpeed;
+
+  @override
   void play() {
     controller.runJavaScript(CourseWebViewScripts.playScript(isVimeo: isVimeo));
     _isPlaying = true;
@@ -113,7 +117,9 @@ class CourseWebViewAdapter extends CourseVideoAdapter {
 
   @override
   void pause() {
-    controller.runJavaScript(CourseWebViewScripts.pauseScript(isVimeo: isVimeo));
+    controller.runJavaScript(
+      CourseWebViewScripts.pauseScript(isVimeo: isVimeo),
+    );
     _isPlaying = false;
     notifyListeners();
   }
@@ -145,6 +151,15 @@ class CourseWebViewAdapter extends CourseVideoAdapter {
     controller.runJavaScript(
       CourseWebViewScripts.setVolumeScript(vol, isVimeo: isVimeo),
     );
+  }
+
+  @override
+  void setPlaybackSpeed(double speed) {
+    _playbackSpeed = speed;
+    controller.runJavaScript(
+      CourseWebViewScripts.setPlaybackSpeedScript(speed, isVimeo: isVimeo),
+    );
+    notifyListeners();
   }
 
   @override

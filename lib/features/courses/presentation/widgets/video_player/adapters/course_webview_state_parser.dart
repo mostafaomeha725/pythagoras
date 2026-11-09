@@ -51,10 +51,7 @@ class CourseWebViewStateParser {
       if (data.containsKey('error')) {
         final errorMsg = data['error']?.toString();
         debugPrint('[WEBVIEW] JS ERROR: $errorMsg');
-        return CourseWebViewVideoState(
-          hasError: true,
-          errorMessage: errorMsg,
-        );
+        return CourseWebViewVideoState(hasError: true, errorMessage: errorMsg);
       }
 
       final paused = data['paused'] == true;

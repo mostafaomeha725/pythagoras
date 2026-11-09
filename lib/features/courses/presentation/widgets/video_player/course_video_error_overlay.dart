@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pythagoras/core/theme/styles.dart';
+import 'package:pythagoras/core/utils/responsive_helper.dart';
 import 'package:pythagoras/core/widgets/custom_text.dart';
 
 class CourseVideoErrorOverlay extends StatelessWidget {
@@ -16,6 +17,9 @@ class CourseVideoErrorOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isNetworkError = errorMessage.contains('الإنترنت');
+    final isTablet = ResponsiveHelper.isTablet(context);
+
     return ClipRRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
@@ -35,17 +39,57 @@ class CourseVideoErrorOverlay extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  Icons.videocam_off_rounded,
+                  isNetworkError
+                      ? Icons.wifi_off_rounded
+                      : Icons.videocam_off_rounded,
                   color: Colors.redAccent,
                   size: 28.w,
                 ),
               ),
               SizedBox(height: 12.h),
               AppText(
-                'عذراً، تعذر تشغيل الفيديو',
-                style: font16w700.copyWith(color: Colors.white),
+                errorMessage,
+                style: font16w700.copyWith(
+                  color: Colors.white,
+                  fontSize: isTablet ? 14 : 16.sp,
+                  height: 1.3,
+                ),
                 alignment: AlignmentDirectional.center,
                 textAlign: TextAlign.center,
+                maxLines: 2,
+              ),
+              SizedBox(height: isTablet ? 16.h : 20.h),
+              SizedBox(
+                width: isTablet ? 190 : 180.w,
+                height: 44,
+                child: TextButton.icon(
+                  onPressed: onRetry,
+                  icon: Icon(Icons.refresh_rounded, size: isTablet ? 18 : 20.w),
+                  label: Text(
+                    'إعادة المحاولة',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: font14w700.copyWith(
+                      color: Colors.white,
+                      fontSize: isTablet ? 14 : 14.sp,
+                      height: 1.1,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: Colors.white.withValues(alpha: 0.14),
+                    minimumSize: Size.zero,
+                    padding: EdgeInsets.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10.r),
+                      side: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.28),
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

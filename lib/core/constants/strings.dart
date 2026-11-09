@@ -1,12 +1,12 @@
 class AppStrings {
   static const String baseUrl = 'https://neudrosi-pythagoras.com/backend/';
-  // static const String baseUrl =
-  //     'https://optima-software-solutions.com/pythagoras/';
+  //   static const String baseUrl =
+  //       'https://optima-software-solutions.com/pythagoras/';
 
   static const String notificationHubUrl =
       'https://primefit.runasp.net/hubs/notifications';
   static const String googleServerClientId =
-      '127516870517-pidtbq98rf0lbkldl0bb2enm1l52aq70.apps.googleusercontent.com';
+      '127516870517-pidtbq98rf0lbklpdl0bb2enm1l52aq70.apps.googleusercontent.com';
   static const String androidApplicationId = 'com.example.gymbook';
   static const String androidDebugSha1 =
       'D9:F9:5D:EC:28:B0:69:E4:85:42:35:80:CB:8F:68:7A:2D:C5:EF:0E';

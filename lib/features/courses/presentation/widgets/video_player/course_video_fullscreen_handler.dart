@@ -66,7 +66,9 @@ class CourseVideoFullscreenHandler {
   }) async {
     if (!manager.isFullScreen) {
       final bool wasPlaying = manager.adapter?.isPlaying ?? false;
-      if (wasPlaying) {
+      final bool isIOS = !kIsWeb && Platform.isIOS;
+      final bool needsPlaybackWorkaround = wasPlaying && isIOS;
+      if (needsPlaybackWorkaround) {
         manager.adapter?.pause();
       }
 
@@ -82,12 +84,18 @@ class CourseVideoFullscreenHandler {
 
       Navigator.of(context, rootNavigator: true).push(
         PageRouteBuilder(
-          opaque: false, // Keeps the underlying route in the render tree to prevent Surface detachment
+          opaque:
+              false, // Keeps the underlying route in the render tree to prevent Surface detachment
           fullscreenDialog: true,
-          transitionDuration: const Duration(milliseconds: 250),
-          reverseTransitionDuration: const Duration(milliseconds: 250),
+          transitionDuration: const Duration(milliseconds: 220),
+          reverseTransitionDuration: const Duration(milliseconds: 180),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(opacity: animation, child: child);
+            final easedAnimation = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            );
+            return FadeTransition(opacity: easedAnimation, child: child);
           },
           pageBuilder: (context, animation, secondaryAnimation) {
             return PopScope(
@@ -112,10 +120,8 @@ class CourseVideoFullscreenHandler {
                           Positioned.fill(
                             child: CourseVideoErrorOverlay(
                               errorMessage: manager.errorMessage!,
-                              onRetry: () => manager.initPlayer(
-                                videoUrl,
-                                videoType,
-                              ),
+                              onRetry: () =>
+                                  manager.initPlayer(videoUrl, videoType),
                             ),
                           ),
                         ],
@@ -126,10 +132,8 @@ class CourseVideoFullscreenHandler {
                         manager: manager,
                         videoUrl: videoUrl ?? '',
                         isFullscreenRoute: true,
-                        onToggleFullScreen: () => exitFullscreen(
-                          context: context,
-                          manager: manager,
-                        ),
+                        onToggleFullScreen: () =>
+                            exitFullscreen(context: context, manager: manager),
                       ),
                     );
                   },
@@ -146,7 +150,7 @@ class CourseVideoFullscreenHandler {
           // 3. NOW rotate the device. The Fullscreen Route will smoothly resize without overflowing!
           await SystemUiManager.enterFullscreen();
 
-          if (wasPlaying) {
+          if (needsPlaybackWorkaround) {
             Future.delayed(const Duration(milliseconds: 300), () {
               if (context.mounted) manager.adapter?.play();
             });

@@ -43,6 +43,7 @@ class CourseVimeoEmbedBuilder {
     window.flutterPause = function() { player.pause(); };
     window.flutterSeek = function(sec) { player.setCurrentTime(sec); };
     window.flutterVolume = function(vol) { player.setVolume(vol); };
+    window.flutterPlaybackSpeed = function(speed) { player.setPlaybackRate(speed); };
     
     player.getDuration().then(function(dur) {
         window.VimeoFlutterChannel.postMessage(JSON.stringify({

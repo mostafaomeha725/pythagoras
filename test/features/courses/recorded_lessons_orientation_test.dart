@@ -19,6 +19,7 @@ import 'package:pythagoras/features/courses/presentation/widgets/video_player/ad
 import 'package:pythagoras/features/courses/presentation/widgets/video_player/controls/course_video_bottom_controls.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/video_player/course_video_fullscreen_handler.dart';
 import 'package:pythagoras/features/courses/presentation/widgets/video_player/course_video_player_manager.dart';
+import 'package:pythagoras/features/courses/presentation/widgets/video_player/course_video_player_placeholder.dart';
 
 class FakeChapterVideosCubit extends Cubit<ChapterVideosState>
     implements ChapterVideosCubit {
@@ -58,9 +59,13 @@ class FakeVideoAdapter extends ChangeNotifier implements CourseVideoAdapter {
   @override
   Duration get position => const Duration(minutes: 59, seconds: 4);
   @override
+  Duration? get pendingSeekPosition => null;
+  @override
   Duration get duration => const Duration(minutes: 60, seconds: 23);
   @override
   double get volume => 1.0;
+  @override
+  bool get isMuted => false;
   @override
   bool get supportsPlayPause => true;
   @override
@@ -116,17 +121,18 @@ void main() {
   setUp(() {
     platformCalls.clear();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform,
-            (MethodCall methodCall) async {
-      platformCalls.add(methodCall);
-      return null;
-    });
+        .setMockMethodCallHandler(SystemChannels.platform, (
+          MethodCall methodCall,
+        ) async {
+          platformCalls.add(methodCall);
+          return null;
+        });
 
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
-      const MethodChannel('screen_protector'),
-      (MethodCall methodCall) async => null,
-    );
+          const MethodChannel('screen_protector'),
+          (MethodCall methodCall) async => null,
+        );
 
     if (sl.isRegistered<ChapterVideosCubit>()) {
       sl.unregister<ChapterVideosCubit>();
@@ -147,7 +153,10 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(SystemChannels.platform, null);
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(const MethodChannel('screen_protector'), null);
+        .setMockMethodCallHandler(
+          const MethodChannel('screen_protector'),
+          null,
+        );
 
     if (sl.isRegistered<ChapterVideosCubit>()) {
       sl.unregister<ChapterVideosCubit>();
@@ -161,41 +170,44 @@ void main() {
   });
 
   group('SystemUiManager Orientation Lifecycle Tests', () {
-    test('enterFullscreen locks to landscape and sets immersiveSticky',
-        () async {
-      await SystemUiManager.enterFullscreen();
+    test(
+      'enterFullscreen locks to landscape and sets immersiveSticky',
+      () async {
+        await SystemUiManager.enterFullscreen();
 
-      final orientationCall = platformCalls.firstWhere(
-        (c) => c.method == 'SystemChrome.setPreferredOrientations',
-      );
-      final List<dynamic> orientations = orientationCall.arguments as List;
-      expect(orientations, contains('DeviceOrientation.landscapeLeft'));
-      expect(orientations, contains('DeviceOrientation.landscapeRight'));
+        final orientationCall = platformCalls.firstWhere(
+          (c) => c.method == 'SystemChrome.setPreferredOrientations',
+        );
+        final List<dynamic> orientations = orientationCall.arguments as List;
+        expect(orientations, contains('DeviceOrientation.landscapeLeft'));
+        expect(orientations, contains('DeviceOrientation.landscapeRight'));
 
-      final uiModeCall = platformCalls.firstWhere(
-        (c) => c.method == 'SystemChrome.setEnabledSystemUIMode',
-      );
-      expect(uiModeCall.arguments, contains('immersiveSticky'));
-    });
+        final uiModeCall = platformCalls.firstWhere(
+          (c) => c.method == 'SystemChrome.setEnabledSystemUIMode',
+        );
+        expect(uiModeCall.arguments, contains('immersiveSticky'));
+      },
+    );
 
     test(
-        'exitFullscreen on Tablet in Landscape preserves landscape and does NOT force portrait',
-        () async {
-      platformCalls.clear();
-      await SystemUiManager.exitFullscreen(
-        isTablet: true,
-        targetOrientation: Orientation.landscape,
-      );
+      'exitFullscreen on Tablet in Landscape preserves landscape and does NOT force portrait',
+      () async {
+        platformCalls.clear();
+        await SystemUiManager.exitFullscreen(
+          isTablet: true,
+          targetOrientation: Orientation.landscape,
+        );
 
-      final orientationCall = platformCalls.firstWhere(
-        (c) => c.method == 'SystemChrome.setPreferredOrientations',
-      );
-      final List<dynamic> orientations = orientationCall.arguments as List;
-      expect(orientations, contains('DeviceOrientation.landscapeLeft'));
-      expect(orientations, contains('DeviceOrientation.landscapeRight'));
-      expect(orientations, isNot(contains('DeviceOrientation.portraitUp')));
-      expect(orientations, isNot(contains('DeviceOrientation.portraitDown')));
-    });
+        final orientationCall = platformCalls.firstWhere(
+          (c) => c.method == 'SystemChrome.setPreferredOrientations',
+        );
+        final List<dynamic> orientations = orientationCall.arguments as List;
+        expect(orientations, contains('DeviceOrientation.landscapeLeft'));
+        expect(orientations, contains('DeviceOrientation.landscapeRight'));
+        expect(orientations, isNot(contains('DeviceOrientation.portraitUp')));
+        expect(orientations, isNot(contains('DeviceOrientation.portraitDown')));
+      },
+    );
 
     test('exitFullscreen on Tablet in Portrait returns to portrait', () async {
       platformCalls.clear();
@@ -213,23 +225,26 @@ void main() {
       expect(orientations, isNot(contains('DeviceOrientation.landscapeLeft')));
     });
 
-    test('unlockOrientations resets orientation locks to allow sensor rotation',
-        () async {
-      platformCalls.clear();
-      await SystemUiManager.unlockOrientations();
+    test(
+      'unlockOrientations resets orientation locks to allow sensor rotation',
+      () async {
+        platformCalls.clear();
+        await SystemUiManager.unlockOrientations();
 
-      final orientationCall = platformCalls.firstWhere(
-        (c) => c.method == 'SystemChrome.setPreferredOrientations',
-      );
-      final List<dynamic> orientations = orientationCall.arguments as List;
-      expect(orientations, isEmpty);
-    });
+        final orientationCall = platformCalls.firstWhere(
+          (c) => c.method == 'SystemChrome.setPreferredOrientations',
+        );
+        final List<dynamic> orientations = orientationCall.arguments as List;
+        expect(orientations, isEmpty);
+      },
+    );
 
     test('exitFullscreen on Mobile strictly preserves portrait lock', () async {
       platformCalls.clear();
       await SystemUiManager.exitFullscreen(
         isTablet: false,
-        targetOrientation: Orientation.landscape, // Mobile ignores landscape target
+        targetOrientation:
+            Orientation.landscape, // Mobile ignores landscape target
       );
 
       final orientationCall = platformCalls.firstWhere(
@@ -244,282 +259,330 @@ void main() {
 
   group('CourseVideoFullscreenHandler Tablet Lifecycle Tests', () {
     testWidgets(
-        'Tablet Landscape: exits fullscreen without forcing portrait, then unlocks orientations',
-        (tester) async {
-      tester.view.physicalSize = const Size(1280, 800);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+      'Tablet Landscape: exits fullscreen without forcing portrait, then unlocks orientations',
+      (tester) async {
+        tester.view.physicalSize = const Size(1280, 800);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
 
-      final manager = CourseVideoPlayerManager();
-      addTearDown(manager.dispose);
+        final manager = CourseVideoPlayerManager();
+        addTearDown(manager.dispose);
 
-      late BuildContext testContext;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Builder(
-            builder: (ctx) {
-              testContext = ctx;
-              return const Scaffold(body: Text('Test'));
-            },
+        late BuildContext testContext;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Builder(
+              builder: (ctx) {
+                testContext = ctx;
+                return const Scaffold(body: Text('Test'));
+              },
+            ),
           ),
-        ),
-      );
-      await tester.pump();
+        );
+        await tester.pump();
 
-      // Enter fullscreen
-      await CourseVideoFullscreenHandler.toggleFullscreen(
-        context: testContext,
-        manager: manager,
-        videoUrl: 'https://example.com/video.mp4',
-        videoType: 'native',
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+        // Enter fullscreen
+        await CourseVideoFullscreenHandler.toggleFullscreen(
+          context: testContext,
+          manager: manager,
+          videoUrl: 'https://example.com/video.mp4',
+          videoType: 'native',
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
 
-      expect(manager.wasTablet, isTrue);
-      expect(manager.preFullscreenOrientation, equals(Orientation.landscape));
-      expect(manager.isFullScreen, isTrue);
+        expect(manager.wasTablet, isTrue);
+        expect(manager.preFullscreenOrientation, equals(Orientation.landscape));
+        expect(manager.isFullScreen, isTrue);
 
-      platformCalls.clear();
+        platformCalls.clear();
 
-      // Exit fullscreen
-      CourseVideoFullscreenHandler.exitFullscreen(
-        context: testContext,
-        manager: manager,
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.pump(const Duration(milliseconds: 300));
+        // Exit fullscreen
+        CourseVideoFullscreenHandler.exitFullscreen(
+          context: testContext,
+          manager: manager,
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pump(const Duration(milliseconds: 300));
 
-      expect(manager.isFullScreen, isFalse);
+        expect(manager.isFullScreen, isFalse);
 
-      final orientationCalls = platformCalls
-          .where((c) => c.method == 'SystemChrome.setPreferredOrientations')
-          .toList();
-      expect(orientationCalls, isNotEmpty);
+        final orientationCalls = platformCalls
+            .where((c) => c.method == 'SystemChrome.setPreferredOrientations')
+            .toList();
+        expect(orientationCalls, isNotEmpty);
 
-      // Verify that landscape was restored
-      final firstCallOrientations = orientationCalls.first.arguments as List;
-      expect(firstCallOrientations, contains('DeviceOrientation.landscapeLeft'));
-      expect(firstCallOrientations, isNot(contains('DeviceOrientation.portraitUp')));
+        // Verify that landscape was restored
+        final firstCallOrientations = orientationCalls.first.arguments as List;
+        expect(
+          firstCallOrientations,
+          contains('DeviceOrientation.landscapeLeft'),
+        );
+        expect(
+          firstCallOrientations,
+          isNot(contains('DeviceOrientation.portraitUp')),
+        );
 
-      // Verify that unlockOrientations (empty list) was called subsequently
-      final lastCallOrientations = orientationCalls.last.arguments as List;
-      expect(lastCallOrientations, isEmpty);
-    });
+        // Verify that unlockOrientations (empty list) was called subsequently
+        final lastCallOrientations = orientationCalls.last.arguments as List;
+        expect(lastCallOrientations, isEmpty);
+      },
+    );
 
     testWidgets(
-        'Tablet Portrait: exits fullscreen to portrait, then unlocks orientations',
-        (tester) async {
-      tester.view.physicalSize = const Size(768, 1024);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+      'Tablet Portrait: exits fullscreen to portrait, then unlocks orientations',
+      (tester) async {
+        tester.view.physicalSize = const Size(768, 1024);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
 
-      final manager = CourseVideoPlayerManager();
-      addTearDown(manager.dispose);
+        final manager = CourseVideoPlayerManager();
+        addTearDown(manager.dispose);
 
-      late BuildContext testContext;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Builder(
-            builder: (ctx) {
-              testContext = ctx;
-              return const Scaffold(body: Text('Test'));
-            },
+        late BuildContext testContext;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Builder(
+              builder: (ctx) {
+                testContext = ctx;
+                return const Scaffold(body: Text('Test'));
+              },
+            ),
           ),
-        ),
-      );
-      await tester.pump();
+        );
+        await tester.pump();
 
-      // Enter fullscreen from portrait
-      await CourseVideoFullscreenHandler.toggleFullscreen(
-        context: testContext,
-        manager: manager,
-        videoUrl: 'https://example.com/video.mp4',
-        videoType: 'native',
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+        // Enter fullscreen from portrait
+        await CourseVideoFullscreenHandler.toggleFullscreen(
+          context: testContext,
+          manager: manager,
+          videoUrl: 'https://example.com/video.mp4',
+          videoType: 'native',
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
 
-      expect(manager.wasTablet, isTrue);
-      expect(manager.preFullscreenOrientation, equals(Orientation.portrait));
-      expect(manager.isFullScreen, isTrue);
+        expect(manager.wasTablet, isTrue);
+        expect(manager.preFullscreenOrientation, equals(Orientation.portrait));
+        expect(manager.isFullScreen, isTrue);
 
-      platformCalls.clear();
+        platformCalls.clear();
 
-      // Exit fullscreen
-      CourseVideoFullscreenHandler.exitFullscreen(
-        context: testContext,
-        manager: manager,
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.pump(const Duration(milliseconds: 300));
+        // Exit fullscreen
+        CourseVideoFullscreenHandler.exitFullscreen(
+          context: testContext,
+          manager: manager,
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pump(const Duration(milliseconds: 300));
 
-      expect(manager.isFullScreen, isFalse);
+        expect(manager.isFullScreen, isFalse);
 
-      final orientationCalls = platformCalls
-          .where((c) => c.method == 'SystemChrome.setPreferredOrientations')
-          .toList();
-      expect(orientationCalls, isNotEmpty);
+        final orientationCalls = platformCalls
+            .where((c) => c.method == 'SystemChrome.setPreferredOrientations')
+            .toList();
+        expect(orientationCalls, isNotEmpty);
 
-      // First call rotates back to portrait
-      final firstCallOrientations = orientationCalls.first.arguments as List;
-      expect(firstCallOrientations, contains('DeviceOrientation.portraitUp'));
+        // First call rotates back to portrait
+        final firstCallOrientations = orientationCalls.first.arguments as List;
+        expect(firstCallOrientations, contains('DeviceOrientation.portraitUp'));
 
-      // Final call unlocks orientations
-      final lastCallOrientations = orientationCalls.last.arguments as List;
-      expect(lastCallOrientations, isEmpty);
-    });
+        // Final call unlocks orientations
+        final lastCallOrientations = orientationCalls.last.arguments as List;
+        expect(lastCallOrientations, isEmpty);
+      },
+    );
   });
 
   group('CourseRecordedLessonsScreen Responsive Layout Tests', () {
     testWidgets(
-        'Tablet Landscape (1024x768): renders CourseRecordedLessonsTabletLandscape',
-        (tester) async {
-      tester.view.physicalSize = const Size(1024, 768);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+      'Tablet Landscape (1024x768): renders CourseRecordedLessonsTabletLandscape',
+      (tester) async {
+        tester.view.physicalSize = const Size(1024, 768);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.pumpWidget(
-        createScreenTestWidget(surfaceSize: const Size(1024, 768)),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+        await tester.pumpWidget(
+          createScreenTestWidget(surfaceSize: const Size(1024, 768)),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.byType(CourseRecordedLessonsTabletLandscape), findsOneWidget);
-      expect(find.byType(CourseRecordedLessonsScreenBody), findsNothing);
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets(
-        'Small Tablet Landscape WSVGA (1024x600): correctly renders CourseRecordedLessonsTabletLandscape',
-        (tester) async {
-      tester.view.physicalSize = const Size(1024, 600);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-
-      await tester.pumpWidget(
-        createScreenTestWidget(surfaceSize: const Size(1024, 600)),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-
-      expect(find.byType(CourseRecordedLessonsTabletLandscape), findsOneWidget);
-      expect(find.byType(CourseRecordedLessonsScreenBody), findsNothing);
-      expect(tester.takeException(), isNull);
-    });
+        expect(
+          find.byType(CourseRecordedLessonsTabletLandscape),
+          findsOneWidget,
+        );
+        expect(find.byType(CourseRecordedLessonsScreenBody), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
 
     testWidgets(
-        'Tablet Portrait (768x1024): renders CourseRecordedLessonsScreenBody and AppBar',
-        (tester) async {
-      tester.view.physicalSize = const Size(768, 1024);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+      'Small Tablet Landscape WSVGA (1024x600): correctly renders CourseRecordedLessonsTabletLandscape',
+      (tester) async {
+        tester.view.physicalSize = const Size(1024, 600);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.pumpWidget(
-        createScreenTestWidget(surfaceSize: const Size(768, 1024)),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+        await tester.pumpWidget(
+          createScreenTestWidget(surfaceSize: const Size(1024, 600)),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.byType(CourseDetailAppBar), findsOneWidget);
-      expect(find.byType(CourseRecordedLessonsScreenBody), findsOneWidget);
-      expect(find.byType(CourseRecordedLessonsTabletLandscape), findsNothing);
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets(
-        'Mobile Portrait (412x915): renders CourseRecordedLessonsScreenBody and AppBar',
-        (tester) async {
-      tester.view.physicalSize = const Size(412, 915);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-
-      await tester.pumpWidget(
-        createScreenTestWidget(surfaceSize: const Size(412, 915)),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-
-      expect(find.byType(CourseDetailAppBar), findsOneWidget);
-      expect(find.byType(CourseRecordedLessonsScreenBody), findsOneWidget);
-      expect(find.byType(CourseRecordedLessonsTabletLandscape), findsNothing);
-      expect(tester.takeException(), isNull);
-    });
+        expect(
+          find.byType(CourseRecordedLessonsTabletLandscape),
+          findsOneWidget,
+        );
+        expect(find.byType(CourseRecordedLessonsScreenBody), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
 
     testWidgets(
-        'Mobile Landscape (844x390): maintains mobile layout without switching to tablet',
-        (tester) async {
-      tester.view.physicalSize = const Size(844, 390);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+      'Tablet Portrait (768x1024): renders CourseRecordedLessonsScreenBody and AppBar',
+      (tester) async {
+        tester.view.physicalSize = const Size(768, 1024);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.pumpWidget(
-        createScreenTestWidget(surfaceSize: const Size(844, 390)),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+        await tester.pumpWidget(
+          createScreenTestWidget(surfaceSize: const Size(768, 1024)),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.byType(CourseDetailAppBar), findsOneWidget);
-      expect(find.byType(CourseRecordedLessonsScreenBody), findsOneWidget);
-      expect(find.byType(CourseRecordedLessonsTabletLandscape), findsNothing);
-      // Draining any vertical RenderFlex overflow caused by synthetic 390px mobile height
-      tester.takeException();
-    });
+        expect(find.byType(CourseDetailAppBar), findsOneWidget);
+        expect(find.byType(CourseRecordedLessonsScreenBody), findsOneWidget);
+        expect(find.byType(CourseRecordedLessonsTabletLandscape), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'Mobile Portrait (412x915): renders CourseRecordedLessonsScreenBody and AppBar',
+      (tester) async {
+        tester.view.physicalSize = const Size(412, 915);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          createScreenTestWidget(surfaceSize: const Size(412, 915)),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+
+        expect(find.byType(CourseDetailAppBar), findsOneWidget);
+        expect(find.byType(CourseRecordedLessonsScreenBody), findsOneWidget);
+        expect(find.byType(CourseRecordedLessonsTabletLandscape), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'Mobile Landscape (844x390): maintains mobile layout without switching to tablet',
+      (tester) async {
+        tester.view.physicalSize = const Size(844, 390);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          createScreenTestWidget(surfaceSize: const Size(844, 390)),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+
+        expect(find.byType(CourseDetailAppBar), findsOneWidget);
+        expect(find.byType(CourseRecordedLessonsScreenBody), findsOneWidget);
+        expect(find.byType(CourseRecordedLessonsTabletLandscape), findsNothing);
+        // Draining any vertical RenderFlex overflow caused by synthetic 390px mobile height
+        tester.takeException();
+      },
+    );
   });
 
-  group('CourseVideoBottomControls Time Text Tests', () {
-    testWidgets('Tablet: time text uses balanced fontSize: 13 instead of bloated .sp',
-        (tester) async {
-      tester.view.physicalSize = const Size(1024, 768);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-
-      final adapter = FakeVideoAdapter();
-
+  testWidgets('video card is taller only on mobile portrait', (tester) async {
+    Future<void> expectRatio(Size size, double expectedRatio) async {
       await tester.pumpWidget(
         MediaQuery(
-          data: const MediaQueryData(size: Size(1024, 768)),
+          data: MediaQueryData(size: size),
           child: ScreenUtilInit(
             designSize: const Size(420, 910),
-            builder: (context, _) => MaterialApp(
-              home: Scaffold(
-                body: Stack(
-                  children: [
-                    CourseVideoBottomControls(
-                      adapter: adapter,
-                      isFullScreen: false,
-                      onToggleFullScreen: () {},
-                    ),
-                  ],
-                ),
-              ),
+            builder: (context, child) => MaterialApp(
+              home: Scaffold(body: CourseVideoPlayerPlaceholder(imageUrl: '')),
             ),
           ),
         ),
       );
       await tester.pump();
 
-      final textFinder = find.byWidgetPredicate(
-        (widget) => widget is AppText && widget.text.contains('59:04'),
+      final aspectRatio = tester.widget<AspectRatio>(
+        find.byType(AspectRatio).first,
       );
-      expect(textFinder, findsOneWidget);
+      expect(aspectRatio.aspectRatio, expectedRatio);
+    }
 
-      final appText = tester.widget<AppText>(textFinder);
-      expect(appText.style?.fontSize, equals(13.0));
-    });
+    await expectRatio(const Size(400, 800), 16 / 10);
+    await expectRatio(const Size(800, 400), 16 / 9);
+    await expectRatio(const Size(800, 1200), 16 / 9);
+  });
 
-    testWidgets('Mobile: time text preserves mobile font12w400 style',
-        (tester) async {
+  group('CourseVideoBottomControls Time Text Tests', () {
+    testWidgets(
+      'Tablet: time text uses balanced fontSize: 13 instead of bloated .sp',
+      (tester) async {
+        tester.view.physicalSize = const Size(1024, 768);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final adapter = FakeVideoAdapter();
+
+        await tester.pumpWidget(
+          MediaQuery(
+            data: const MediaQueryData(size: Size(1024, 768)),
+            child: ScreenUtilInit(
+              designSize: const Size(420, 910),
+              builder: (context, _) => MaterialApp(
+                home: Scaffold(
+                  body: Stack(
+                    children: [
+                      CourseVideoBottomControls(
+                        adapter: adapter,
+                        isFullScreen: false,
+                        onToggleFullScreen: () {},
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        final textFinder = find.byWidgetPredicate(
+          (widget) => widget is AppText && widget.text.contains('59:04'),
+        );
+        expect(textFinder, findsOneWidget);
+
+        final appText = tester.widget<AppText>(textFinder);
+        expect(appText.style?.fontSize, equals(13.0));
+      },
+    );
+
+    testWidgets('Mobile: time text preserves mobile font12w400 style', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(412, 915);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
