@@ -3,12 +3,14 @@ import 'package:equatable/equatable.dart';
 class RemoteConfigState extends Equatable {
   final bool iosIapEnabled;
   final bool courseLessonRequestsEnabled;
+  final bool deleteAccountEnabled;
   final bool isLoading;
   final String? errorMessage;
 
   const RemoteConfigState({
     this.iosIapEnabled = false,
     this.courseLessonRequestsEnabled = true,
+    this.deleteAccountEnabled = true,
     this.isLoading = false,
     this.errorMessage,
   });
@@ -16,6 +18,7 @@ class RemoteConfigState extends Equatable {
   RemoteConfigState copyWith({
     bool? iosIapEnabled,
     bool? courseLessonRequestsEnabled,
+    bool? deleteAccountEnabled,
     bool? isLoading,
     String? errorMessage,
     bool clearErrorMessage = false,
@@ -24,6 +27,7 @@ class RemoteConfigState extends Equatable {
       iosIapEnabled: iosIapEnabled ?? this.iosIapEnabled,
       courseLessonRequestsEnabled:
           courseLessonRequestsEnabled ?? this.courseLessonRequestsEnabled,
+      deleteAccountEnabled: deleteAccountEnabled ?? this.deleteAccountEnabled,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearErrorMessage
           ? null
@@ -35,6 +39,7 @@ class RemoteConfigState extends Equatable {
   List<Object?> get props => [
     iosIapEnabled,
     courseLessonRequestsEnabled,
+    deleteAccountEnabled,
     isLoading,
     errorMessage,
   ];

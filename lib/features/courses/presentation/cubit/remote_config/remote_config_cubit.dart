@@ -10,6 +10,7 @@ class RemoteConfigCubit extends Cubit<RemoteConfigState> {
   Future<void>? _loadFuture;
   StreamSubscription<bool>? _updatesSubscription;
   StreamSubscription<bool>? _courseLessonRequestsSubscription;
+  StreamSubscription<bool>? _deleteAccountSubscription;
 
   RemoteConfigCubit({required this.remoteConfigService})
     : super(const RemoteConfigState());
@@ -39,11 +40,21 @@ class RemoteConfigCubit extends Cubit<RemoteConfigState> {
                   remoteConfigService.courseLessonRequestsEnabled,
                 ),
           );
+      _deleteAccountSubscription ??= remoteConfigService
+          .deleteAccountEnabledChanges
+          .listen(
+            _emitDeleteAccountState,
+            onError: (Object error, StackTrace stackTrace) =>
+                _emitDeleteAccountState(
+                  remoteConfigService.deleteAccountEnabled,
+                ),
+          );
       emit(
         state.copyWith(
           iosIapEnabled: remoteConfigService.iosIapEnabled,
           courseLessonRequestsEnabled:
               remoteConfigService.courseLessonRequestsEnabled,
+          deleteAccountEnabled: remoteConfigService.deleteAccountEnabled,
           isLoading: false,
         ),
       );
@@ -82,10 +93,16 @@ class RemoteConfigCubit extends Cubit<RemoteConfigState> {
     );
   }
 
+  void _emitDeleteAccountState(bool enabled) {
+    if (isClosed) return;
+    emit(state.copyWith(deleteAccountEnabled: enabled, isLoading: false));
+  }
+
   @override
   Future<void> close() async {
     await _updatesSubscription?.cancel();
     await _courseLessonRequestsSubscription?.cancel();
+    await _deleteAccountSubscription?.cancel();
     return super.close();
   }
 }

@@ -19,8 +19,11 @@ class _RemoteConfigService extends RemoteConfigService {
   );
   final StreamController<bool> requestUpdates =
       StreamController<bool>.broadcast(sync: true);
+  final StreamController<bool> deleteAccountUpdates =
+      StreamController<bool>.broadcast(sync: true);
   bool iapEnabled = false;
   bool requestsEnabled = true;
+  bool deleteAccountFlagEnabled = true;
 
   _RemoteConfigService() : super(isIos: false);
 
@@ -37,6 +40,12 @@ class _RemoteConfigService extends RemoteConfigService {
   Stream<bool> get courseLessonRequestsEnabledChanges => requestUpdates.stream;
 
   @override
+  bool get deleteAccountEnabled => deleteAccountFlagEnabled;
+
+  @override
+  Stream<bool> get deleteAccountEnabledChanges => deleteAccountUpdates.stream;
+
+  @override
   Future<void> initialize() async {}
 
   void setIapEnabled(bool value) {
@@ -47,6 +56,11 @@ class _RemoteConfigService extends RemoteConfigService {
   void setRequestsEnabled(bool value) {
     requestsEnabled = value;
     requestUpdates.add(value);
+  }
+
+  void setDeleteAccountEnabled(bool value) {
+    deleteAccountFlagEnabled = value;
+    deleteAccountUpdates.add(value);
   }
 }
 
@@ -96,6 +110,23 @@ void main() {
   );
 
   test(
+    'delete account flag false is propagated to Remote Config state',
+    () async {
+      final service = _RemoteConfigService();
+      final cubit = RemoteConfigCubit(remoteConfigService: service);
+
+      await cubit.load();
+      expect(cubit.state.deleteAccountEnabled, isTrue);
+
+      service.setDeleteAccountEnabled(false);
+      expect(cubit.state.deleteAccountEnabled, isFalse);
+
+      await cubit.close();
+      await service.deleteAccountUpdates.close();
+    },
+  );
+
+  test(
     'Remote Config streams request changes independently of Apple IAP',
     () async {
       final service = _RemoteConfigService();
@@ -116,6 +147,7 @@ void main() {
       await cubit.close();
       await service.iapUpdates.close();
       await service.requestUpdates.close();
+      await service.deleteAccountUpdates.close();
     },
   );
 

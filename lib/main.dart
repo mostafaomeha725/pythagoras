@@ -5,7 +5,6 @@ import 'package:pythagoras/core/routes/app_routes.dart';
 import 'package:pythagoras/core/theme/light_colors.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -34,6 +33,14 @@ Future<void> main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+  } else if (defaultTargetPlatform == TargetPlatform.android) {
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    } catch (error) {
+      debugPrint('[Firebase] Android initialization skipped: $error');
+    }
   }
 
   PlatformDispatcher.instance.onError = (error, stack) {
@@ -64,7 +71,8 @@ Future<void> main() async {
   await Hive.openBox(HiveBoxes.cacheBox);
   await initializeDateFormatting('ar', null);
   await ServiceLocator().initDependencies();
-  if (defaultTargetPlatform == TargetPlatform.iOS) {
+  if (defaultTargetPlatform == TargetPlatform.iOS ||
+      defaultTargetPlatform == TargetPlatform.android) {
     unawaited(sl<RemoteConfigService>().initialize());
   }
 
